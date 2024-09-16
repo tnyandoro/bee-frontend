@@ -1,38 +1,101 @@
-.App {
+/* For the login page split layout */
+.mainContainer {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* Left side for the logo */
+.logoContainer {
+  width: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #f1f1f1;
+  ; /* Light gray background for logo */
+}
+
+.logoSize {
+  width: 400px; /* 128px wide, you can adjust this value */
+  height: auto; /* Maintain aspect ratio */
+}
+
+/* Right side for the form */
+.formContainer {
+  width: 50%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background-color: #247edf;
+}
+
+/* Title styles */
+.titleContainer {
+  font-size: 32px;
+  font-weight: bolder;
   text-align: center;
+  margin-bottom: 20px;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+/* Input box styles */
+.inputBox {
+  height: 48px;
+  width: 80%;
+  font-size: large;
+  border-radius: 8px;
+  border: 1px solid #063d77; /* Light gray border */
+  padding-left: 8px;
+  margin-bottom: 8px;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
+/* Error label styles */
+.inputContainer > .errorLabel {
+  color: red;
+  font-size: 12px;
+  margin-top: 4px;
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
+/* Button styles */
+.inputButton {
+  background-color: #02194c; /* Blue button */
+  color: white;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 18px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  width: 80%;
+}
+
+.inputButton:hover {
+  background-color: #1d4ed8; /* Darker blue on hover */
+}
+
+/* Flexbox containers for the form and logo */
+.inputContainer {
+  width: 80%;
+  display: flex;
+  flex-direction: column;
+}
+
+.buttonContainer {
+  margin-top: 16px;
+  width: 80%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
 }
 
-.App-link {
-  color: #61dafb;
-}
-
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
+@media (max-width: 768px) {
+  /* On smaller screens, stack the logo and form vertically */
+  .mainContainer {
+    flex-direction: column;
   }
-  to {
-    transform: rotate(360deg);
+
+  .logoContainer, .formContainer {
+    width: 100%;
   }
 }
