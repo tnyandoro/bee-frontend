@@ -1,7 +1,23 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import logo from '../assets/logor.png'; // Ensure your logo is available
-import backgroundImage from '../assets/landing.jpg'; // Add your background image
+
+// Fallback image URLs
+const fallbackLogo = 'https://via.placeholder.com/150?text=Logo'; // Replace with a real fallback image URL if needed
+const fallbackBackgroundImage = 'https://via.placeholder.com/1920x1080?text=Background'; // Replace with a real fallback image URL if needed';
+
+// Attempt to load actual assets with fallback handling
+let logo, backgroundImage;
+try {
+  logo = require('../assets/logor.png').default;
+} catch (e) {
+  logo = fallbackLogo;
+}
+
+try {
+  backgroundImage = require('../assets/landing.jpg').default;
+} catch (e) {
+  backgroundImage = fallbackBackgroundImage;
+}
 
 const Home = (props) => {
   const { loggedIn } = props;
@@ -39,7 +55,6 @@ const Home = (props) => {
         {/* White Description Text */}
         <p
           className="text-2xl text-white mb-8 text-center max-w-2xl"
-          //style={{ textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }} // Darker shadow for better contrast
         >
           A comprehensive IT Service Management platform to streamline your operations.
         </p>
