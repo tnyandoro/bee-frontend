@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import bg from '../bg.png';
+import bg from '../assets/bg.png';
 
 function AdminRegister() {
   const [name, setName] = useState('');
@@ -15,46 +15,6 @@ function AdminRegister() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // const handleSubmit = async (e) => {
-  //   e.preventDefault();
-  //   if (isSubmitting) return; // Prevent multiple submissions
-  //   if (password !== passwordConfirmation) {
-  //     setError('Passwords do not match');
-  //     return;
-  //   }
-
-  //   setIsSubmitting(true);
-  
-  //   try {
-  //     const response = await axios.post('http://localhost:3000/api/v1/admins/register', {
-  //       name,
-  //       email,
-  //       phone_number: phoneNumber,
-  //       website,
-  //       address,
-  //       subdomain,
-  //       password,
-  //       password_confirmation: passwordConfirmation,
-  //     });
-
-  //     // Store JWT token in localStorage
-  //     localStorage.setItem('token', response.data.token);
-
-  //     // Redirect to admin dashboard
-  //     window.location.href = '/admin/dashboard';
-
-  //   } catch (err) {
-  //     // Set a more specific error message if available
-  //     if (err.response && err.response.data && err.response.data.error) {
-  //       setError(err.response.data.error);
-  //     } else {
-  //       setError('Error during registration');
-  //     }
-  //   } finally {
-  //     setIsSubmitting(false); // Re-enable submission after request completes
-  //   }
-  // };
-  
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (isSubmitting) return;
@@ -79,9 +39,11 @@ function AdminRegister() {
       localStorage.setItem('token', response.data.token); // Store JWT
       window.location.href = '/admin/dashboard'; // Redirect to admin dashboard
     } catch (err) {
-      setError('Error during registration');
-    } finally {
-      setIsSubmitting(false); // Re-enable submission after request completes
+      if (err.response && err.response.data && err.response.data.errors) {
+        setError(err.response.data.errors.join(', ')); // Display specific backend errors
+      } else {
+        setError('Error during registration');
+      }
     }
   };
   
