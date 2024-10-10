@@ -1,23 +1,11 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import logo from '../assets/logor.png'; // Make sure the file exists in this path
+import backgroundImage from '../assets/landing.jpg'; // Make sure the file exists in this path
 
 // Fallback image URLs
 const fallbackLogo = 'https://via.placeholder.com/150?text=Logo'; // Replace with a real fallback image URL if needed
-const fallbackBackgroundImage = 'https://via.placeholder.com/1920x1080?text=Background'; // Replace with a real fallback image URL if needed';
-
-// Attempt to load actual assets with fallback handling
-let logo, backgroundImage;
-try {
-  logo = require('../assets/logor.png').default;
-} catch (e) {
-  logo = fallbackLogo;
-}
-
-try {
-  backgroundImage = require('../assets/landing.jpg').default;
-} catch (e) {
-  backgroundImage = fallbackBackgroundImage;
-}
+const fallbackBackgroundImage = 'https://via.placeholder.com/1920x1080?text=Background'; // Replace with a real fallback image URL if needed
 
 const Home = (props) => {
   const { loggedIn } = props;
@@ -38,7 +26,7 @@ const Home = (props) => {
   return (
     <div
       className="relative flex flex-col items-center min-h-screen bg-cover bg-center"
-      style={{ backgroundImage: `url(${backgroundImage})` }}
+      style={{ backgroundImage: `url(${backgroundImage || fallbackBackgroundImage})` }}
     >
       {/* Gray overlay with reduced opacity for better contrast */}
       <div className="absolute inset-0 bg-gray-900 opacity-40 z-0"></div>
@@ -47,15 +35,13 @@ const Home = (props) => {
       <div className="relative z-10 flex flex-col items-center justify-center min-h-[70vh] w-full px-4">
         {/* Logo Section */}
         <img
-          src={logo}
+          src={logo || fallbackLogo}
           alt="Resolve 360 Logo"
           className="w-96 mb-6 brightness-125" // Added brightness utility
         />
 
         {/* White Description Text */}
-        <p
-          className="text-2xl text-white mb-8 text-center max-w-2xl"
-        >
+        <p className="text-2xl text-white mb-8 text-center max-w-2xl">
           A comprehensive IT Service Management platform to streamline your operations.
         </p>
 
