@@ -27,18 +27,17 @@ const generateRandomSubject = () => {
 const generateRandomDate = () => {
   const now = new Date();
   const pastDate = new Date(now);
-  pastDate.setDate(now.getDate() - Math.floor(Math.random() * 30)); // Random date within the last 30 days
+  pastDate.setDate(now.getDate() - Math.floor(Math.random() * 30));
 
-  const hours = Math.floor(Math.random() * 24); // Random hour
-  const minutes = Math.floor(Math.random() * 60); // Random minutes
-  const formattedDate = pastDate.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+  const hours = Math.floor(Math.random() * 24);
+  const minutes = Math.floor(Math.random() * 60);
+  const formattedDate = pastDate.toISOString().split('T')[0];
   const formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} PM`;
 
   return `${formattedDate} ${formattedTime}`;
 };
 
 const Dashboard = () => {
-  // Dummy data for ticket counts
   const [ticketData, setTicketData] = useState({
     newTickets: 15,
     critical: 5,
@@ -47,12 +46,11 @@ const Dashboard = () => {
     missedSLA: 2,
   });
 
-  // State to store tickets
   const [tickets, setTickets] = useState(Array.from({ length: 50 }).map((_, index) => ({
     id: generateRandomTicketNumber(),
     subject: generateRandomSubject(),
     date: generateRandomDate(),
-    type: ['New', 'Critical', 'High', 'Breaching', 'Missed SLA'][Math.floor(Math.random() * 5)], // Random ticket type
+    type: ['New Tickets', 'Critical', 'High', 'Breaching in 2hrs', 'Missed SLA'][Math.floor(Math.random() * 5)],
     status: ['Open', 'In Progress', 'Resolved'][Math.floor(Math.random() * 3)],
     customer: `Customer ${index + 1}`,
     priority: ['Low', 'Medium', 'High', 'Critical'][Math.floor(Math.random() * 4)],
@@ -62,93 +60,58 @@ const Dashboard = () => {
     resolvedOn: generateRandomDate(),
   })));
 
-  const [selectedType, setSelectedType] = useState('All'); // To store the selected ticket type
-  const [selectedCategory, setSelectedCategory] = useState('Incident'); // New state for incident/request filter
-  const [searchQuery, setSearchQuery] = useState(''); // To store search query
-  const [currentPage, setCurrentPage] = useState(1); // To manage pagination
+  const [selectedType, setSelectedType] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
 
-  // Pagination variables
   const itemsPerPage = 10;
-  const totalPages = Math.ceil(tickets.length / itemsPerPage);
 
-  // Handler for filtering tickets by type
-  const handleFilter = (type) => {
-    setSelectedType(type);
+  const handleFilter = (title) => {
+    setSelectedType(title);
   };
 
-  // Handler for search input change
   const handleSearch = (e) => {
     setSearchQuery(e.target.value);
   };
 
-  // Filter tickets based on selected type and search query
   const filteredTickets = tickets.filter((ticket) => {
     const matchesType = selectedType === 'All' || ticket.type === selectedType;
     const matchesSearch = ticket.subject.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesType && matchesSearch;
   });
 
-  // Handle pagination
-  const handlePageChange = (page) => {
-    setCurrentPage(page);
+  const counts = {
+    'New Tickets': tickets.filter(ticket => ticket.type === 'New Tickets').length,
+    'Critical': tickets.filter(ticket => ticket.type === 'Critical').length,
+    'High': tickets.filter(ticket => ticket.type === 'High').length,
+    'Breaching in 2hrs': tickets.filter(ticket => ticket.type === 'Breaching in 2hrs').length,
+    'Missed SLA': tickets.filter(ticket => ticket.type === 'Missed SLA').length,
   };
 
-  // Get tickets for the current page
-  const ticketsToShow = filteredTickets.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-
   return (
-  <div className="bg-blue-700 container mx-auto p-2">
+    <div className="bg-blue-700 container mx-auto p-2">
       <div className="bg-gray-300 p-5 mt-10">
-        <div className="p-2 mx-auto  rounded-b-lg bg-blue-700 shadow-5xl mb-6 mt-10">
-            <h2 className="text-xl mb-6 text-white">Dashboard Overview</h2>
+        <div className="p-2 mx-auto rounded-b-lg bg-blue-700 shadow-5xl mb-6 mt-10">
+          <h2 className="text-xl mb-6 text-white">Dashboard Overview</h2>
         </div>
 
         {/* Cards Section */}
         <div className="flex flex-wrap justify-between mb-8">
-          {[
-            { title: 'New Tickets', count: ticketData.newTickets },
-            { title: 'Critical', count: ticketData.critical },
-            { title: 'High', count: ticketData.high },
-            { title: 'Breaching in 2hrs', count: ticketData.breaching },
-            { title: 'Missed SLA', count: ticketData.missedSLA },
-          ].map((item, index) => (
+          {Object.keys(counts).map((title, index) => (
             <div
               key={index}
-              className="w-full sm:w-1/2 md:w-1/5 bg-gray-100 p-4 rounded text-center mb-4 md:mb-0"
+              className="w-full sm:w-1/2 md:w-1/5 bg-gray-100 p-4 rounded text-center mb-4 md:mb-0 cursor-pointer"
+              onClick={() => handleFilter(title)}
             >
-              {/* Hide the h2 element */}
-              <h2 className="hidden">{item.title}</h2>
-
-              {/* Make the ticket number blue and bold */}
-              <p className="text-2xl font-bold text-blue-600">{item.count}</p>
-
-              {/* Keep the bottom text visible */}
+              <p className="text-2xl font-bold text-blue-600">{counts[title]}</p>
               <span className="bg-gradient-to-t from-blue-900 via-blue-600 to-blue-900 text-white px-2 py-8 rounded block w-full">
-                {item.title}
+                {title}
               </span>
             </div>
           ))}
         </div>
 
-
-        {/* Ticket Type Filter Buttons */}
-        <div className="bg-gray-200 rounded p-3 mb-5 flex flex-wrap">
-          {[ 'New', 'Critical', 'High', 'Breaching', 'Missed SLA'].map(
-            (heading, index) => (
-              <div
-                key={index}
-                className={`flex-1 text-center p-2 rounded-t-lg bg-gray-300 hover:bg-gray-400 cursor-pointer m-1 ${
-                  selectedType === heading ? 'bg-gray-500' : ''
-                }`}
-                onClick={() => handleFilter(heading)}
-              >
-                {heading}
-              </div>
-            )
-          )}
-        </div>
-
-        {/* Search and Refresh Section */}
+        {/* Search Section */}
         <div className="flex flex-col sm:flex-row mb-5">
           <div className="flex w-full sm:w-1/3">
             <input
@@ -168,7 +131,7 @@ const Dashboard = () => {
           </button>
         </div>
 
-        {/* Tickets Table (Original) */}
+        {/* Tickets Table */}
         <div className="overflow-x-auto mb-8">
           <table className="min-w-full border border-blue-600">
             <thead className="bg-blue-600 text-white">
@@ -180,7 +143,6 @@ const Dashboard = () => {
               </tr>
             </thead>
             <tbody>
-              {/* Render filtered incident tickets */}
               {filteredTickets.map((ticket, index) => (
                 <tr key={index}>
                   <td className="border border-blue-600 p-2">{ticket.id}</td>
@@ -199,42 +161,8 @@ const Dashboard = () => {
           <MyChartComponent />
         </div>
 
-        {/* New Table Section */}
+        {/* New Tickets Table */}
         <div className="mb-8">
-          {/* Filter Buttons */}
-          <div className="bg-gray-200 rounded p-3 mb-5 flex">
-            {['Incident', 'Request'].map((category, index) => (
-              <div
-                key={index}
-                className={`flex-1 text-center p-2 rounded-t-lg bg-gray-300 hover:bg-gray-400 cursor-pointer m-1 ${
-                  selectedCategory === category ? 'bg-gray-500' : ''
-                }`}
-                onClick={() => setSelectedCategory(category)}
-              >
-                {category}
-              </div>
-            ))}
-          </div>
-
-          {/* Search, Refresh, Export Section */}
-          <div className="flex justify-between mb-5">
-            <div className="flex items-center">
-              <input
-                type="text"
-                placeholder="Search..."
-                className="border rounded-l p-2 w-64"
-                value={searchQuery}
-                onChange={handleSearch}
-              />
-              <button className="border border-l-0 rounded-r p-2 bg-blue-600 text-white">🔍</button>
-            </div>
-            <div className="flex items-center">
-              <button className="border rounded p-2 bg-blue-600 text-white mr-3">Refresh</button>
-              <button className="border rounded p-2 bg-green-600 text-white">Export Report</button>
-            </div>
-          </div>
-
-          {/* New Tickets Table */}
           <div className="overflow-x-auto">
             <table className="min-w-full border border-blue-600">
               <thead className="bg-blue-600 text-white">
@@ -244,15 +172,15 @@ const Dashboard = () => {
                   <th className="border border-blue-600 p-2">Customer</th>
                   <th className="border border-blue-600 p-2">Subject</th>
                   <th className="border border-blue-600 p-2">Priority</th>
-                  <th className="border border-blue-600 p-2">Created On</th>
+                  <th className="border border-blue-600 p-2">Date</th>
                   <th className="border border-blue-600 p-2">Assignment Group</th>
                   <th className="border border-blue-600 p-2">Assignee</th>
-                  <th className="border border-blue-600 p-2">Last Update On</th>
+                  <th className="border border-blue-600 p-2">Last Update</th>
                   <th className="border border-blue-600 p-2">Resolved On</th>
                 </tr>
               </thead>
               <tbody>
-                {ticketsToShow.map((ticket, index) => (
+                {filteredTickets.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((ticket, index) => (
                   <tr key={index}>
                     <td className="border border-blue-600 p-2">{ticket.id}</td>
                     <td className="border border-blue-600 p-2">{ticket.status}</td>
@@ -271,20 +199,28 @@ const Dashboard = () => {
           </div>
 
           {/* Pagination */}
-          <div className="flex justify-center mt-4">
-            {Array.from({ length: totalPages }).map((_, index) => (
-              <button
-                key={index}
-                className={`mx-1 px-3 py-1 border ${currentPage === index + 1 ? 'bg-blue-600 text-white' : 'bg-gray-300'}`}
-                onClick={() => handlePageChange(index + 1)}
-              >
-                {index + 1}
-              </button>
-            ))}
+          <div className="flex justify-between mt-4">
+            <button
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(currentPage - 1)}
+              className="bg-blue-600 text-white p-2 rounded"
+            >
+              Previous
+            </button>
+            <span>
+              Page {currentPage} of {Math.ceil(filteredTickets.length / itemsPerPage)}
+            </span>
+            <button
+              disabled={currentPage === Math.ceil(filteredTickets.length / itemsPerPage)}
+              onClick={() => setCurrentPage(currentPage + 1)}
+              className="bg-blue-600 text-white p-2 rounded"
+            >
+              Next
+            </button>
           </div>
         </div>
       </div>
-   </div>
+    </div>
   );
 };
 
