@@ -1,39 +1,47 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { useAuth } from '../contexts/authContext'; // Ensure correct path
 
-const Profile = ({ userId, organizationId }) => {
-  const [user, setUser] = useState(null);
-  const [error, setError] = useState(null);
+const Profile = () => {
+  const { currentUser, isAdmin } = useAuth(); // Ensure isAdmin is part of your context state
+  const [profile, setProfile] = useState(null);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    // Fetch user profile data
-    const fetchUserProfile = async () => {
+    const fetchProfile = async () => {
       try {
-        const response = await axios.get(`/api/v1/organizations/${organizationId}/users/${userId}`);
-        setUser(response.data);
+        const response = await axios.get(`http://localhost:3000/api/v1/auth/profile`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        });
+        setProfile(response.data);
       } catch (err) {
-        setError('Failed to load user profile');
+        setError('Failed to fetch profile data. Please try again.');
       }
     };
 
-    fetchUserProfile();
-  }, [userId, organizationId]);
+    fetchProfile();
+  }, []);
 
-  if (error) {
-    return <p>{error}</p>;
-  }
-
-  if (!user) {
-    return <p>Loading profile...</p>;
+  if (!profile) {
+    return <div>Loading profile...</div>;
   }
 
   return (
-    <div className="bg-gray-100 p-5 rounded shadow-lg">
-      <h2 className="text-2xl font-bold mb-3">User Profile</h2>
-      <p><strong>Name:</strong> {user.name}</p>
-      <p><strong>Email:</strong> {user.email}</p>
-      <p><strong>Role:</strong> {user.role}</p>
-      <img src={user.profileImage || '/path/to/default-avatar.png'} alt="Profile" className="w-20 h-20 rounded-full mt-3" />
+    <div className="container mx-auto p-4">
+      <h1 className="text-xl font-bold">User Profile</h1>
+      {error && <p className="text-red-500">{error}</p>}
+      <div className="bg-white shadow rounded-lg p-6 mt-4">
+        <p><strong>Full Name:</strong> {profile.user.first_name} {profile.user.last_name}</p>
+        <p><strong>Email:</strong> {profile.user.email}</p>
+        <p><strong>Name:</strong> {profile.user.name}</p>
+        <p><strong>Department:</strong> {profile.user.department}</p>
+        <p><strong>Position:</strong> {profile.user.position}</p>
+        <p><strong>Phone:</strong> {profile.user.phone_number}</p>
+        <p><strong>Role:</strong> {isAdmin ? 'Admin' : 'User'}</p>
+        {/* Display any additional fields as necessary */}
+      </div>
     </div>
   );
 };

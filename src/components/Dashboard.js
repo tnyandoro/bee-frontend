@@ -95,6 +95,12 @@ const Dashboard = () => {
           <h2 className="text-xl mb-6 text-white">Dashboard Overview</h2>
         </div>
 
+         {/* Charts Section */}
+         <div className="mb-8">
+            <h2 className="text-2xl mb-3">Incident Distribution & Monthly Overview</h2>
+            <MyChartComponent />
+        </div>
+
         {/* Cards Section */}
         <div className="flex flex-wrap justify-between mb-8">
           {Object.keys(counts).map((title, index) => (
@@ -153,12 +159,6 @@ const Dashboard = () => {
               ))}
             </tbody>
           </table>
-        </div>
-
-        {/* Charts Section */}
-        <div className="mb-8">
-          <h2 className="text-2xl mb-3">Incident Distribution & Monthly Overview</h2>
-          <MyChartComponent />
         </div>
 
         {/* New Tickets Table */}
