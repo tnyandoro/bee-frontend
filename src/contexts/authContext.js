@@ -11,6 +11,7 @@ export const useAuth = () => useContext(AuthContext);
 // AuthProvider component to wrap around parts of the app that need access to auth state
 export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -18,27 +19,33 @@ export const AuthProvider = ({ children }) => {
       try {
         const token = localStorage.getItem('token');
         if (token) {
-          const response = await axios.get('/api/v1/users/me', {
+          // Fetch the logged-in user's profile
+          const response = await axios.get('/api/v1/auth/profile', {
             headers: {
-              Authorization: `Bearer ${token}`,
+              Authorization: `Bearer ${token}`, // Send the token in Authorization header
             },
           });
-          setCurrentUser(response.data);
+
+          // Set the current user and their admin status
+          setCurrentUser(response.data.user);
+          setIsAdmin(response.data.is_admin); // Update admin status
         }
       } catch (error) {
         console.error('Failed to fetch current user:', error);
         setCurrentUser(null);
+        setIsAdmin(false); // Default to non-admin on error or no auth
       } finally {
-        setLoading(false);
+        setLoading(false); // Mark loading as complete
       }
     };
 
     fetchCurrentUser();
   }, []);
 
+  // Provide currentUser and isAdmin to the rest of the app
   return (
-    <AuthContext.Provider value={{ currentUser, loading }}>
-      {children}
+    <AuthContext.Provider value={{ currentUser, isAdmin, loading }}>
+      {!loading && children} {/* Ensure children are rendered after loading */}
     </AuthContext.Provider>
   );
 };
