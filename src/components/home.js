@@ -15,7 +15,7 @@ const Home = (props) => {
     if (loggedIn) {
       // Logic for logging out (if applicable)
     } else {
-      navigate('/admin/login'); // Navigate to the login page
+      navigate('/login'); // Navigate to the login page
     }
   };
 
