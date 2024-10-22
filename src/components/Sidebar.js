@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { HomeIcon, TicketIcon, BookOpenIcon, CogIcon, UserIcon } from '@heroicons/react/24/outline'; // Update the path to Heroicons v2
+import { HomeIcon, TicketIcon, ExclamationTriangleIcon, BookOpenIcon, EyeIcon, CogIcon, UserIcon } from '@heroicons/react/24/outline'; // Update the path to Heroicons v2
 
 const Sidebar = ({ isLoggedIn }) => {
   const [selected, setSelected] = useState(null);
@@ -8,10 +8,10 @@ const Sidebar = ({ isLoggedIn }) => {
   const links = [
     { id: 1, name: 'Dashboard', path: '/dashboard', icon: <HomeIcon className="h-5 w-5" /> },
     { id: 2, name: 'Create Ticket', path: '/create-ticket', icon: <TicketIcon className="h-5 w-5" /> },
-    { id: 3, name: 'Incident Overview', path: '/incident-overview', icon: <TicketIcon className="h-5 w-5" /> },
+    { id: 3, name: 'Overview', path: '/incident-overview', icon: <EyeIcon className="h-5 w-5" /> },
     { id: 4, name: 'Knowledge Base', path: '/knowledge-base', icon: <BookOpenIcon className="h-5 w-5" /> },
     { id: 5, name: 'Create Problems', path: '/create-problems', icon: <TicketIcon className="h-5 w-5" /> },
-    { id: 6, name: 'Problems Overview', path: '/problems-overview', icon: <TicketIcon className="h-5 w-5" /> },
+    { id: 6, name: 'Problems ', path: '/problems-overview', icon: <ExclamationTriangleIcon className="h-5 w-5" /> },
     { id: 7, name: 'Settings', path: '/settings', icon: <CogIcon className="h-5 w-5" /> },
     { id: 8, name: 'Profile', path: '/profile', icon: <UserIcon className="h-5 w-5" /> },
   ];
