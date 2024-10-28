@@ -34,13 +34,12 @@ const Sidebar = ({ isLoggedIn }) => {
           <li key={link.id}>
             <NavLink
               to={link.path}
-              className={({ isActive }) =>
-                `block py-4 px-6 text-gray-700 ${
-                  isActive
-                    ? 'bg-blue-700 text-white rounded-l-full' // Tailwind blue-700 for selected state
-                    : 'hover:bg-blue-700 hover:text-white rounded-l-full' // Tailwind blue-700 on hover
-                }`
-              }
+              className={`block py-4 px-6 text-gray-700 ${
+                selected === link.id
+                  ? 'bg-blue-700 text-white rounded-l-full' // Tailwind blue-700 for selected state
+                  : 'hover:bg-blue-700 hover:text-white rounded-l-full' // Tailwind blue-700 on hover
+              }`}
+              onClick={() => setSelected(link.id)}
             >
               {link.icon}
               <span className="ml-3">{link.name}</span>

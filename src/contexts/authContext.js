@@ -22,35 +22,22 @@ export const AuthProvider = ({ children }) => {
           // Fetch the logged-in user's profile
           const response = await axios.get('/api/v1/auth/profile', {
             headers: {
-              Authorization: `Bearer ${token}`, // Send the token in Authorization header
-              Authorization: `Bearer ${token}`, // Send the token in Authorization header
+              Authorization: `Bearer ${token}`,
             },
           });
-
-          // Set the current user and their admin status
-          setCurrentUser(response.data.user);
-          setIsAdmin(response.data.is_admin); // Update admin status
-
-          // Set the current user and their admin status
-          setCurrentUser(response.data.user);
-          setIsAdmin(response.data.is_admin); // Update admin status
+          setCurrentUser(response.data);
         }
       } catch (error) {
         console.error('Failed to fetch current user:', error);
         setCurrentUser(null);
-        setIsAdmin(false); // Default to non-admin on error or no auth
-        setIsAdmin(false); // Default to non-admin on error or no auth
       } finally {
-        setLoading(false); // Mark loading as complete
-        setLoading(false); // Mark loading as complete
+        setLoading(false);
       }
     };
 
     fetchCurrentUser();
   }, []);
 
-  // Provide currentUser and isAdmin to the rest of the app
-  // Provide currentUser and isAdmin to the rest of the app
   return (
     <AuthContext.Provider value={{ currentUser, isAdmin, loading }}>
       {!loading && children} {/* Ensure children are rendered after loading */}
