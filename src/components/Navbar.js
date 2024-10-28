@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom'; // Import useNavigate
+import { useNavigate } from 'react-router-dom'; // Import useNavigate from react-router-dom
+
 import logor from '../assets/logor.png';
 import profileImage from '../assets/tendy.jpg';
 
 const Navbar = ({ name, email, role, loggedIn, onLogout, organizationName }) => { // Added organizationName here
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const navigate = useNavigate(); // Initialize useNavigate hook
+
+  const navigate = useNavigate(); // Initialize useNavigate
 
   const toggleDropdown = () => {
     setDropdownOpen(!dropdownOpen);
@@ -92,7 +94,11 @@ const Navbar = ({ name, email, role, loggedIn, onLogout, organizationName }) => 
           {dropdownOpen && (
             <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-20">
               <button
-                onClick={handleProfileClick} // Profile redirect on click
+                onClick={() => {
+                  navigate('/profile'); // Navigate to profile page
+                  setDropdownOpen(false); // Close the dropdown
+                }}
+
                 className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                 aria-label="Go to Profile"
               >
