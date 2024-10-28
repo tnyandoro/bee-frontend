@@ -28,25 +28,26 @@ const CreateProblems = () => {
     console.log('Form submitted');
   };
 
-  return (
-    <div className="bg-blue-700 container mx-auto p-1"> 
-      <div className="p-6 bg-gray-300 shadow rounded-lg mt-12">
-        <div className="p-6 mx-auto mb-3">
-        <div className="p-2 text-white mx-auto rounded-b-lg bg-blue-700 shadow-2xl mb-6">
-          <h2 className="text-2xl mb-2">Log a problem</h2>
-          <p className="text-sm mb-2">Log an escalated issue as a problem to report an issue with a service or system.</p>
+  const handleCancel = () => {
+    // Reset form fields or perform any cancel logic
+    console.log('Form canceled');
+  };
 
+  return (
+    <div className="bg-blue-700 container mx-auto p-1">
+      <div className="p-6 bg-gray-100 shadow-lg rounded-lg mt-12">
+        <div className="p-2 text-white rounded-t-lg bg-blue-700 shadow-xl mb-6">
+          <h2 className="text-2xl mb-1">Log a Problem</h2>
+          <p className="text-sm">Log an escalated issue as a problem to report an issue with a service or system.</p>
         </div>
-       </div>
-        <form className="problem-form shadow-md rounded" onSubmit={handleSubmit}>
+        <form className="problem-form shadow-md rounded-lg p-4 bg-white" onSubmit={handleSubmit}>
           <div className="flex space-x-8">
-            {/* Left Section */}
             <div className="left-col w-1/3">
               <div className="form-group mb-4">
                 <label>Problem Number</label>
                 <input
                   type="text"
-                  className="input-box border p-2 w-full"
+                  className="input-box border p-2 w-full rounded"
                   value={problemNumber}
                   onChange={(e) => setProblemNumber(e.target.value)}
                 />
@@ -55,7 +56,7 @@ const CreateProblems = () => {
                 <label>Main Ticket</label>
                 <input
                   type="text"
-                  className="input-box border p-2 w-full"
+                  className="input-box border p-2 w-full rounded"
                   value={mainTicket}
                   onChange={(e) => setMainTicket(e.target.value)}
                 />
@@ -64,19 +65,18 @@ const CreateProblems = () => {
                 <label>Ticket Status</label>
                 <input
                   type="text"
-                  className="input-box border p-2 w-full"
+                  className="input-box border p-2 w-full rounded"
                   value={ticketStatus}
                   onChange={(e) => setTicketStatus(e.target.value)}
                 />
               </div>
             </div>
 
-            {/* Middle Section */}
             <div className="middle-col w-1/3">
               <div className="form-group mb-4">
-                <label>Relate to Existing Record</label>
+                <label>Related to Existing Record</label>
                 <select
-                  className="input-box border p-2 w-full"
+                  className="input-box border p-2 w-full rounded"
                   value={relatedToRecord}
                   onChange={(e) => setRelatedToRecord(e.target.value)}
                 >
@@ -87,13 +87,12 @@ const CreateProblems = () => {
               </div>
             </div>
 
-            {/* Right Section */}
             <div className="right-col w-1/3">
               <div className="form-group mb-4">
                 <label>Reported Date & Time</label>
                 <input
                   type="datetime-local"
-                  className="input-box border p-2 w-full"
+                  className="input-box border p-2 w-full rounded"
                   value={reportDateTime}
                   onChange={(e) => setReportDateTime(e.target.value)}
                 />
@@ -102,7 +101,7 @@ const CreateProblems = () => {
                 <label>Related Record</label>
                 <input
                   type="text"
-                  className="input-box border p-2 w-full"
+                  className="input-box border p-2 w-full rounded"
                   value={relatedRecord}
                   onChange={(e) => setRelatedRecord(e.target.value)}
                 />
@@ -117,7 +116,7 @@ const CreateProblems = () => {
                 <label>Caller Name</label>
                 <input
                   type="text"
-                  className="input-box border p-2 w-full"
+                  className="input-box border p-2 w-full rounded"
                   value={callerName}
                   onChange={(e) => setCallerName(e.target.value)}
                 />
@@ -126,25 +125,25 @@ const CreateProblems = () => {
                 <label>Caller Surname</label>
                 <input
                   type="text"
-                  className="input-box border p-2 w-full"
+                  className="input-box border p-2 w-full rounded"
                   value={callerSurname}
                   onChange={(e) => setCallerSurname(e.target.value)}
                 />
               </div>
               <div className="form-group mb-4">
-                <label>Caller Email Address</label>
+                <label>Caller Email</label>
                 <input
                   type="email"
-                  className="input-box border p-2 w-full"
+                  className="input-box border p-2 w-full rounded"
                   value={callerEmail}
                   onChange={(e) => setCallerEmail(e.target.value)}
                 />
               </div>
               <div className="form-group mb-4">
-                <label>Caller Contact Number</label>
+                <label>Caller Contact</label>
                 <input
                   type="text"
-                  className="input-box border p-2 w-full"
+                  className="input-box border p-2 w-full rounded"
                   value={callerContact}
                   onChange={(e) => setCallerContact(e.target.value)}
                 />
@@ -153,7 +152,7 @@ const CreateProblems = () => {
                 <label>Caller Location</label>
                 <input
                   type="text"
-                  className="input-box border p-2 w-full"
+                  className="input-box border p-2 w-full rounded"
                   value={callerLocation}
                   onChange={(e) => setCallerLocation(e.target.value)}
                 />
@@ -165,7 +164,7 @@ const CreateProblems = () => {
                 <label>Opened By</label>
                 <input
                   type="text"
-                  className="input-box border p-2 w-full"
+                  className="input-box border p-2 w-full rounded"
                   value={openedBy}
                   onChange={(e) => setOpenedBy(e.target.value)}
                 />
@@ -174,7 +173,7 @@ const CreateProblems = () => {
                 <label>Category</label>
                 <input
                   type="text"
-                  className="input-box border p-2 w-full"
+                  className="input-box border p-2 w-full rounded"
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
                 />
@@ -183,7 +182,7 @@ const CreateProblems = () => {
                 <label>Impact</label>
                 <input
                   type="text"
-                  className="input-box border p-2 w-full"
+                  className="input-box border p-2 w-full rounded"
                   value={impact}
                   onChange={(e) => setImpact(e.target.value)}
                 />
@@ -192,7 +191,7 @@ const CreateProblems = () => {
                 <label>Urgency</label>
                 <input
                   type="text"
-                  className="input-box border p-2 w-full"
+                  className="input-box border p-2 w-full rounded"
                   value={urgency}
                   onChange={(e) => setUrgency(e.target.value)}
                 />
@@ -201,7 +200,7 @@ const CreateProblems = () => {
                 <label>Priority</label>
                 <input
                   type="text"
-                  className="input-box border p-2 w-full"
+                  className="input-box border p-2 w-full rounded"
                   value={priority}
                   onChange={(e) => setPriority(e.target.value)}
                 />
@@ -210,7 +209,7 @@ const CreateProblems = () => {
                 <label>Assignment Group</label>
                 <input
                   type="text"
-                  className="input-box border p-2 w-full"
+                  className="input-box border p-2 w-full rounded"
                   value={assignmentGroup}
                   onChange={(e) => setAssignmentGroup(e.target.value)}
                 />
@@ -219,7 +218,7 @@ const CreateProblems = () => {
                 <label>Assignee</label>
                 <input
                   type="text"
-                  className="input-box border p-2 w-full"
+                  className="input-box border p-2 w-full rounded"
                   value={assignee}
                   onChange={(e) => setAssignee(e.target.value)}
                 />
@@ -233,7 +232,7 @@ const CreateProblems = () => {
               <label>Subject</label>
               <input
                 type="text"
-                className="input-box border p-2 w-full"
+                className="input-box border p-2 w-full rounded"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
               />
@@ -241,37 +240,38 @@ const CreateProblems = () => {
             <div className="form-group mb-4">
               <label>Description</label>
               <textarea
-                className="input-box border p-2 w-full h-32"
+                className="input-box border p-2 w-full h-32 rounded"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
             </div>
             <div className="form-group mb-4">
               <label>Workaround</label>
-              <input
-                type="text"
-                className="input-box border p-2 w-full"
+              <textarea
+                className="input-box border p-2 w-full h-32 rounded"
                 value={workaround}
                 onChange={(e) => setWorkaround(e.target.value)}
               />
             </div>
           </div>
 
-          {/* Attachment Button */}
-          <div className="form-group mb-4">
-            <button className="bg-gray-300 py-2 px-4 rounded">Attachment</button>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex justify-end space-x-4 mt-8">
-            <button type="button" className="bg-red-500 text-white py-2 px-4 rounded">Cancel</button>
-            <button type="button" className="bg-blue-500 text-white py-2 px-4 rounded">Save</button>
-            <button type="submit" className="bg-green-500 text-white py-2 px-4 rounded">Submit</button>
+          {/* Submit and Cancel Buttons */}
+          <div className="flex justify-end mt-6 space-x-2">
+            <button
+              type="button"
+              className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500 transition duration-300"
+              onClick={handleCancel}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="bg-blue-700 text-white px-4 py-2 rounded hover:bg-blue-600 transition duration-300"
+            >
+              Submit Problem
+            </button>
           </div>
         </form>
-        <div className="p-2 mx-auto text-center border-2 border-blue-700 bg-gradient-to-b from-blue-500 to-gray-400 shadow-2xl mt-6 rounded-t-lg">
-          <h5 className="text-xl mb-6 text-white italic font-semibold drop-shadow-lg">© 2024 Greensoft solutions. All rights reserved.</h5>
-        </div>
       </div>
     </div>
   );

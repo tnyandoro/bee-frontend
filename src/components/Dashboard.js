@@ -33,7 +33,6 @@ const generateRandomDate = () => {
   const minutes = Math.floor(Math.random() * 60);
   const formattedDate = pastDate.toISOString().split('T')[0];
   const formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} PM`;
-
   return `${formattedDate} ${formattedTime}`;
 };
 
