@@ -6,8 +6,7 @@ import {
   Navigate,
 } from 'react-router-dom';
 import Home from './components/Home';
-import UserLogin from './components/UserLogin';
-import AdminLogin from './components/AdminLogin';
+import Login from './components/Login'; // Combined Login component
 import AdminRegister from './components/AdminRegister';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
@@ -73,17 +72,7 @@ function App() {
             <Route
               path="/login"
               element={
-                <UserLogin
-                  setLoggedIn={setLoggedIn}
-                  setEmail={setEmail}
-                  setRole={setRole}
-                />
-              }
-            />
-            <Route
-              path="/admin/login"
-              element={
-                <AdminLogin
+                <Login
                   setLoggedIn={setLoggedIn}
                   setEmail={setEmail}
                   setRole={setRole}
@@ -96,7 +85,7 @@ function App() {
             <Route
               path="/dashboard"
               element={
-                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin']}>
+                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin', 'User']}>
                   <Dashboard email={email} role={role} />
                 </PrivateRoute>
               }
@@ -112,7 +101,7 @@ function App() {
             <Route
               path="/create-ticket"
               element={
-                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin']}>
+                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin', 'User']}>
                   <CreateTicket email={email} role={role} />
                 </PrivateRoute>
               }
@@ -128,7 +117,7 @@ function App() {
             <Route
               path="/knowledge-base"
               element={
-                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin']}>
+                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin', 'User']}>
                   <KnowledgeBase email={email} role={role} />
                 </PrivateRoute>
               }
@@ -141,7 +130,7 @@ function App() {
                 </PrivateRoute>
               }
             />
-              <Route
+            <Route
               path="/problems-overview"
               element={
                 <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin']}>
@@ -160,7 +149,7 @@ function App() {
             <Route
               path="/profile"
               element={
-                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin']}>
+                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin', 'User']}>
                   <Profile email={email} role={role} />
                 </PrivateRoute>
               }

@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom'; // Import useNavigate from react-router-dom
 import logor from '../assets/logor.png';
 import profileImage from '../assets/tendy.jpg';
 
 const Navbar = ({ logo, name, email, role, loggedIn, onLogout }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const navigate = useNavigate(); // Initialize useNavigate
 
   const toggleDropdown = () => {
     setDropdownOpen(!dropdownOpen);
@@ -83,12 +85,15 @@ const Navbar = ({ logo, name, email, role, loggedIn, onLogout }) => {
           {/* Dropdown Menu */}
           {dropdownOpen && (
             <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-20">
-              <a
-                href="#profile"
+              <button
+                onClick={() => {
+                  navigate('/profile'); // Navigate to profile page
+                  setDropdownOpen(false); // Close the dropdown
+                }}
                 className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
               >
                 Profile
-              </a>
+              </button>
               <button
                 onClick={onLogout}
                 className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
@@ -104,7 +109,7 @@ const Navbar = ({ logo, name, email, role, loggedIn, onLogout }) => {
       {mobileMenuOpen && (
         <div className="md:hidden absolute top-16 left-0 w-full bg-white shadow-lg z-40">
           <div className="flex flex-col items-start p-4 space-y-2">
-            <a href="#profile" className="block text-gray-800">Profile</a>
+            <button onClick={() => navigate('/profile')} className="block text-gray-800">Profile</button>
             <button
               onClick={onLogout}
               className="block text-gray-800 text-left"
