@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   HomeIcon,
@@ -13,6 +13,8 @@ import {
 } from '@heroicons/react/24/outline';
 
 const Sidebar = ({ isLoggedIn }) => {
+  const [selected, setSelected] = useState(null);
+
   const links = [
     { id: 1, name: 'Admin Dashboard', path: '/admin-dashboard', icon: <Squares2X2Icon className="h-5 w-5" /> },
     { id: 2, name: 'Dashboard', path: '/dashboard', icon: <HomeIcon className="h-5 w-5" /> },
@@ -34,10 +36,10 @@ const Sidebar = ({ isLoggedIn }) => {
           <li key={link.id}>
             <NavLink
               to={link.path}
-              className={`block py-4 px-6 text-gray-700 ${
+              className={`flex items-center py-4 px-6 text-gray-700 ${
                 selected === link.id
-                  ? 'bg-blue-700 text-white rounded-l-full' // Tailwind blue-700 for selected state
-                  : 'hover:bg-blue-700 hover:text-white rounded-l-full' // Tailwind blue-700 on hover
+                  ? 'bg-blue-700 text-white rounded-l-full'
+                  : 'hover:bg-blue-700 hover:text-white rounded-l-full'
               }`}
               onClick={() => setSelected(link.id)}
             >
