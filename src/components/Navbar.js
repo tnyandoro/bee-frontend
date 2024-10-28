@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import logor from '../assets/logor.png';
 import profileImage from '../assets/tendy.jpg';
 
-const Navbar = ({ logo, name, email, role, loggedIn, onLogout }) => {
+const Navbar = ({ name, email, role, loggedIn, onLogout, organizationName }) => { // Added organizationName here
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navigate = useNavigate(); // Initialize useNavigate hook
@@ -20,20 +20,21 @@ const Navbar = ({ logo, name, email, role, loggedIn, onLogout }) => {
     navigate('/profile'); // Navigate to the profile page
     setDropdownOpen(false); // Close the dropdown
   };
+  
 
   if (!loggedIn) return null; // Only show the navbar if the user is logged in
 
   return (
     <nav className="bg-slate-50 text-gray-800 p-4 flex justify-between items-center shadow-lg fixed top-0 left-0 right-0 z-50 border-b-4 border-blue-500">
-      {/* Left Section: Logo */}
+      {/* Left Section: Logo and Organization Name */}
       <div className="flex items-center">
         <img src={logor} alt="Logo" className="h-12 mr-3" />
-        <span className="text-xl font-bold"></span>
+        <span className="text-xl font-bold">{organizationName}</span>
       </div>
 
       {/* Mobile Menu Icon */}
       <div className="md:hidden flex items-center">
-        <button onClick={toggleMobileMenu} className="focus:outline-none">
+        <button onClick={toggleMobileMenu} className="focus:outline-none" aria-label="Toggle mobile menu">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
@@ -93,12 +94,14 @@ const Navbar = ({ logo, name, email, role, loggedIn, onLogout }) => {
               <button
                 onClick={handleProfileClick} // Profile redirect on click
                 className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                aria-label="Go to Profile"
               >
                 Profile
               </button>
               <button
                 onClick={onLogout}
                 className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                aria-label="Logout"
               >
                 Logout
               </button>
@@ -110,13 +113,18 @@ const Navbar = ({ logo, name, email, role, loggedIn, onLogout }) => {
       {/* Mobile Menu */}
       {mobileMenuOpen && (
         <div className="md:hidden absolute top-16 left-0 w-full bg-white shadow-lg z-40">
-          <div className="flex flex-col items-start p-4 space-y-2">
-            <button onClick={handleProfileClick} className="block text-gray-800">
+          <div className="flex flex-col items-start p-4">
+            <button
+              onClick={handleProfileClick}
+              className="py-2 px-4 w-full text-left text-gray-700 hover:bg-gray-100"
+              aria-label="Mobile Profile"
+            >
               Profile
             </button>
             <button
               onClick={onLogout}
-              className="block text-gray-800 text-left"
+              className="py-2 px-4 w-full text-left text-gray-700 hover:bg-gray-100"
+              aria-label="Mobile Logout"
             >
               Logout
             </button>

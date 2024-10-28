@@ -1,59 +1,54 @@
 import React, { useState } from 'react';
-import {
-  BrowserRouter as Router,
-  Route,
-  Routes,
-  Navigate,
-} from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import Home from './components/Home';
-import Login from './components/Login'; // Combined Login component
+import Login from './components/Login';
 import AdminRegister from './components/AdminRegister';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import PrivateRoute from './components/PrivateRoute';
 import Incident from './components/Incident';
-import CreateTicket from './components/CreateTicket';
+import CreateTicketPage from './components/CreateTicketPage';
 import IncidentOverview from './components/IncidentOverview';
 import KnowledgeBase from './components/KnowledgeBase';
 import CreateProblems from './components/CreateProblems';
 import ProblemsOverview from './components/ProblemsOverview';
 import Settings from './components/Settings';
 import Profile from './components/Profile';
+import CreateUserForm from './components/CreateUserForm';
+import AdminDashboard from './components/AdminDashboard'; // Import AdminDashboard
 
 function App() {
-  const [loggedIn, setLoggedIn] = useState(false); // Manages login state
-  const [email, setEmail] = useState(''); // Stores user email
-  const [role, setRole] = useState(''); // Stores user role (Admin/User)
-  const profileImage = 'path_to_image'; // Update with actual profile image URL
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState('');
+  const profileImage = 'path_to_image'; // Replace with actual profile image URL
 
   const handleLogout = () => {
     setLoggedIn(false);
     setEmail('');
     setRole('');
-    localStorage.removeItem('token'); // Remove the authentication token
+    localStorage.removeItem('token');
   };
 
   return (
     <Router>
       <div className="App">
-        {/* Show Navbar and Sidebar only if the user is logged in */}
         {loggedIn && (
           <>
             <Navbar
-              logo="path_to_logo" // Replace with the actual logo path
-              name={email} // Display email; modify as needed
+              logo="path_to_logo"
+              name={email}
               email={email}
               role={role}
               profileImage={profileImage}
               loggedIn={loggedIn}
-              onLogout={handleLogout} // Pass logout function to Navbar
+              onLogout={handleLogout}
             />
-            <Sidebar isLoggedIn={loggedIn} /> {/* Sidebar component */}
+            <Sidebar isLoggedIn={loggedIn} />
           </>
         )}
 
-        {/* Main Content Area with dynamic padding when Sidebar is visible */}
         <div className={loggedIn ? 'pl-64' : ''}>
           <Routes>
             {/* Public Routes */}
@@ -81,7 +76,7 @@ function App() {
             />
             <Route path="/admin/register" element={<AdminRegister />} />
 
-            {/* Protected Routes (Accessible only when logged in) */}
+            {/* Protected Routes */}
             <Route
               path="/dashboard"
               element={
@@ -93,7 +88,7 @@ function App() {
             <Route
               path="/incident"
               element={
-                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin']}>
+                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin', 'User']}>
                   <Incident email={email} role={role} />
                 </PrivateRoute>
               }
@@ -102,14 +97,14 @@ function App() {
               path="/create-ticket"
               element={
                 <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin', 'User']}>
-                  <CreateTicket email={email} role={role} />
+                  <CreateTicketPage email={email} role={role} />
                 </PrivateRoute>
               }
             />
             <Route
               path="/incident-overview"
               element={
-                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin']}>
+                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin', 'User']}>
                   <IncidentOverview email={email} role={role} />
                 </PrivateRoute>
               }
@@ -125,7 +120,7 @@ function App() {
             <Route
               path="/create-problems"
               element={
-                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin']}>
+                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin', 'User']}>
                   <CreateProblems email={email} role={role} />
                 </PrivateRoute>
               }
@@ -133,7 +128,7 @@ function App() {
             <Route
               path="/problems-overview"
               element={
-                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin']}>
+                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin', 'User']}>
                   <ProblemsOverview email={email} role={role} />
                 </PrivateRoute>
               }
@@ -141,7 +136,7 @@ function App() {
             <Route
               path="/settings"
               element={
-                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin']}>
+                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin', 'User']}>
                   <Settings email={email} role={role} />
                 </PrivateRoute>
               }
@@ -154,7 +149,22 @@ function App() {
                 </PrivateRoute>
               }
             />
-
+            <Route
+              path="/create-user"
+              element={
+                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin']}>
+                  <CreateUserForm email={email} role={role} />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/admin-dashboard"
+              element={
+                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin']}>
+                  <AdminDashboard email={email} role={role} />
+                </PrivateRoute>
+              }
+            />
             {/* Redirect unknown paths to the home page */}
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>

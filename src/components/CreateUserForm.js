@@ -1,82 +1,108 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 
-const CreateUserForm = ({ organization_id }) => { // Accept organization_id as a prop
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [role, setRole] = useState('agent'); // Default role
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+const CreateUserForm = ({ orgSubdomain, token, onClose }) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    username: '',
+    phone_number: '',
+    department: '',
+    position: '',
+    role: 'agent', // Default role
+    password: '',
+  });
+  const [message, setMessage] = useState('');
+  const [isError, setIsError] = useState(false);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
-
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/v1/organizations/${organization_id}/users`, { // Use organization_id prop
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user: {
-            name,
-            email,
-            role,
-            password: 'defaultPassword', // You might want to generate a random password or let the user set it later
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Error creating user');
-      }
-
-      const result = await response.json();
-      setSuccess(`User ${result.name} created successfully`);
-      setName('');
-      setEmail('');
-      setRole('agent');
-    } catch (err) {
-      setError(err.message);
+      await axios.post(
+        `/api/v1/organizations/${orgSubdomain}/users`,
+        { user: formData },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setMessage('User created successfully!');
+      setIsError(false);
+    } catch (error) {
+      setMessage(error.response?.data?.errors?.join(', ') || 'Error creating user');
+      setIsError(true);
+      console.error(error);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white p-6 rounded shadow-md">
-      {error && <p className="text-red-500">{error}</p>}
-      {success && <p className="text-green-500">{success}</p>}
-      
-      <div className="mb-4">
-        <label className="block text-gray-700">Name</label>
+    <div>
+      <h2 className="text-2xl font-semibold mb-4">Create User</h2>
+      {message && (
+        <p className={`mb-4 ${isError ? 'text-red-500' : 'text-green-500'}`}>{message}</p>
+      )}
+      <form onSubmit={handleSubmit} className="space-y-4">
         <input
           type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="mt-1 p-2 w-full border rounded"
+          name="name"
+          placeholder="Name"
+          value={formData.name}
+          onChange={handleChange}
+          className="border p-2 rounded w-full"
           required
         />
-      </div>
-
-      <div className="mb-4">
-        <label className="block text-gray-700">Email</label>
         <input
           type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="mt-1 p-2 w-full border rounded"
+          name="email"
+          placeholder="Email"
+          value={formData.email}
+          onChange={handleChange}
+          className="border p-2 rounded w-full"
           required
         />
-      </div>
-
-      <div className="mb-4">
-        <label className="block text-gray-700">Role</label>
+        <input
+          type="text"
+          name="username"
+          placeholder="Username"
+          value={formData.username}
+          onChange={handleChange}
+          className="border p-2 rounded w-full"
+          required
+        />
+        <input
+          type="text"
+          name="phone_number"
+          placeholder="Phone Number"
+          value={formData.phone_number}
+          onChange={handleChange}
+          className="border p-2 rounded w-full"
+          required
+        />
+        <input
+          type="text"
+          name="department"
+          placeholder="Department"
+          value={formData.department}
+          onChange={handleChange}
+          className="border p-2 rounded w-full"
+          required
+        />
+        <input
+          type="text"
+          name="position"
+          placeholder="Position"
+          value={formData.position}
+          onChange={handleChange}
+          className="border p-2 rounded w-full"
+          required
+        />
         <select
-          value={role}
-          onChange={(e) => setRole(e.target.value)}
-          className="mt-1 p-2 w-full border rounded"
+          name="role"
+          value={formData.role}
+          onChange={handleChange}
+          className="border p-2 rounded w-full"
           required
         >
           <option value="admin">Admin</option>
@@ -86,14 +112,32 @@ const CreateUserForm = ({ organization_id }) => { // Accept organization_id as a
           <option value="sales_person">Sales Person</option>
           <option value="technical">Technical</option>
         </select>
-      </div>
-
-      <div>
-        <button type="submit" className="bg-blue-500 text-white p-2 rounded">
-          Create User
-        </button>
-      </div>
-    </form>
+        <input
+          type="password"
+          name="password"
+          placeholder="Password"
+          value={formData.password}
+          onChange={handleChange}
+          className="border p-2 rounded w-full"
+          required
+        />
+        <div className="flex justify-between mt-4">
+          <button
+            type="submit"
+            className="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded shadow"
+          >
+            Create User
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded shadow"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
   );
 };
 

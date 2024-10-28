@@ -29,7 +29,7 @@ const Profile = () => {
   }
 
   // Organization name should always be available
-  const organizationName = profile.user.organization_name || 'N/A'; // Fallback to 'N/A' if name is missing
+  const organizationName = profile.user.organization_name || 'N/A';
   const fullName = profile.user.full_name || profile.user.name || 'N/A'; // Fallback to 'N/A' if full name is missing
   const role = isAdmin ? 'Admin' : (profile.user.role === 'admin' ? 'Admin' : 'User'); // Handle role correctly
 
