@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import axios from 'axios';
 import bg from '../assets/bg.png';
 
@@ -13,21 +13,25 @@ function AdminRegister() {
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [department, setDepartment] = useState('');
   const [position, setPosition] = useState('');
-  const [role, setRole] = useState(''); // Updated to start with an empty string
+  const [role, setRole] = useState('');
   const [username, setUsername] = useState('');
   const [adminName, setAdminName] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
-  const roles = ['user', 'admin', 'super_admin']; // Define the valid roles
+  const roles = ['user', 'admin', 'super_admin'];
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
     if (isSubmitting) return;
     setIsSubmitting(true);
+    setError('');
+    setSuccessMessage('');
 
     try {
-      const response = await axios.post('https://gss-itsm-platform-api-27vo.onrender.com/api/v1/admins/admins', {
+      const response = await axios.post(`${process.env.REACT_APP_API_BASE_URL}/api/v1/admins/admins`, {
         organization: {
           name,
           email,
@@ -49,8 +53,9 @@ function AdminRegister() {
         }
       });
 
+      setSuccessMessage('Organization registered successfully!');
       localStorage.setItem('token', response.data.token);
-      window.location.href = '/admin/dashboard';
+      setTimeout(() => (window.location.href = '/admin/dashboard'), 2000);
     } catch (err) {
       if (err.response && err.response.data && err.response.data.errors) {
         setError(err.response.data.errors.join(', '));
@@ -60,7 +65,7 @@ function AdminRegister() {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [isSubmitting, name, email, phoneNumber, website, address, subdomain, adminName, password, passwordConfirmation, department, position, role, username]);
 
   return (
     <div
@@ -75,6 +80,7 @@ function AdminRegister() {
       <div className="bg-white bg-opacity-70 p-8 rounded shadow-md w-full max-w-4xl">
         <h1 className="text-3xl mb-8 text-center text-blue-500">Register Organization</h1>
         {error && <p className="text-red-500 mb-4 text-center">{error}</p>}
+        {successMessage && <p className="text-green-500 mb-4 text-center">{successMessage}</p>}
 
         <form onSubmit={handleSubmit} className="flex flex-wrap gap-6">
           {/* Organization Details */}
@@ -175,7 +181,7 @@ function AdminRegister() {
               ))}
             </select>
             <input
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -183,19 +189,26 @@ function AdminRegister() {
               required
             />
             <input
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               placeholder="Confirm Password"
               value={passwordConfirmation}
               onChange={(e) => setPasswordConfirmation(e.target.value)}
               className="border p-2 w-full mb-4"
               required
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="text-sm text-blue-500 underline"
+            >
+              {showPassword ? 'Hide Passwords' : 'Show Passwords'}
+            </button>
           </div>
 
           <div className="w-full">
             <button
               type="submit"
-              className="bg-blue-500 text-white p-2 w-full"
+              className={`bg-blue-500 text-white p-2 w-full ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
               disabled={isSubmitting}
             >
               {isSubmitting ? 'Registering...' : 'Register'}
