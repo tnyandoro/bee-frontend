@@ -31,7 +31,7 @@ function AdminRegister() {
     setSuccessMessage('');
 
     try {
-      const response = await axios.post(`${process.env.REACT_APP_API_BASE_URL}/api/v1/admins/admins`, {
+      const response = await axios.post(`https://gss-itsm-platform-api-27vo.onrender.com/api/v1/admins/admins`, {
         organization: {
           name,
           email,
@@ -50,7 +50,7 @@ function AdminRegister() {
           position,
           role,
           username,
-        }
+        },
       });
 
       setSuccessMessage('Organization registered successfully!');
