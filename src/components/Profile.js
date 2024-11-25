@@ -16,7 +16,7 @@ const Profile = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const response = await axios.get(`http://localhost:3000/api/v1/auth/profile`, {
+        const response = await axios.get(`https://gss-itsm-platform-api-27vo.onrender.com/api/v1/auth/profile`, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
           },

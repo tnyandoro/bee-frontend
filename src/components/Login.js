@@ -51,7 +51,7 @@ const Login = ({ loginType, setLoggedIn, setEmail, setRole }) => {
 
 //     setIsLoading(true);
 //     const endpoint =
-//       loginType === 'Admin' ? 'http://localhost:3000/api/v1/admin_auth/login' : 'http://localhost:3000/api/v1/auth/login';
+//       loginType === 'Admin' ? 'https://gss-itsm-platform-api-27vo.onrender.com/api/v1/admin_auth/login' : 'https://gss-itsm-platform-api-27vo.onrender.com/api/v1/auth/login';
 
 //     try {
 //       const response = await axios.post(endpoint, {
@@ -90,7 +90,7 @@ const handleLogin = async () => {
     if (!validateForm()) return;
   
     setIsLoading(true);
-    const endpoint = 'http://localhost:3000/api/v1/auth/login'; // Unified endpoint
+    const endpoint = 'https://gss-itsm-platform-api-27vo.onrender.com/api/v1/auth/login'; // Unified endpoint
   
     try {
       const response = await axios.post(endpoint, {

@@ -27,7 +27,7 @@ function AdminRegister() {
     setIsSubmitting(true);
 
     try {
-      const response = await axios.post('http://localhost:3000/api/v1/admins/admins', {
+      const response = await axios.post('https://gss-itsm-platform-api-27vo.onrender.com/api/v1/admins/admins', {
         organization: {
           name,
           email,
