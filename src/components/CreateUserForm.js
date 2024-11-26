@@ -20,14 +20,37 @@ const CreateUserForm = ({ orgSubdomain, token, onClose }) => {
     setFormData({ ...formData, [name]: value });
   };
 
+  // const handleSubmit = async (e) => {
+  //   e.preventDefault();
+  //   try {
+  //     await axios.post(
+  //       `/api/v1/organizations/${orgSubdomain}/users`,
+  //       { user: formData },
+  //       { headers: { Authorization: `Bearer ${token}` } }
+  //     );
+  //     setMessage('User created successfully!');
+  //     setIsError(false);
+  //   } catch (error) {
+  //     setMessage(error.response?.data?.errors?.join(', ') || 'Error creating user');
+  //     setIsError(true);
+  //     console.error(error);
+  //   }
+  // };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      // Fetch organization ID based on subdomain
+      const orgResponse = await axios.get(`/api/v1/organizations/${orgSubdomain}`);
+      const organizationId = orgResponse.data.id; // Assuming the response contains the ID
+  
+      // Now make the user creation request
       await axios.post(
-        `/api/v1/organizations/${orgSubdomain}/users`,
+        `/api/v1/organizations/${organizationId}/users`,
         { user: formData },
         { headers: { Authorization: `Bearer ${token}` } }
       );
+  
       setMessage('User created successfully!');
       setIsError(false);
     } catch (error) {
@@ -36,7 +59,7 @@ const CreateUserForm = ({ orgSubdomain, token, onClose }) => {
       console.error(error);
     }
   };
-
+  
   return (
     <div>
       <h2 className="text-2xl font-semibold mb-4">Create User</h2>
