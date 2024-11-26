@@ -43,6 +43,11 @@ const CreateUserForm = ({ orgSubdomain, token, onClose }) => {
       // Fetch organization ID based on subdomain
       const orgResponse = await axios.get(`/api/v1/organizations/${orgSubdomain}`);
       const organizationId = orgResponse.data.id; // Assuming the response contains the ID
+
+      // Check if organizationId is valid
+      if (!organizationId) {
+        throw new Error('Organization ID is undefined');
+      }
   
       // Now make the user creation request
       await axios.post(
@@ -54,12 +59,12 @@ const CreateUserForm = ({ orgSubdomain, token, onClose }) => {
       setMessage('User created successfully!');
       setIsError(false);
     } catch (error) {
-      setMessage(error.response?.data?.errors?.join(', ') || 'Error creating user');
+      setMessage(error.response?.data?.errors?.join(', ') || error.message || 'Error creating user');
       setIsError(true);
       console.error(error);
     }
   };
-  
+
   return (
     <div>
       <h2 className="text-2xl font-semibold mb-4">Create User</h2>
