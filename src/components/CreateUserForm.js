@@ -19,24 +19,7 @@ const CreateUserForm = ({ orgSubdomain, token, onClose }) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
   };
-
-  // const handleSubmit = async (e) => {
-  //   e.preventDefault();
-  //   try {
-  //     await axios.post(
-  //       `/api/v1/organizations/${orgSubdomain}/users`,
-  //       { user: formData },
-  //       { headers: { Authorization: `Bearer ${token}` } }
-  //     );
-  //     setMessage('User created successfully!');
-  //     setIsError(false);
-  //   } catch (error) {
-  //     setMessage(error.response?.data?.errors?.join(', ') || 'Error creating user');
-  //     setIsError(true);
-  //     console.error(error);
-  //   }
-  // };
-
+  
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
