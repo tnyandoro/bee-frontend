@@ -19,10 +19,15 @@ const CreateUserForm = ({ orgSubdomain, token, onClose }) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
   };
-  
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      // Check if orgSubdomain is defined
+      if (!orgSubdomain) {
+        throw new Error('Organization subdomain is undefined');
+      }
+
       // Fetch organization ID based on subdomain
       const orgResponse = await axios.get(`/api/v1/organizations/${orgSubdomain}`);
       const organizationId = orgResponse.data.id; // Assuming the response contains the ID
