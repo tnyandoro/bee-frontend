@@ -101,13 +101,13 @@ const Login = ({ loginType, setLoggedIn, setEmail, setRole }) => {
         backgroundRepeat: 'no-repeat',
       }}
     >
-      {/* Left Side: Logo Section */}
-      <div className="hidden lg:flex lg:w-1/2 items-center justify-center bg-gray-200">
-        <img src={logor} alt="Logo" className="w-80" />
+      {/* Logo Section */}
+      <div className="flex flex-col items-center justify-center bg-gray-200 w-full lg:w-1/2 p-4">
+        <img src={logor} alt="Logo" className="w-40 lg:w-80 mb-6" />
       </div>
 
-      {/* Right Side: Login Form */}
-      <div className="flex flex-col w-full lg:w-1/2 justify-center items-center p-4 bg-opacity-70 bg-black">
+      {/* Login Form Section */}
+      <div className="flex flex-col items-center justify-center w-full lg:w-1/2 p-4">
         <h2 className="text-2xl md:text-3xl font-semibold text-white mb-6">
           {loginType} Login
         </h2>
