@@ -15,6 +15,9 @@ const CreateUserForm = ({ orgSubdomain, token, onClose }) => {
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
 
+  // Log the organization subdomain
+  console.log('Organization Subdomain:', orgSubdomain);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
