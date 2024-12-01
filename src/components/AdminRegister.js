@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import axios from 'axios';
 import bg from '../assets/bg.png';
 
@@ -21,6 +21,19 @@ function AdminRegister() {
   const [showPassword, setShowPassword] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
+  // Automatically generate subdomain when organization name changes
+  useEffect(() => {
+    if (name) {
+      // Convert name to URL-friendly format
+      const generatedSubdomain = name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')  // Replace non-alphanumeric chars with hyphens
+        .replace(/^-+|-+$/g, '');     // Remove leading/trailing hyphens
+      
+      setSubdomain(generatedSubdomain);
+    }
+  }, [name]);
+
   const roles = ['user', 'admin', 'super_admin'];
 
   const handleSubmit = useCallback(async (e) => {
@@ -31,27 +44,35 @@ function AdminRegister() {
     setSuccessMessage('');
 
     try {
-      const response = await axios.post(`https://gss-itsm-platform-api-27vo.onrender.com/api/v1/admins/admins`, {
-        organization: {
-          name,
-          email,
-          phone_number: phoneNumber,
-          website,
-          address,
-          subdomain,
-        },
-        admin: {
-          name: adminName,
-          email,
-          phone_number: phoneNumber,
-          password,
-          password_confirmation: passwordConfirmation,
-          department,
-          position,
-          role,
-          username,
-        },
-      });
+      // Validate subdomain
+      if (!subdomain) {
+        throw new Error('Subdomain is required');
+      }
+
+      const response = await axios.post(
+        `https://gss-itsm-platform-api-27vo.onrender.com/api/v1/admins/admins`, 
+        {
+          organization: {
+            name,
+            email,
+            phone_number: phoneNumber,
+            website,
+            address,
+            subdomain,  // Use the auto-generated or user-modified subdomain
+          },
+          admin: {
+            name: adminName,
+            email,
+            phone_number: phoneNumber,
+            password,
+            password_confirmation: passwordConfirmation,
+            department,
+            position,
+            role,
+            username,
+          },
+        }
+      );
 
       setSuccessMessage('Organization registered successfully!');
       localStorage.setItem('token', response.data.token);
@@ -60,12 +81,17 @@ function AdminRegister() {
       if (err.response && err.response.data && err.response.data.errors) {
         setError(err.response.data.errors.join(', '));
       } else {
-        setError('Error during registration');
+        setError(err.message || 'Error during registration');
       }
     } finally {
       setIsSubmitting(false);
     }
-  }, [isSubmitting, name, email, phoneNumber, website, address, subdomain, adminName, password, passwordConfirmation, department, position, role, username]);
+  }, [
+    isSubmitting, name, email, phoneNumber, website, 
+    address, subdomain, adminName, password, 
+    passwordConfirmation, department, position, 
+    role, username
+  ]);
 
   return (
     <div
@@ -95,6 +121,13 @@ function AdminRegister() {
               required
             />
             <input
+              type="text"
+              placeholder="Subdomain"
+              value={subdomain}
+              onChange={(e) => setSubdomain(e.target.value)}
+              className="border p-2 w-full mb-4"
+              required
+            />            <input
               type="email"
               placeholder="Organization Email"
               value={email}
@@ -123,14 +156,6 @@ function AdminRegister() {
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               className="border p-2 w-full mb-4"
-            />
-            <input
-              type="text"
-              placeholder="Subdomain"
-              value={subdomain}
-              onChange={(e) => setSubdomain(e.target.value)}
-              className="border p-2 w-full mb-4"
-              required
             />
           </div>
 
