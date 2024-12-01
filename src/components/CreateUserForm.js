@@ -24,33 +24,43 @@ const CreateUserForm = ({ orgSubdomain, token, onClose }) => {
     e.preventDefault();
     try {
       // Check if orgSubdomain is defined
-      console.log('Organization Subdomain:', orgSubdomain); // Log the subdomain
       if (!orgSubdomain) {
         throw new Error('Organization subdomain is undefined');
       }
-  
+
       // Fetch organization ID based on subdomain
       const orgResponse = await axios.get(`/api/v1/organizations/${orgSubdomain}`);
       const organizationId = orgResponse.data.id; // Assuming the response contains the ID
-  
+
       // Check if organizationId is valid
       if (!organizationId) {
         throw new Error('Organization ID is undefined');
       }
-    
+
+      // Log the API call details
+      console.log('Making API call to create user with data:', {
+        url: `/api/v1/organizations/${organizationId}/users`,
+        data: { user: formData },
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
       // Now make the user creation request
-      await axios.post(
+      const response = await axios.post(
         `/api/v1/organizations/${organizationId}/users`,
         { user: formData },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-    
+
+      // Log the response from the API
+      console.log('User created successfully:', response.data);
+  
       setMessage('User created successfully!');
       setIsError(false);
     } catch (error) {
+      // Log the error details
+      console.error('Error creating user:', error);
       setMessage(error.response?.data?.errors?.join(', ') || error.message || 'Error creating user');
       setIsError(true);
-      console.error(error);
     }
   };
   
