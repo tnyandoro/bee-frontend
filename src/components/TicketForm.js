@@ -23,7 +23,7 @@ const TicketForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     // Submit form data to the backend API
-    const response = await fetch('/api/tickets', {
+    const response = await fetch(`/api/v1/organizations/${subdomain}/tickets`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
