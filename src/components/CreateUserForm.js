@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
-const CreateUserForm = ({ orgSubdomain, token, onClose }) => {
+const CreateUserForm = ({ onClose }) => { // Removed orgSubdomain prop since we'll use localStorage
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -15,9 +15,6 @@ const CreateUserForm = ({ orgSubdomain, token, onClose }) => {
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
 
-  // Log the organization subdomain
-  console.log('Organization Subdomain:', orgSubdomain);
-
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
@@ -25,48 +22,54 @@ const CreateUserForm = ({ orgSubdomain, token, onClose }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setMessage('');
+    setIsError(false);
+
+    const token = localStorage.getItem('token');
+    const subdomain = localStorage.getItem('subdomain');
+
+    if (!token || !subdomain) {
+      setMessage('Please log in to create a user.');
+      setIsError(true);
+      return;
+    }
+
     try {
-      // Check if orgSubdomain is defined
-      if (!orgSubdomain) {
-        throw new Error('Organization subdomain is undefined');
-      }
-
-      // Fetch organization ID based on subdomain
-      const orgResponse = await axios.get(`/api/v1/organizations/${orgSubdomain}`);
-      const organizationId = orgResponse.data.id; // Assuming the response contains the ID
-
-      // Check if organizationId is valid
-      if (!organizationId) {
-        throw new Error('Organization ID is undefined');
-      }
-
-      // Log the API call details
+      const url = `http://${subdomain}.lvh.me:3000/api/v1/organizations/${subdomain}/users`;
       console.log('Making API call to create user with data:', {
-        url: `/api/v1/organizations/${organizationId}/users`,
+        url,
         data: { user: formData },
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
 
-      // Now make the user creation request
       const response = await axios.post(
-        `/api/v1/organizations/${organizationId}/users`,
+        url,
         { user: formData },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // Log the response from the API
       console.log('User created successfully:', response.data);
-  
       setMessage('User created successfully!');
       setIsError(false);
+      setFormData({ // Reset form
+        name: '',
+        email: '',
+        username: '',
+        phone_number: '',
+        department: '',
+        position: '',
+        role: 'agent',
+        password: '',
+      });
+      // Optionally close the form after success
+      // onClose();
     } catch (error) {
-      // Log the error details
       console.error('Error creating user:', error);
       setMessage(error.response?.data?.errors?.join(', ') || error.message || 'Error creating user');
       setIsError(true);
     }
   };
-  
+
   return (
     <div>
       <h2 className="text-2xl font-semibold mb-4">Create User</h2>
@@ -137,10 +140,10 @@ const CreateUserForm = ({ orgSubdomain, token, onClose }) => {
         >
           <option value="admin">Admin</option>
           <option value="super_user">Super User</option>
-          <option value="team_lead">Team Lead</option>
+          <option value="teamlead">Team Lead</option> {/* Updated to match User model enum */}
           <option value="agent">Agent</option>
-          <option value="sales_person">Sales Person</option>
-          <option value="technical">Technical</option>
+          <option value="viewer">Viewer</option> {/* Assuming these are valid roles */}
+          {/* Removed sales_person and technical as they aren't in your User model enum */}
         </select>
         <input
           type="password"
