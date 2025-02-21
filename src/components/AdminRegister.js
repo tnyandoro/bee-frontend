@@ -50,7 +50,7 @@ function AdminRegister() {
       }
 
       const response = await axios.post(
-        `https://gss-itsm-platform-api-27vo.onrender.com/api/v1/admins/admins`, 
+        `http://localhost:3000/api/v1/register`, 
         {
           organization: {
             name,
