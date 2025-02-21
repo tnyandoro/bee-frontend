@@ -3,38 +3,42 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import logor from '../assets/logor.png';
 import bg from '../assets/main_bg.png';
-import splashLogo from '../assets/splash_logo.png'; // For splash screen
+import splashLogo from '../assets/splash_logo.png';
 
 const Login = ({ loginType, setLoggedIn, setEmail, setRole }) => {
   const [email, setEmailInput] = useState('');
   const [password, setPasswordInput] = useState('');
+  const [subdomain, setSubdomain] = useState('');
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [subdomainError, setSubdomainError] = useState('');
   const [generalError, setGeneralError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [showSplash, setShowSplash] = useState(true); // Splash screen control
+  const [showSplash, setShowSplash] = useState(true);
 
   const navigate = useNavigate();
 
-  // Hide the splash screen after 3 seconds
+  // Hide splash screen after 3 seconds
   useEffect(() => {
-    const splashTimeout = setTimeout(() => {
-      setShowSplash(false);
-    }, 3000);
+    const splashTimeout = setTimeout(() => setShowSplash(false), 3000);
     return () => clearTimeout(splashTimeout);
   }, []);
 
-  // Form validation function
+  // Form validation
   const validateForm = () => {
     let isValid = true;
     setEmailError('');
     setPasswordError('');
+    setSubdomainError('');
 
+    if (!subdomain) {
+      setSubdomainError('Organization subdomain is required');
+      isValid = false;
+    }
     if (!email) {
       setEmailError('Email is required');
       isValid = false;
     }
-
     if (!password) {
       setPasswordError('Password is required');
       isValid = false;
@@ -48,40 +52,48 @@ const Login = ({ loginType, setLoggedIn, setEmail, setRole }) => {
     if (!validateForm()) return;
 
     setIsLoading(true);
-    const endpoint = 'https://gss-itsm-platform-api-27vo.onrender.com/api/v1/auth/login'; // Unified endpoint
+    const baseUrl = `http://${subdomain}.lvh.me:3000`; // Fixed for local development
+    const endpoint = `${baseUrl}/api/v1/login`;
+
+    console.log(`Logging in to: ${endpoint}`); // Debug log
 
     try {
-      const response = await axios.post(endpoint, {
-        email,
-        password,
-      });
+      const response = await axios.post(endpoint, { email, password });
 
-      // Get token and user data from response
-      const { token, user, is_admin } = response.data; // Assuming `is_admin` indicates if the user is an admin
+      const { auth_token, user } = response.data;
 
-      // Store token in localStorage
-      localStorage.setItem('token', token);
+      // Store token and subdomain in localStorage
+      localStorage.setItem('token', auth_token);
+      localStorage.setItem('subdomain', subdomain);
 
-      // Update parent state with login status, email, and role
+      // Update parent state
       setLoggedIn(true);
-      setEmail(email);
-      setRole(is_admin ? 'Admin' : 'User');
+      setEmail(user.email);
+      setRole(user.role);
 
-      // Redirect to the appropriate dashboard
-      const dashboardPath = is_admin ? '/dashboard' : '/user/dashboard';
+      // Redirect based on role
+      const dashboardPath = user.role === 'admin' || user.role === 'super_user'
+        ? '/dashboard'
+        : '/user/dashboard';
       navigate(dashboardPath);
     } catch (error) {
-      if (error.response && error.response.status === 401) {
-        setEmailError('Invalid email or password');
+      console.error('Login error:', error.response || error); // Debug log
+      if (error.response) {
+        if (error.response.status === 401) {
+          setEmailError('Invalid email or password');
+        } else if (error.response.status === 404) {
+          setSubdomainError('Organization not found');
+        } else {
+          setGeneralError(error.response.data.error || 'An error occurred');
+        }
       } else {
-        setGeneralError('An error occurred. Please try again later.');
+        setGeneralError('Network error. Please check if the API is running.');
       }
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Render splash screen if needed
   if (showSplash) {
     return (
       <div className="flex items-center justify-center bg-white h-screen">
@@ -90,7 +102,6 @@ const Login = ({ loginType, setLoggedIn, setEmail, setRole }) => {
     );
   }
 
-  // Render the login form
   return (
     <div
       className="flex flex-col lg:flex-row h-screen"
@@ -101,18 +112,27 @@ const Login = ({ loginType, setLoggedIn, setEmail, setRole }) => {
         backgroundRepeat: 'no-repeat',
       }}
     >
-      {/* Logo Section */}
       <div className="flex flex-col items-center justify-center bg-gray-200 w-full lg:w-1/2 p-4">
         <img src={logor} alt="Logo" className="w-40 lg:w-80 mb-6" />
       </div>
 
-      {/* Login Form Section */}
       <div className="flex flex-col items-center justify-center w-full lg:w-1/2 p-4">
         <h2 className="text-2xl md:text-3xl font-semibold text-white mb-6">
           {loginType} Login
         </h2>
 
         {generalError && <div className="text-red-500 mb-4">{generalError}</div>}
+
+        <div className="mb-4 w-full max-w-sm">
+          <input
+            value={subdomain}
+            type="text"
+            placeholder="Organization Subdomain (e.g., watoli)"
+            onChange={(e) => setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+            className={`border p-2 w-full rounded ${subdomainError ? 'border-red-500' : ''}`}
+          />
+          {subdomainError && <p className="text-red-500 text-sm">{subdomainError}</p>}
+        </div>
 
         <div className="mb-4 w-full max-w-sm">
           <input
