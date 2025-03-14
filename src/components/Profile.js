@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/authContext';
 import { FaUpload, FaLock, FaUser, FaArrowLeft } from 'react-icons/fa';
 
 const Profile = () => {
-  const { user } = useAuth(); // Assuming useAuth provides the user object
+  const { user } = useAuth();
   const [profile, setProfile] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -16,7 +16,7 @@ const Profile = () => {
 
   useEffect(() => {
     const fetchProfile = async () => {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('authToken');
       const subdomain = localStorage.getItem('subdomain');
 
       if (!token || !subdomain) {
@@ -34,7 +34,7 @@ const Profile = () => {
         console.log('Profile response:', response.data);
         setProfile(response.data);
       } catch (err) {
-        setError('Failed to fetch profile data. Please try again.');
+        setError('Failed to fetch profile data: ' + (err.response?.data?.error || err.message));
         console.error('Profile fetch error:', err.response || err);
       } finally {
         setLoading(false);
@@ -47,7 +47,9 @@ const Profile = () => {
     if (storedImage) {
       setProfilePicture(storedImage);
     }
-  }, []);
+
+    console.log('Current user from context:', user);
+  }, [user]);
 
   const handleImageUpload = () => {
     if (selectedFile) {
@@ -64,7 +66,7 @@ const Profile = () => {
 
   const handleChangePassword = () => {
     if (newPassword === confirmPassword) {
-      // TODO: Implement actual password change API call
+      // TODO: Implement password change API call
       alert('Password changed successfully!');
       setNewPassword('');
       setConfirmPassword('');
@@ -74,6 +76,8 @@ const Profile = () => {
     }
   };
 
+  console.log('Profile state:', profile); // Debug profile state
+
   if (loading) {
     return <div className="p-4">Loading profile...</div>;
   }
@@ -82,22 +86,20 @@ const Profile = () => {
     return <div className="p-4 text-red-500">{error}</div>;
   }
 
-  if (!profile || !profile.data || !profile.data.attributes) {
+  if (!profile) {
     return <div className="p-4">No profile data available.</div>;
   }
 
-  const userData = profile.data.attributes; // Access nested attributes
+  const userData = profile.user || {};
   const isAdmin = userData.role === 'admin' || userData.role === 'super_user';
 
   return (
     <div className="bg-gray-300 p-5 mt-10 flex">
-      {/* Vertical Menu */}
       <div className="bg-blue-700 p-4 rounded-l-lg text-white w-1/4">
         <div className="p-2 mx-auto rounded-b-lg bg-blue-700 shadow-5xl mb-6 mt-10">
           <h2 className="text-xl mb-6">My Profile</h2>
         </div>
 
-        {/* Profile Picture and Upload Button */}
         <div className="flex flex-col items-center mr-10 mb-4">
           {profilePicture ? (
             <img
@@ -122,7 +124,6 @@ const Profile = () => {
           />
         </div>
 
-        {/* Menu Buttons */}
         <label
           htmlFor="file-upload"
           className="flex items-center py-2 px-4 mb-2 bg-blue-700 hover:bg-blue-600 rounded cursor-pointer transition"
@@ -149,18 +150,17 @@ const Profile = () => {
         </label>
       </div>
 
-      {/* Main Profile Content */}
       <div className="flex-1 p-4">
         {activeTab === 'profile' ? (
           <div>
             <div className="p-2 mt-6">
               {error && <p className="text-red-500">{error}</p>}
+              {isAdmin && <p className="text-green-500">You have admin privileges.</p>}
             </div>
 
-            {/* User Details */}
             <div className="grid grid-cols-2 gap-2">
               {[
-                { key: 'ID', value: profile.data.id || 'N/A' },
+                { key: 'ID', value: userData.id || 'N/A' },
                 { key: 'Full Name', value: userData.name || 'N/A' },
                 { key: 'Password', value: '*********' },
                 { key: 'Email', value: userData.email || 'N/A' },
@@ -168,11 +168,9 @@ const Profile = () => {
                 { key: 'Phone', value: userData.phone_number || 'N/A' },
                 { key: 'Department', value: userData.department || 'N/A' },
                 { key: 'Position', value: userData.position || 'N/A' },
-                { key: 'Organization ID', value: userData.organization_id || 'N/A' },
-                { key: 'Organization Name', value: profile.organization.name || 'N/A' },
+                { key: 'Organization ID', value: profile.organization?.id || 'N/A' },
+                { key: 'Organization Name', value: profile.organization?.name || 'N/A' },
                 { key: 'Team ID', value: userData.team_id || 'N/A' },
-                { key: 'Created At', value: userData.created_at ? new Date(userData.created_at).toLocaleDateString() : 'N/A' },
-                { key: 'Updated At', value: userData.updated_at ? new Date(userData.updated_at).toLocaleDateString() : 'N/A' },
                 { key: 'Role', value: userData.role || 'N/A' },
               ].map(({ key, value }, index) => (
                 <div key={index} className="flex flex-col items-start mb-2">

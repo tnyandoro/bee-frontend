@@ -1,319 +1,537 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/authContext';
 
-const TicketForm = ({ organization }) => {
+const TicketForm = () => {
+  const { token, subdomain } = useAuth();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    title: '',
+    ticketNumber: `INC/REQ${Math.floor(Math.random() * 1000000000).toString().padStart(9, '0')}`,
+    ticketStatus: 'Open',
+    callerName: '',
+    callerSurname: '',
+    callerEmail: '',
+    callerContact: '',
+    callerLocation: '',
+    subject: '',
     description: '',
+    reportedDate: new Date().toISOString().slice(0, 16),
+    relatedRecord: '',
     ticket_type: 'Incident',
-    urgency: 'low',
-    priority: 1,
-    impact: 'low',
+    category: 'Technical', // Default to a valid category
+    impact: '2 - High',
+    urgency: '2 - High',
+    priority: '',
     team_id: '',
-    caller_name: '',
-    caller_surname: '',
-    caller_email: '',
-    caller_phone: '',
-    customer: '',
-    source: 'Web',
-    category: 'Technical',
     assignee_id: '',
   });
-
   const [teams, setTeams] = useState([]);
   const [teamUsers, setTeamUsers] = useState([]);
-  const [tickets, setTickets] = useState([]);
-  const [editingTicket, setEditingTicket] = useState(null);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [currentUser, setCurrentUser] = useState(null);
+  const [calculatedPriority, setCalculatedPriority] = useState('P?');
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const ticketTypes = ['Incident', 'Request', 'Problem'];
-  const urgencies = ['low', 'medium', 'high'];
-  const impacts = ['low', 'medium', 'high'];
-  const priorities = [3, 2, 1, 0];
-  const categories = ['Technical', 'Billing', 'Support', 'Hardware', 'Software', 'Other'];
+  const baseUrl = `http://${subdomain || 'kinzamba'}.lvh.me:3000/api/v1`;
 
+  // Fetch current user profile for "Opened By" and user_id
   useEffect(() => {
+    const fetchProfile = async () => {
+      if (!token || !subdomain) {
+        setError('Please log in to submit a ticket.');
+        return;
+      }
+      setLoading(true);
+      try {
+        const response = await axios.get(`${baseUrl}/profile`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setCurrentUser(response.data.name || response.data.username || 'Unknown User');
+        console.log('Current user profile:', response.data);
+      } catch (err) {
+        setError(`Failed to fetch user profile: ${err.response?.data?.error || err.message}`);
+        console.error('Fetch profile error:', err.response || err);
+        setCurrentUser('Unknown User');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProfile();
+  }, [token, subdomain, baseUrl]);
+
+  // Fetch teams
+  useEffect(() => {
+    const fetchTeams = async () => {
+      if (!token || !subdomain) return;
+      setLoading(true);
+      try {
+        const response = await axios.get(`${baseUrl}/organizations/${subdomain}/teams`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setTeams(response.data || []);
+      } catch (err) {
+        setError(`Failed to fetch teams: ${err.response?.data?.error || err.message}`);
+        console.error('Fetch teams error:', err.response || err);
+      } finally {
+        setLoading(false);
+      }
+    };
     fetchTeams();
-    fetchTickets();
-  }, [organization?.subdomain]);
+  }, [token, subdomain, baseUrl]);
 
-  const fetchTeams = async () => {
-    const token = localStorage.getItem('token');
-    if (!token || !organization?.subdomain) {
-      setError('You must be logged in and provide a subdomain to fetch teams.');
-      return;
-    }
-    try {
-      const response = await axios.get(`http://${organization.subdomain}.lvh.me:3000/api/v1/organizations/${organization.subdomain}/teams`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setTeams(Array.isArray(response.data.teams) ? response.data.teams : []);
-    } catch (err) {
-      setError('Failed to fetch teams: ' + (err.response?.data?.error || err.message));
-      setTeams([]);
-    }
-  };
-
-  const fetchTeamUsers = async (teamId) => {
-    const token = localStorage.getItem('token');
-    if (!token || !teamId) {
-      setTeamUsers([]);
-      return;
-    }
-    try {
-      const response = await axios.get(`http://${organization.subdomain}.lvh.me:3000/api/v1/organizations/${organization.subdomain}/teams/${teamId}/users`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setTeamUsers(Array.isArray(response.data.users) ? response.data.users : []);
-    } catch (err) {
-      setError('Failed to fetch team users: ' + (err.response?.data?.error || err.message));
-      setTeamUsers([]);
-    }
-  };
-
-  const fetchTickets = async () => {
-    const token = localStorage.getItem('token');
-    if (!token || !organization?.subdomain) return;
-    try {
-      const response = await axios.get(`http://${organization.subdomain}.lvh.me:3000/api/v1/organizations/${organization.subdomain}/tickets`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setTickets(Array.isArray(response.data.tickets) ? response.data.tickets : response.data);
-    } catch (err) {
-      setError('Failed to fetch tickets: ' + (err.response?.data?.error || err.message));
-    }
-  };
+  // Fetch users for the selected team
+  useEffect(() => {
+    const fetchTeamUsers = async () => {
+      if (!token || !subdomain || !formData.team_id) {
+        setTeamUsers([]);
+        return;
+      }
+      setLoading(true);
+      try {
+        const response = await axios.get(
+          `${baseUrl}/organizations/${subdomain}/teams/${formData.team_id}/users`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setTeamUsers(response.data || []);
+      } catch (err) {
+        setError(`Failed to fetch users for team: ${err.response?.data?.error || err.message}`);
+        console.error('Fetch team users error:', err.response || err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTeamUsers();
+  }, [token, subdomain, formData.team_id, baseUrl]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: name === 'priority' ? parseInt(value, 10) : value });
-    if (name === 'team_id' && value) fetchTeamUsers(value);
+    setFormData((prevData) => ({
+      ...prevData,
+      [name]: value,
+      ...(name === 'team_id' ? { assignee_id: '' } : {}),
+    }));
+    if (name === 'urgency' || name === 'impact') {
+      calculatePriority();
+    }
+  };
+
+  const calculatePriority = () => {
+    const urgencyMap = { '1 - Critical': 'high', '2 - High': 'medium', '3 - Medium': 'medium', '4 - Low': 'low' };
+    const impactMap = { '1 - Critical': 'high', '2 - High': 'medium', '3 - Medium': 'medium', '4 - Low': 'low' };
+    const priorityMatrix = {
+      'high_high': 'p1',
+      'high_medium': 'p2',
+      'high_low': 'p3',
+      'medium_high': 'p2',
+      'medium_medium': 'p3',
+      'medium_low': 'p4',
+      'low_high': 'p3',
+      'low_medium': 'p4',
+      'low_low': 'p4',
+    };
+    const urgencyValue = urgencyMap[formData.urgency] || 'medium';
+    const impactValue = impactMap[formData.impact] || 'medium';
+    const priorityKey = `${urgencyValue}_${impactValue}`;
+    const priority = priorityMatrix[priorityKey] || 'p4';
+    const priorityDisplay = { p4: 'P4', p3: 'P3', p2: 'P2', p1: 'P1' };
+    setCalculatedPriority(priorityDisplay[priority] || 'P?');
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
-    const token = localStorage.getItem('token');
-    const baseUrl = `http://${organization.subdomain}.lvh.me:3000`;
-    const url = editingTicket 
-      ? `${baseUrl}/api/v1/organizations/${organization.subdomain}/tickets/${editingTicket.id}`
-      : `${baseUrl}/api/v1/organizations/${organization.subdomain}/tickets`;
+    if (!token || !subdomain) {
+      setError('Please log in to submit a ticket.');
+      return;
+    }
+
+    // Validate all required fields
+    const requiredFields = {
+      subject: formData.subject,
+      description: formData.description,
+      ticket_type: formData.ticket_type,
+      category: formData.category,
+      team_id: formData.team_id,
+      callerName: formData.callerName,
+      callerSurname: formData.callerSurname,
+      callerEmail: formData.callerEmail,
+      callerContact: formData.callerContact,
+      callerLocation: formData.callerLocation,
+    };
+    const missingFields = Object.entries(requiredFields)
+      .filter(([key, value]) => !value)
+      .map(([key]) => key);
+    if (missingFields.length > 0) {
+      setError(`Please fill in all required fields: ${missingFields.join(', ')}.`);
+      return;
+    }
+
+    setError(null);
+    setSuccess(false);
+    setLoading(true);
+
+    const urgencyMap = { '1 - Critical': 'high', '2 - High': 'medium', '3 - Medium': 'medium', '4 - Low': 'low' };
+    const impactMap = { '1 - Critical': 'high', '2 - High': 'medium', '3 - Medium': 'medium', '4 - Low': 'low' };
+    const priorityMap = { 'P4': 'p4', 'P3': 'p3', 'P2': 'p2', 'P1': 'p1' };
+
+    const ticketData = {
+      ticket: {
+        title: formData.subject || 'Untitled',
+        description: formData.description || 'No description provided',
+        ticket_type: formData.ticket_type,
+        urgency: urgencyMap[formData.urgency] || 'medium',
+        impact: impactMap[formData.impact] || 'medium',
+        priority: priorityMap[calculatedPriority] || 'p4',
+        team_id: formData.team_id,
+        ticket_number: formData.ticketNumber,
+        reported_at: formData.reportedDate,
+        caller_name: formData.callerName || 'Unknown',
+        caller_surname: formData.callerSurname || 'Unknown',
+        caller_email: formData.callerEmail || 'unknown@example.com',
+        caller_phone: formData.callerContact || 'N/A',
+        customer: formData.callerLocation || 'Unknown Location',
+        source: 'Web',
+        category: formData.category,
+        assignee_id: formData.assignee_id || null,
+        // organization_id and user_id will be set by the backend
+      },
+    };
 
     try {
-      const response = editingTicket 
-        ? await axios.put(url, { ticket: formData }, { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } })
-        : await axios.post(url, { ticket: formData }, { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } });
-
-      const successMessage = editingTicket ? 'Ticket updated successfully!' : 'Ticket created successfully!';
-      setSuccess(successMessage);
-      toast.success(successMessage, {
-        position: "top-right",
-        autoClose: 3000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
+      const response = await axios.post(
+        `${baseUrl}/organizations/${subdomain}/tickets`,
+        ticketData,
+        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
+      );
+      console.log('Ticket created:', response.data);
+      const priorityMap = { p4: 'P4', p3: 'P3', p2: 'P2', p1: 'P1' };
+      const newPriority = priorityMap[response.data.priority_before_type_cast] || 'P?';
+      const newTicket = { ...response.data, calculated_priority: newPriority };
+      setCalculatedPriority(newPriority);
+      setSuccess(true);
+      navigate('/incident-overview', { state: { newTicket } });
+      setFormData({
+        ticketNumber: `INC/REQ${Math.floor(Math.random() * 1000000000).toString().padStart(9, '0')}`,
+        ticketStatus: 'Open',
+        callerName: '',
+        callerSurname: '',
+        callerEmail: '',
+        callerContact: '',
+        callerLocation: '',
+        subject: '',
+        description: '',
+        reportedDate: new Date().toISOString().slice(0, 16),
+        relatedRecord: '',
+        ticket_type: 'Incident',
+        category: 'Technical',
+        impact: '2 - High',
+        urgency: '2 - High',
+        team_id: '',
+        assignee_id: '',
       });
-      resetForm();
-      fetchTickets();
+      setTeamUsers([]);
     } catch (err) {
-      setError(err.response?.data?.errors?.join(', ') || err.response?.data?.error || 'Error processing ticket');
+      setError(`Failed to create ticket: ${JSON.stringify(err.response?.data) || err.message}`);
+      console.error('Submit error:', err.response || err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const resetForm = () => {
-    setFormData({
-      title: '',
-      description: '',
-      ticket_type: 'Incident',
-      urgency: 'low',
-      priority: 1,
-      impact: 'low',
-      team_id: '',
-      caller_name: '',
-      caller_surname: '',
-      caller_email: '',
-      caller_phone: '',
-      customer: '',
-      source: 'Web',
-      category: 'Technical',
-      assignee_id: '',
-    });
-    setEditingTicket(null);
-    setTeamUsers([]);
-  };
-
-  const editTicket = (ticket) => {
-    setFormData({
-      ...ticket,
-      priority: ticket.priority !== undefined ? ticket.priority : 1,
-    });
-    setEditingTicket(ticket);
-    if (ticket.team_id) fetchTeamUsers(ticket.team_id);
-  };
-
-  const getPriorityLabel = (priority) => {
-    const priorityNum = Number(priority);
-    if (isNaN(priorityNum) || priorityNum < 0 || priorityNum > 3) return 'P?';
-    return `P${4 - priorityNum}`;
-  };
+  if (loading) return <p className="text-blue-700 text-center">Loading teams, users, and profile...</p>;
 
   return (
-    <div className="w-full p-4 relative">
-      {/* Toast Container for Notifications */}
-      <ToastContainer
-        position="top-right"
-        autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop={false}
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-      />
+    <div className="max-w-4xl mx-auto bg-white shadow-lg p-6 rounded-lg">
+      <h2 className="text-xl font-semibold mb-4">Create Ticket</h2>
 
-      <form onSubmit={handleSubmit} className="w-full bg-gray-100 shadow-md rounded-lg p-6 mb-6">
-        <h2 className="text-2xl font-bold mb-6">{editingTicket ? 'Edit Ticket' : 'Create Ticket'}</h2>
-        {error && <p className="text-red-500 mb-4">{error}</p>}
-        {success && <p className="text-green-500 mb-4">{success}</p>}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-gray-700 font-bold">Title *</label>
-            <input type="text" name="title" value={formData.title} onChange={handleChange} className="mt-1 w-full border rounded p-2 bg-white" required />
-          </div>
-          <div>
-            <label className="block text-gray-700 font-bold">Description *</label>
-            <textarea name="description" value={formData.description} onChange={handleChange} className="mt-1 w-full border rounded p-2 bg-white" required />
-          </div>
-          <div>
-            <label className="block text-gray-700 font-bold">Ticket Type *</label>
-            <select name="ticket_type" value={formData.ticket_type} onChange={handleChange} className="mt-1 w-full border rounded p-2 bg-white" required>
-              {ticketTypes.map((type) => <option key={type} value={type}>{type}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-gray-700 font-bold">Urgency *</label>
-            <select name="urgency" value={formData.urgency} onChange={handleChange} className="mt-1 w-full border rounded p-2 bg-white" required>
-              {urgencies.map((urgency) => <option key={urgency} value={urgency}>{urgency.charAt(0).toUpperCase() + urgency.slice(1)}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-gray-700 font-bold">Priority *</label>
-            <select name="priority" value={formData.priority} onChange={handleChange} className="mt-1 w-full border rounded p-2 bg-white" required>
-              {priorities.map((priority) => <option key={priority} value={priority}>{`P${4 - priority}`}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-gray-700 font-bold">Impact *</label>
-            <select name="impact" value={formData.impact} onChange={handleChange} className="mt-1 w-full border rounded p-2 bg-white" required>
-              {impacts.map((impact) => <option key={impact} value={impact}>{impact.charAt(0).toUpperCase() + impact.slice(1)}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-gray-700 font-bold">Team *</label>
-            <select name="team_id" value={formData.team_id} onChange={handleChange} className="mt-1 w-full border rounded p-2 bg-white" required>
-              <option value="">Select a Team</option>
-              {teams.map((team) => team && <option key={team.id} value={team.id}>{team.name || 'Unnamed Team'}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-gray-700 font-bold">Assignee</label>
-            <select name="assignee_id" value={formData.assignee_id} onChange={handleChange} className="mt-1 w-full border rounded p-2 bg-white" disabled={!formData.team_id}>
-              <option value="">Select an Assignee (Optional)</option>
-              {teamUsers.map((user) => user && <option key={user.id} value={user.id}>{user.name || 'Unnamed User'} ({user.email})</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-gray-700 font-bold">Caller Name *</label>
-            <input type="text" name="caller_name" value={formData.caller_name} onChange={handleChange} className="mt-1 w-full border rounded p-2 bg-white" required />
-          </div>
-          <div>
-            <label className="block text-gray-700 font-bold">Caller Surname *</label>
-            <input type="text" name="caller_surname" value={formData.caller_surname} onChange={handleChange} className="mt-1 w-full border rounded p-2 bg-white" required />
-          </div>
-          <div>
-            <label className="block text-gray-700 font-bold">Caller Email *</label>
-            <input type="email" name="caller_email" value={formData.caller_email} onChange={handleChange} className="mt-1 w-full border rounded p-2 bg-white" required />
-          </div>
-          <div>
-            <label className="block text-gray-700 font-bold">Caller Phone *</label>
-            <input type="text" name="caller_phone" value={formData.caller_phone} onChange={handleChange} className="mt-1 w-full border rounded p-2 bg-white" required />
-          </div>
-          <div>
-            <label className="block text-gray-700 font-bold">Customer *</label>
-            <input type="text" name="customer" value={formData.customer} onChange={handleChange} className="mt-1 w-full border rounded p-2 bg-white" required />
-          </div>
-          <div>
-            <label className="block text-gray-700 font-bold">Source *</label>
-            <input type="text" name="source" value={formData.source} onChange={handleChange} className="mt-1 w-full border rounded p-2 bg-white" required />
-          </div>
-          <div>
-            <label className="block text-gray-700 font-bold">Category *</label>
-            <select name="category" value={formData.category} onChange={handleChange} className="mt-1 w-full border rounded p-2 bg-white" required>
-              {categories.map((category) => <option key={category} value={category}>{category}</option>)}
-            </select>
-          </div>
+      {/* Ticket Details */}
+      <div className="grid grid-cols-3 gap-4">
+        <div>
+          <label className="block text-sm font-medium">Ticket Number</label>
+          <input
+            type="text"
+            value={formData.ticketNumber}
+            readOnly
+            className="w-full border px-3 py-2 rounded-md bg-gray-100"
+          />
         </div>
-
-        <div className="mt-6 flex space-x-4">
-          <button type="submit" className="flex-1 bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition duration-200">
-            {editingTicket ? 'Update Ticket' : 'Create Ticket'}
-          </button>
-          {editingTicket && (
-            <button type="button" onClick={resetForm} className="flex-1 bg-gray-500 text-white p-2 rounded hover:bg-gray-600 transition duration-200">
-              Cancel
-            </button>
-          )}
+        <div>
+          <label className="block text-sm font-medium">Ticket Status</label>
+          <input
+            type="text"
+            value={formData.ticketStatus}
+            readOnly
+            className="w-full border px-3 py-2 rounded-md bg-gray-100"
+          />
         </div>
-      </form>
-
-      <div className="w-full bg-white shadow-lg rounded-lg p-6">
-        <h2 className="text-2xl font-bold mb-6 text-gray-800">Ticket List</h2>
-        {tickets.length === 0 ? (
-          <p className="text-gray-500 italic">No tickets available.</p>
-        ) : (
-          <div className="space-y-6">
-            {tickets.map((ticket) => (
-              <div key={ticket.id} className="bg-gray-50 border border-gray-200 rounded-lg p-5 shadow-sm hover:shadow-md transition-shadow duration-200">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900">{ticket.title}</h3>
-                    <p className="text-gray-700 mt-1">{ticket.description}</p>
-                    <div className="mt-2 flex flex-wrap gap-4 text-sm">
-                      <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                        <span className="font-bold">Type:</span> {ticket.ticket_type}
-                      </span>
-                      <span className="bg-green-100 text-green-800 px-2 py-1 rounded">
-                        <span className="font-bold">Priority:</span> {getPriorityLabel(ticket.priority)}
-                      </span>
-                      <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-                        <span className="font-bold">Status:</span> {ticket.status || 'open'}
-                      </span>
-                      {ticket.category && (
-                        <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded">
-                          <span className="font-bold">Category:</span> {ticket.category}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => editTicket(ticket)}
-                    className="bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 transition duration-200 font-medium"
-                  >
-                    Edit
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        <div>
+          <label className="block text-sm font-medium">Opened By</label>
+          <input
+            type="text"
+            value={currentUser || 'Loading...'}
+            readOnly
+            className="w-full border px-3 py-2 rounded-md bg-gray-200 text-gray-600 cursor-not-allowed"
+          />
+        </div>
       </div>
+
+      {/* Caller Details */}
+      <div className="mt-4">
+        <h3 className="text-md font-semibold">Caller Details</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium">Caller Name</label>
+            <input
+              type="text"
+              placeholder="Caller Name"
+              name="callerName"
+              value={formData.callerName}
+              onChange={handleChange}
+              className="w-full border px-3 py-2 rounded-md"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium">Caller Surname</label>
+            <input
+              type="text"
+              placeholder="Caller Surname"
+              name="callerSurname"
+              value={formData.callerSurname}
+              onChange={handleChange}
+              className="w-full border px-3 py-2 rounded-md"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium">Caller Email</label>
+            <input
+              type="email"
+              placeholder="Caller Email"
+              name="callerEmail"
+              value={formData.callerEmail}
+              onChange={handleChange}
+              className="w-full border px-3 py-2 rounded-md"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium">Caller Contact</label>
+            <input
+              type="text"
+              placeholder="Caller Contact"
+              name="callerContact"
+              value={formData.callerContact}
+              onChange={handleChange}
+              className="w-full border px-3 py-2 rounded-md"
+              required
+            />
+          </div>
+          <div className="col-span-2">
+            <label className="block text-sm font-medium">Caller Location</label>
+            <input
+              type="text"
+              placeholder="Caller Location"
+              name="callerLocation"
+              value={formData.callerLocation}
+              onChange={handleChange}
+              className="w-full border px-3 py-2 rounded-md"
+              required
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Subject & Description */}
+      <div className="mt-4">
+        <label className="block text-sm font-medium">Subject</label>
+        <input
+          type="text"
+          name="subject"
+          value={formData.subject}
+          onChange={handleChange}
+          className="w-full border px-3 py-2 rounded-md"
+          required
+        />
+      </div>
+      <div className="mt-4">
+        <label className="block text-sm font-medium">Description</label>
+        <textarea
+          name="description"
+          value={formData.description}
+          onChange={handleChange}
+          rows="4"
+          className="w-full border px-3 py-2 rounded-md"
+          required
+        />
+      </div>
+
+      {/* Ticket Details */}
+      <div className="mt-4 grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium">Reported Date</label>
+          <input
+            type="datetime-local"
+            name="reportedDate"
+            value={formData.reportedDate}
+            onChange={handleChange}
+            className="w-full border px-3 py-2 rounded-md"
+            readOnly
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium">Related Record</label>
+          <input
+            type="text"
+            name="relatedRecord"
+            value={formData.relatedRecord}
+            onChange={handleChange}
+            className="w-full border px-3 py-2 rounded-md"
+          />
+        </div>
+      </div>
+
+      {/* Ticket Type, Category, Impact, Urgency, Priority */}
+      <div className="mt-4 grid grid-cols-4 gap-4">
+        <div>
+          <label className="block text-sm font-medium">Ticket Type</label>
+          <select
+            name="ticket_type"
+            value={formData.ticket_type}
+            onChange={handleChange}
+            className="w-full border px-3 py-2 rounded-md"
+            required
+          >
+            <option>Incident</option>
+            <option>Request</option>
+            <option>Problem</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium">Category</label>
+          <select
+            name="category"
+            value={formData.category}
+            onChange={handleChange}
+            className="w-full border px-3 py-2 rounded-md"
+            required
+          >
+            <option>Technical</option>
+            <option>Billing</option>
+            <option>Support</option>
+            <option>Hardware</option>
+            <option>Software</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium">Impact</label>
+          <select
+            name="impact"
+            value={formData.impact}
+            onChange={handleChange}
+            className="w-full border px-3 py-2 rounded-md"
+            required
+          >
+            <option>1 - Critical</option>
+            <option>2 - High</option>
+            <option>3 - Medium</option>
+            <option>4 - Low</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium">Urgency</label>
+          <select
+            name="urgency"
+            value={formData.urgency}
+            onChange={handleChange}
+            className="w-full border px-3 py-2 rounded-md"
+            required
+          >
+            <option>1 - Critical</option>
+            <option>2 - High</option>
+            <option>3 - Medium</option>
+            <option>4 - Low</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium">Priority</label>
+          <input
+            type="text"
+            value={calculatedPriority}
+            readOnly
+            className="w-full border px-3 py-2 rounded-md bg-gray-100"
+          />
+        </div>
+      </div>
+
+      {/* Team and Assignee Dropdowns */}
+      <div className="mt-4 grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium">Team</label>
+          <select
+            name="team_id"
+            value={formData.team_id}
+            onChange={handleChange}
+            className="w-full border px-3 py-2 rounded-md"
+            required
+          >
+            <option value="">Select a Team</option>
+            {teams.map((team) => (
+              <option key={team.id} value={team.id}>
+                {team.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium">Assignee</label>
+          <select
+            name="assignee_id"
+            value={formData.assignee_id}
+            onChange={handleChange}
+            className="w-full border px-3 py-2 rounded-md"
+            disabled={!formData.team_id}
+          >
+            <option value="">Select an Assignee</option>
+            {teamUsers.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.name || user.username}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Buttons */}
+      <div className="flex justify-end space-x-4 mt-6">
+        <button
+          className="bg-red-500 text-white px-4 py-2 rounded-md"
+          onClick={() => navigate('/incident-overview')}
+        >
+          Cancel
+        </button>
+        <button
+          className="bg-blue-500 text-white px-4 py-2 rounded-md"
+          onClick={() => {
+            setError('Save as draft functionality not implemented yet.');
+          }}
+          disabled
+        >
+          Save
+        </button>
+        <button
+          onClick={handleSubmit}
+          className="bg-green-500 text-white px-4 py-2 rounded-md"
+          disabled={loading}
+        >
+          {loading ? 'Submitting...' : 'Submit'}
+        </button>
+      </div>
+
+      {error && <p className="text-red-500 mt-2">{error}</p>}
+      {success && <p className="text-green-500 mt-2">Ticket submitted successfully!</p>}
     </div>
   );
 };

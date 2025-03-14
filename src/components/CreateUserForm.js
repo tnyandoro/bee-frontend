@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { useAuth } from '../contexts/authContext'; // Use AuthContext
 
-const CreateUserForm = ({ onClose }) => { // Removed orgSubdomain prop since we'll use localStorage
+const CreateUserForm = ({ onClose }) => {
+  const { currentUser, token, subdomain } = useAuth(); // Get auth data from context
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -9,11 +11,12 @@ const CreateUserForm = ({ onClose }) => { // Removed orgSubdomain prop since we'
     phone_number: '',
     department: '',
     position: '',
-    role: 'agent', // Default role
+    role: 'agent',
     password: '',
   });
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // Added loading state
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -24,34 +27,42 @@ const CreateUserForm = ({ onClose }) => { // Removed orgSubdomain prop since we'
     e.preventDefault();
     setMessage('');
     setIsError(false);
-
-    const token = localStorage.getItem('token');
-    const subdomain = localStorage.getItem('subdomain');
+    setIsLoading(true); // Set loading state
 
     if (!token || !subdomain) {
+      console.log('No token or subdomain available, user not authenticated');
       setMessage('Please log in to create a user.');
       setIsError(true);
+      setIsLoading(false);
+      return;
+    }
+
+    // Check if current user has admin privileges
+    if (!currentUser || !['admin', 'super_user'].includes(currentUser.role)) {
+      console.log('User lacks admin privileges:', currentUser?.role);
+      setMessage('You must be an admin or super user to create a user.');
+      setIsError(true);
+      setIsLoading(false);
       return;
     }
 
     try {
       const url = `http://${subdomain}.lvh.me:3000/api/v1/organizations/${subdomain}/users`;
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      };
       console.log('Making API call to create user with data:', {
         url,
         data: { user: formData },
-        headers: { Authorization: `Bearer ${token}` },
+        headers,
       });
 
-      const response = await axios.post(
-        url,
-        { user: formData },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
+      const response = await axios.post(url, { user: formData }, { headers });
       console.log('User created successfully:', response.data);
       setMessage('User created successfully!');
       setIsError(false);
-      setFormData({ // Reset form
+      setFormData({
         name: '',
         email: '',
         username: '',
@@ -61,14 +72,40 @@ const CreateUserForm = ({ onClose }) => { // Removed orgSubdomain prop since we'
         role: 'agent',
         password: '',
       });
-      // Optionally close the form after success
+      // Uncomment to close form after success if desired
       // onClose();
     } catch (error) {
-      console.error('Error creating user:', error);
-      setMessage(error.response?.data?.errors?.join(', ') || error.message || 'Error creating user');
+      console.error('Error creating user:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
+      setMessage(
+        error.response?.data?.errors?.join(', ') ||
+          error.response?.data?.error ||
+          'Error creating user'
+      );
       setIsError(true);
+    } finally {
+      setIsLoading(false); // Reset loading state
     }
   };
+
+  // Guard against unauthenticated access
+  if (!token || !subdomain) {
+    return (
+      <div>
+        <p className="text-red-500">Please log in to create a user.</p>
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-4 bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded shadow"
+        >
+          Close
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -85,6 +122,7 @@ const CreateUserForm = ({ onClose }) => { // Removed orgSubdomain prop since we'
           onChange={handleChange}
           className="border p-2 rounded w-full"
           required
+          disabled={isLoading}
         />
         <input
           type="email"
@@ -94,6 +132,7 @@ const CreateUserForm = ({ onClose }) => { // Removed orgSubdomain prop since we'
           onChange={handleChange}
           className="border p-2 rounded w-full"
           required
+          disabled={isLoading}
         />
         <input
           type="text"
@@ -103,6 +142,7 @@ const CreateUserForm = ({ onClose }) => { // Removed orgSubdomain prop since we'
           onChange={handleChange}
           className="border p-2 rounded w-full"
           required
+          disabled={isLoading}
         />
         <input
           type="text"
@@ -112,6 +152,7 @@ const CreateUserForm = ({ onClose }) => { // Removed orgSubdomain prop since we'
           onChange={handleChange}
           className="border p-2 rounded w-full"
           required
+          disabled={isLoading}
         />
         <input
           type="text"
@@ -121,6 +162,7 @@ const CreateUserForm = ({ onClose }) => { // Removed orgSubdomain prop since we'
           onChange={handleChange}
           className="border p-2 rounded w-full"
           required
+          disabled={isLoading}
         />
         <input
           type="text"
@@ -130,6 +172,7 @@ const CreateUserForm = ({ onClose }) => { // Removed orgSubdomain prop since we'
           onChange={handleChange}
           className="border p-2 rounded w-full"
           required
+          disabled={isLoading}
         />
         <select
           name="role"
@@ -137,13 +180,13 @@ const CreateUserForm = ({ onClose }) => { // Removed orgSubdomain prop since we'
           onChange={handleChange}
           className="border p-2 rounded w-full"
           required
+          disabled={isLoading}
         >
           <option value="admin">Admin</option>
           <option value="super_user">Super User</option>
-          <option value="teamlead">Team Lead</option> {/* Updated to match User model enum */}
+          <option value="teamlead">Team Lead</option>
           <option value="agent">Agent</option>
-          <option value="viewer">Viewer</option> {/* Assuming these are valid roles */}
-          {/* Removed sales_person and technical as they aren't in your User model enum */}
+          <option value="viewer">Viewer</option>
         </select>
         <input
           type="password"
@@ -153,18 +196,21 @@ const CreateUserForm = ({ onClose }) => { // Removed orgSubdomain prop since we'
           onChange={handleChange}
           className="border p-2 rounded w-full"
           required
+          disabled={isLoading}
         />
         <div className="flex justify-between mt-4">
           <button
             type="submit"
-            className="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded shadow"
+            className="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded shadow disabled:bg-green-300"
+            disabled={isLoading}
           >
-            Create User
+            {isLoading ? 'Creating...' : 'Create User'}
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded shadow"
+            className="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded shadow disabled:bg-red-300"
+            disabled={isLoading}
           >
             Cancel
           </button>

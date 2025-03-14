@@ -1,91 +1,107 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import MyChartComponent from './MyChartComponent';
-
-// Function to generate random ticket numbers
-const generateRandomTicketNumber = () => {
-  return `INC-${Math.floor(1000 + Math.random() * 9000)}`;
-};
-
-// Function to generate random subjects for tickets
-const generateRandomSubject = () => {
-  const subjects = [
-    'System Outage',
-    'Login Issue',
-    'High CPU Usage',
-    'Network Latency',
-    'Database Error',
-    'Missing Data',
-    'File Corruption',
-    'Security Breach',
-    'Application Crash',
-    'Permission Denied',
-  ];
-  return subjects[Math.floor(Math.random() * subjects.length)];
-};
-
-// Function to generate random dates within the last 30 days
-const generateRandomDate = () => {
-  const now = new Date();
-  const pastDate = new Date(now);
-  pastDate.setDate(now.getDate() - Math.floor(Math.random() * 30));
-
-  const hours = Math.floor(Math.random() * 24);
-  const minutes = Math.floor(Math.random() * 60);
-  const formattedDate = pastDate.toISOString().split('T')[0];
-  const formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} PM`;
-  return `${formattedDate} ${formattedTime}`;
-};
 
 const Dashboard = () => {
   const [ticketData, setTicketData] = useState({
-    newTickets: 15,
-    critical: 5,
-    high: 10,
-    breaching: 3,
-    missedSLA: 2,
+    newTickets: 0,
+    critical: 0,
+    high: 0,
+    breaching: 0,
+    missedSLA: 0,
   });
 
-  const [tickets, setTickets] = useState(Array.from({ length: 50 }).map((_, index) => ({
-    id: generateRandomTicketNumber(),
-    subject: generateRandomSubject(),
-    date: generateRandomDate(),
-    type: ['New Tickets', 'Critical', 'High', 'Breaching in 2hrs', 'Missed SLA'][Math.floor(Math.random() * 5)],
-    status: ['Open', 'In Progress', 'Resolved'][Math.floor(Math.random() * 3)],
-    customer: `Customer ${index + 1}`,
-    priority: ['Low', 'Medium', 'High', 'Critical'][Math.floor(Math.random() * 4)],
-    assignmentGroup: ['Network', 'Software', 'Hardware'][Math.floor(Math.random() * 3)],
-    assignee: `Assignee ${index + 1}`,
-    lastUpdate: generateRandomDate(),
-    resolvedOn: generateRandomDate(),
-  })));
-
+  const [tickets, setTickets] = useState([]);
   const [selectedType, setSelectedType] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
 
   const itemsPerPage = 10;
 
+  useEffect(() => {
+    fetchTickets();
+  }, []); // Fetch on mount
+
+  const fetchTickets = async () => {
+    const token = localStorage.getItem('authToken');
+    const subdomain = localStorage.getItem('subdomain') || 'kinzamba'; // Default for testing, adjust as needed
+
+    if (!token || !subdomain) {
+      setError('Please log in to view dashboard data.');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await axios.get(
+        `http://${subdomain}.lvh.me:3000/api/v1/organizations/${subdomain}/tickets`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      console.log('Tickets response:', response.data); // Debug response
+
+      const fetchedTickets = Array.isArray(response.data.tickets) ? response.data.tickets : response.data || [];
+      setTickets(fetchedTickets);
+
+      // Calculate ticket counts based on real data
+      const counts = {
+        newTickets: fetchedTickets.filter((t) => t.status === 'open').length,
+        critical: fetchedTickets.filter((t) => t.priority === 0).length, // Assuming 0 is critical
+        high: fetchedTickets.filter((t) => t.priority === 1).length,
+        breaching: fetchedTickets.filter((t) => t.sla_breached && t.status !== 'resolved').length,
+        missedSLA: fetchedTickets.filter((t) => t.sla_breached).length,
+      };
+      setTicketData(counts);
+    } catch (err) {
+      setError('Failed to fetch tickets: ' + (err.response?.data?.error || err.message));
+      console.error('Tickets fetch error:', err.response || err);
+      setTickets([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleFilter = (title) => {
     setSelectedType(title);
+    setCurrentPage(1); // Reset to first page on filter change
   };
 
   const handleSearch = (e) => {
     setSearchQuery(e.target.value);
+    setCurrentPage(1); // Reset to first page on search
   };
 
   const filteredTickets = tickets.filter((ticket) => {
-    const matchesType = selectedType === 'All' || ticket.type === selectedType;
-    const matchesSearch = ticket.subject.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesType =
+      selectedType === 'All' ||
+      (selectedType === 'New Tickets' && ticket.status === 'open') ||
+      (selectedType === 'Critical' && ticket.priority === 0) ||
+      (selectedType === 'High' && ticket.priority === 1) ||
+      (selectedType === 'Breaching in 2hrs' && ticket.sla_breached && ticket.status !== 'resolved') ||
+      (selectedType === 'Missed SLA' && ticket.sla_breached);
+    const matchesSearch = ticket.title.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesType && matchesSearch;
   });
 
   const counts = {
-    'New Tickets': tickets.filter(ticket => ticket.type === 'New Tickets').length,
-    'Critical': tickets.filter(ticket => ticket.type === 'Critical').length,
-    'High': tickets.filter(ticket => ticket.type === 'High').length,
-    'Breaching in 2hrs': tickets.filter(ticket => ticket.type === 'Breaching in 2hrs').length,
-    'Missed SLA': tickets.filter(ticket => ticket.type === 'Missed SLA').length,
+    'New Tickets': ticketData.newTickets,
+    'Critical': ticketData.critical,
+    'High': ticketData.high,
+    'Breaching in 2hrs': ticketData.breaching,
+    'Missed SLA': ticketData.missedSLA,
   };
+
+  if (loading) {
+    return <div className="p-4">Loading dashboard data...</div>;
+  }
+
+  if (error) {
+    return <div className="p-4 text-red-500">{error}</div>;
+  }
 
   return (
     <div className="bg-blue-700 container mx-auto p-2">
@@ -94,10 +110,10 @@ const Dashboard = () => {
           <h2 className="text-xl mb-6 text-white">Dashboard Overview</h2>
         </div>
 
-         {/* Charts Section */}
-         <div className="mb-8">
-            <h2 className="text-2xl mb-3">Incident Distribution & Monthly Overview</h2>
-            <MyChartComponent />
+        {/* Charts Section */}
+        <div className="mb-8">
+          <h2 className="text-2xl mb-3">Incident Distribution & Monthly Overview</h2>
+          <MyChartComponent tickets={tickets} /> {/* Pass real tickets to chart */}
         </div>
 
         {/* Cards Section */}
@@ -130,7 +146,10 @@ const Dashboard = () => {
           </div>
           <button
             className="mt-3 sm:mt-0 sm:ml-2 border rounded p-2 bg-blue-600 text-white"
-            onClick={() => setSearchQuery('')}
+            onClick={() => {
+              setSearchQuery('');
+              fetchTickets(); // Refresh with latest data
+            }}
           >
             Refresh
           </button>
@@ -148,19 +167,19 @@ const Dashboard = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredTickets.map((ticket, index) => (
-                <tr key={index}>
-                  <td className="border border-blue-600 p-2">{ticket.id}</td>
-                  <td className="border border-blue-600 p-2">{ticket.subject}</td>
-                  <td className="border border-blue-600 p-2">{ticket.date}</td>
-                  <td className="border border-blue-600 p-2">{ticket.type}</td>
+              {filteredTickets.map((ticket) => (
+                <tr key={ticket.id}>
+                  <td className="border border-blue-600 p-2">{ticket.ticket_number}</td>
+                  <td className="border border-blue-600 p-2">{ticket.title}</td>
+                  <td className="border border-blue-600 p-2">{ticket.reported_at}</td>
+                  <td className="border border-blue-600 p-2">{ticket.sla_breached ? 'Breached' : 'Within SLA'}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
 
-        {/* New Tickets Table */}
+        {/* Detailed Tickets Table */}
         <div className="mb-8">
           <div className="overflow-x-auto">
             <table className="min-w-full border border-blue-600">
@@ -179,18 +198,20 @@ const Dashboard = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredTickets.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((ticket, index) => (
-                  <tr key={index}>
-                    <td className="border border-blue-600 p-2">{ticket.id}</td>
-                    <td className="border border-blue-600 p-2">{ticket.status}</td>
+                {filteredTickets.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((ticket) => (
+                  <tr key={ticket.id}>
+                    <td className="border border-blue-600 p-2">{ticket.ticket_number}</td>
+                    <td className="border border-blue-600 p-2">{ticket.status || 'Open'}</td>
                     <td className="border border-blue-600 p-2">{ticket.customer}</td>
-                    <td className="border border-blue-600 p-2">{ticket.subject}</td>
-                    <td className="border border-blue-600 p-2">{ticket.priority}</td>
-                    <td className="border border-blue-600 p-2">{ticket.date}</td>
-                    <td className="border border-blue-600 p-2">{ticket.assignmentGroup}</td>
-                    <td className="border border-blue-600 p-2">{ticket.assignee}</td>
-                    <td className="border border-blue-600 p-2">{ticket.lastUpdate}</td>
-                    <td className="border border-blue-600 p-2">{ticket.resolvedOn}</td>
+                    <td className="border border-blue-600 p-2">{ticket.title}</td>
+                    <td className="border border-blue-600 p-2">
+                      {ticket.priority !== undefined ? `P${4 - ticket.priority}` : 'N/A'}
+                    </td>
+                    <td className="border border-blue-600 p-2">{ticket.reported_at}</td>
+                    <td className="border border-blue-600 p-2">{ticket.team_id ? `Team ${ticket.team_id}` : 'Unassigned'}</td>
+                    <td className="border border-blue-600 p-2">{ticket.assignee_id ? `User ${ticket.assignee_id}` : 'Unassigned'}</td>
+                    <td className="border border-blue-600 p-2">{ticket.updated_at || 'N/A'}</td>
+                    <td className="border border-blue-600 p-2">{ticket.resolution_due_at || 'N/A'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -202,7 +223,7 @@ const Dashboard = () => {
             <button
               disabled={currentPage === 1}
               onClick={() => setCurrentPage(currentPage - 1)}
-              className="bg-blue-600 text-white p-2 rounded"
+              className="bg-blue-600 text-white p-2 rounded disabled:bg-gray-400"
             >
               Previous
             </button>
@@ -212,7 +233,7 @@ const Dashboard = () => {
             <button
               disabled={currentPage === Math.ceil(filteredTickets.length / itemsPerPage)}
               onClick={() => setCurrentPage(currentPage + 1)}
-              className="bg-blue-600 text-white p-2 rounded"
+              className="bg-blue-600 text-white p-2 rounded disabled:bg-gray-400"
             >
               Next
             </button>

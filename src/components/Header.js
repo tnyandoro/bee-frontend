@@ -1,4 +1,4 @@
-import React from 'react';
+m 'react';
 
 const Header = () => {
   return (

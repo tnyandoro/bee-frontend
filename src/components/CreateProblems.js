@@ -1,278 +1,466 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/authContext';
 
 const CreateProblems = () => {
-  const [problemNumber, setProblemNumber] = useState('');
-  const [mainTicket, setMainTicket] = useState('');
-  const [ticketStatus, setTicketStatus] = useState('');
-  const [relatedToRecord, setRelatedToRecord] = useState('');
-  const [reportDateTime, setReportDateTime] = useState('');
-  const [relatedRecord, setRelatedRecord] = useState('');
-  const [callerName, setCallerName] = useState('');
-  const [callerSurname, setCallerSurname] = useState('');
-  const [callerEmail, setCallerEmail] = useState('');
-  const [callerContact, setCallerContact] = useState('');
-  const [callerLocation, setCallerLocation] = useState('');
-  const [openedBy, setOpenedBy] = useState('');
-  const [category, setCategory] = useState('');
-  const [impact, setImpact] = useState('');
-  const [urgency, setUrgency] = useState('');
-  const [priority, setPriority] = useState('');
-  const [assignmentGroup, setAssignmentGroup] = useState('');
-  const [assignee, setAssignee] = useState('');
-  const [subject, setSubject] = useState('');
-  const [description, setDescription] = useState('');
-  const [workaround, setWorkaround] = useState('');
+  const { token, subdomain } = useAuth();
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    ticket_type: 'Problem',
+    urgency: 'low',
+    priority: 1,
+    impact: 'low',
+    team_id: '',
+    caller_name: '',
+    caller_surname: '',
+    caller_email: '',
+    caller_phone: '',
+    customer: '',
+    source: 'Web',
+    category: 'Technical',
+    assignee_id: '',
+    related_incident_id: '', // Changed from ticket_id to clarify it’s a reference
+  });
+  const [tickets, setTickets] = useState([]);
+  const [teams, setTeams] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const baseUrl = `http://${subdomain || 'kinzamba'}.lvh.me:3000/api/v1`;
+
+  useEffect(() => {
+    if (token && subdomain) {
+      fetchData();
+    }
+  }, [token, subdomain]);
+
+  const fetchData = async () => {
+    if (!token) {
+      setError('Please log in to access this page.');
+      navigate('/login');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+
+      const [ticketsResponse, teamsResponse, usersResponse] = await Promise.all([
+        axios.get(`${baseUrl}/organizations/${subdomain}/tickets?page=1`, config), // Added page=1 for pagination
+        axios.get(`${baseUrl}/organizations/${subdomain}/teams`, config),
+        axios.get(`${baseUrl}/organizations/${subdomain}/users`, config),
+      ]);
+
+      console.log('Tickets:', ticketsResponse.data);
+      const allTickets = Array.isArray(ticketsResponse.data.tickets)
+        ? ticketsResponse.data.tickets
+        : Array.isArray(ticketsResponse.data)
+        ? ticketsResponse.data
+        : [];
+      setTickets(allTickets.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
+
+      console.log('Teams:', teamsResponse.data);
+      setTeams(Array.isArray(teamsResponse.data) ? teamsResponse.data : teamsResponse.data.teams || []);
+
+      console.log('Users:', usersResponse.data);
+      setUsers(Array.isArray(usersResponse.data) ? usersResponse.data : usersResponse.data.users || []);
+    } catch (err) {
+      const errorMessage = err.response?.data?.error || err.message;
+      setError(`Failed to load data: ${errorMessage}`);
+      if (err.response?.status === 401) {
+        localStorage.removeItem('authToken');
+        navigate('/login');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+    if (name === 'related_incident_id' && value) {
+      const ticket = tickets.find((t) => t.id === parseInt(value));
+      if (ticket) {
+        setFormData((prev) => ({
+          ...prev,
+          title: `Problem related to ${ticket.title}`,
+          description: ticket.description || '',
+          team_id: ticket.team_id?.toString() || '',
+          assignee_id: ticket.assignee_id?.toString() || '',
+        }));
+      }
+    }
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Form submitted');
+    setError(null);
+    setShowSuccessModal(false);
+
+    if (!token) {
+      setError('Please log in to submit a problem.');
+      navigate('/login');
+      return;
+    }
+
+    const ticketData = {
+      ticket: {
+        title: formData.title,
+        description: formData.description,
+        ticket_type: 'Problem',
+        urgency: formData.urgency,
+        priority: parseInt(formData.priority, 10),
+        impact: formData.impact,
+        team_id: formData.team_id || null,
+        caller_name: formData.caller_name || 'System',
+        caller_surname: formData.caller_surname || 'Admin',
+        caller_email: formData.caller_email || 'admin@example.com',
+        caller_phone: formData.caller_phone || 'N/A',
+        customer: formData.customer || 'Internal',
+        source: formData.source,
+        category: formData.category,
+        assignee_id: formData.assignee_id || null,
+        related_incident_id: formData.related_incident_id || null, // Custom field for linking
+      },
+    };
+
+    try {
+      setLoading(true);
+      const response = await axios.post(
+        `${baseUrl}/organizations/${subdomain}/tickets`,
+        ticketData,
+        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
+      );
+
+      console.log('Problem created:', response.data);
+      setShowSuccessModal(true);
+      resetForm();
+      await fetchData();
+      setTimeout(() => {
+        setShowSuccessModal(false);
+      }, 3000);
+    } catch (err) {
+      const errorMessage = err.response?.data?.errors?.join(', ') || err.response?.data?.error || err.message;
+      setError(`Failed to create problem: ${errorMessage}`);
+      if (err.response?.status === 401) {
+        localStorage.removeItem('authToken');
+        navigate('/login');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResolve = async (ticketId) => {
+    if (!token) {
+      setError('Please log in to resolve a problem.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await axios.put(
+        `${baseUrl}/organizations/${subdomain}/tickets/${ticketId}`,
+        { ticket: { status: 'resolved' } },
+        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
+      );
+      setShowSuccessModal(true);
+      await fetchData();
+      setTimeout(() => setShowSuccessModal(false), 3000);
+    } catch (err) {
+      setError(`Failed to resolve problem: ${err.response?.data?.error || err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = (ticket) => {
+    setFormData({
+      title: ticket.title || '',
+      description: ticket.description || '',
+      ticket_type: 'Problem',
+      urgency: ticket.urgency || 'low',
+      priority: ticket.priority !== undefined ? ticket.priority : 1,
+      impact: ticket.impact || 'low',
+      team_id: ticket.team_id?.toString() || '',
+      caller_name: ticket.caller_name || '',
+      caller_surname: ticket.caller_surname || '',
+      caller_email: ticket.caller_email || '',
+      caller_phone: ticket.caller_phone || '',
+      customer: ticket.customer || '',
+      source: ticket.source || 'Web',
+      category: ticket.category || 'Technical',
+      assignee_id: ticket.assignee_id?.toString() || '',
+      related_incident_id: ticket.related_incident_id?.toString() || '',
+    });
+  };
+
+  const resetForm = () => {
+    setFormData({
+      title: '',
+      description: '',
+      ticket_type: 'Problem',
+      urgency: 'low',
+      priority: 1,
+      impact: 'low',
+      team_id: '',
+      caller_name: '',
+      caller_surname: '',
+      caller_email: '',
+      caller_phone: '',
+      customer: '',
+      source: 'Web',
+      category: 'Technical',
+      assignee_id: '',
+      related_incident_id: '',
+    });
+    setError(null);
   };
 
   const handleCancel = () => {
-    // Reset form fields or perform any cancel logic
-    console.log('Form canceled');
+    resetForm();
+    navigate('/dashboard');
   };
 
+  if (!token || !subdomain) {
+    return <p className="text-red-500">Please log in to create or view problems.</p>;
+  }
+
+  const problems = tickets.filter((ticket) => ticket.ticket_type === 'Problem');
+
   return (
-    <div className="bg-blue-700 container mx-auto p-1">
+    <div className="bg-blue-700 container mx-auto p-1 relative">
       <div className="p-6 bg-gray-100 shadow-lg rounded-lg mt-12">
         <div className="p-2 text-white rounded-t-lg bg-blue-700 shadow-xl mb-6">
           <h2 className="text-2xl mb-1">Log a Problem</h2>
           <p className="text-sm">Log an escalated issue as a problem to report an issue with a service or system.</p>
         </div>
+
+        {loading && <p className="text-blue-700">Loading...</p>}
+        {error && <p className="text-red-500 mb-4">{error}</p>}
+
         <form className="problem-form shadow-md rounded-lg p-4 bg-white" onSubmit={handleSubmit}>
-          <div className="flex space-x-8">
-            <div className="left-col w-1/3">
-              <div className="form-group mb-4">
-                <label>Problem Number</label>
-                <input
-                  type="text"
-                  className="input-box border p-2 w-full rounded"
-                  value={problemNumber}
-                  onChange={(e) => setProblemNumber(e.target.value)}
-                />
-              </div>
-              <div className="form-group mb-4">
-                <label>Main Ticket</label>
-                <input
-                  type="text"
-                  className="input-box border p-2 w-full rounded"
-                  value={mainTicket}
-                  onChange={(e) => setMainTicket(e.target.value)}
-                />
-              </div>
-              <div className="form-group mb-4">
-                <label>Ticket Status</label>
-                <input
-                  type="text"
-                  className="input-box border p-2 w-full rounded"
-                  value={ticketStatus}
-                  onChange={(e) => setTicketStatus(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="middle-col w-1/3">
-              <div className="form-group mb-4">
-                <label>Related to Existing Record</label>
-                <select
-                  className="input-box border p-2 w-full rounded"
-                  value={relatedToRecord}
-                  onChange={(e) => setRelatedToRecord(e.target.value)}
-                >
-                  <option value="">Select Record</option>
-                  <option value="Record1">Record 1</option>
-                  <option value="Record2">Record 2</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="right-col w-1/3">
-              <div className="form-group mb-4">
-                <label>Reported Date & Time</label>
-                <input
-                  type="datetime-local"
-                  className="input-box border p-2 w-full rounded"
-                  value={reportDateTime}
-                  onChange={(e) => setReportDateTime(e.target.value)}
-                />
-              </div>
-              <div className="form-group mb-4">
-                <label>Related Record</label>
-                <input
-                  type="text"
-                  className="input-box border p-2 w-full rounded"
-                  value={relatedRecord}
-                  onChange={(e) => setRelatedRecord(e.target.value)}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Caller Details */}
-          <div className="flex space-x-8 mt-8">
-            <div className="w-1/2">
-              <div className="form-group mb-4">
-                <label>Caller Name</label>
-                <input
-                  type="text"
-                  className="input-box border p-2 w-full rounded"
-                  value={callerName}
-                  onChange={(e) => setCallerName(e.target.value)}
-                />
-              </div>
-              <div className="form-group mb-4">
-                <label>Caller Surname</label>
-                <input
-                  type="text"
-                  className="input-box border p-2 w-full rounded"
-                  value={callerSurname}
-                  onChange={(e) => setCallerSurname(e.target.value)}
-                />
-              </div>
-              <div className="form-group mb-4">
-                <label>Caller Email</label>
-                <input
-                  type="email"
-                  className="input-box border p-2 w-full rounded"
-                  value={callerEmail}
-                  onChange={(e) => setCallerEmail(e.target.value)}
-                />
-              </div>
-              <div className="form-group mb-4">
-                <label>Caller Contact</label>
-                <input
-                  type="text"
-                  className="input-box border p-2 w-full rounded"
-                  value={callerContact}
-                  onChange={(e) => setCallerContact(e.target.value)}
-                />
-              </div>
-              <div className="form-group mb-4">
-                <label>Caller Location</label>
-                <input
-                  type="text"
-                  className="input-box border p-2 w-full rounded"
-                  value={callerLocation}
-                  onChange={(e) => setCallerLocation(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="w-1/2">
-              <div className="form-group mb-4">
-                <label>Opened By</label>
-                <input
-                  type="text"
-                  className="input-box border p-2 w-full rounded"
-                  value={openedBy}
-                  onChange={(e) => setOpenedBy(e.target.value)}
-                />
-              </div>
-              <div className="form-group mb-4">
-                <label>Category</label>
-                <input
-                  type="text"
-                  className="input-box border p-2 w-full rounded"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                />
-              </div>
-              <div className="form-group mb-4">
-                <label>Impact</label>
-                <input
-                  type="text"
-                  className="input-box border p-2 w-full rounded"
-                  value={impact}
-                  onChange={(e) => setImpact(e.target.value)}
-                />
-              </div>
-              <div className="form-group mb-4">
-                <label>Urgency</label>
-                <input
-                  type="text"
-                  className="input-box border p-2 w-full rounded"
-                  value={urgency}
-                  onChange={(e) => setUrgency(e.target.value)}
-                />
-              </div>
-              <div className="form-group mb-4">
-                <label>Priority</label>
-                <input
-                  type="text"
-                  className="input-box border p-2 w-full rounded"
-                  value={priority}
-                  onChange={(e) => setPriority(e.target.value)}
-                />
-              </div>
-              <div className="form-group mb-4">
-                <label>Assignment Group</label>
-                <input
-                  type="text"
-                  className="input-box border p-2 w-full rounded"
-                  value={assignmentGroup}
-                  onChange={(e) => setAssignmentGroup(e.target.value)}
-                />
-              </div>
-              <div className="form-group mb-4">
-                <label>Assignee</label>
-                <input
-                  type="text"
-                  className="input-box border p-2 w-full rounded"
-                  value={assignee}
-                  onChange={(e) => setAssignee(e.target.value)}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Subject, Description, and Workaround */}
-          <div className="mt-8">
-            <div className="form-group mb-4">
-              <label>Subject</label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-gray-700 font-medium">Title *</label>
               <input
                 type="text"
-                className="input-box border p-2 w-full rounded"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
+                name="title"
+                value={formData.title}
+                onChange={handleChange}
+                className="input-box border p-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+                disabled={loading}
               />
             </div>
-            <div className="form-group mb-4">
-              <label>Description</label>
+            <div>
+              <label className="block text-gray-700 font-medium">Description *</label>
               <textarea
-                className="input-box border p-2 w-full h-32 rounded"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                className="input-box border p-2 w-full h-24 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+                disabled={loading}
               />
             </div>
-            <div className="form-group mb-4">
-              <label>Workaround</label>
-              <textarea
-                className="input-box border p-2 w-full h-32 rounded"
-                value={workaround}
-                onChange={(e) => setWorkaround(e.target.value)}
-              />
+            <div>
+              <label className="block text-gray-700 font-medium">Related Incident</label>
+              <select
+                name="related_incident_id"
+                value={formData.related_incident_id}
+                onChange={handleChange}
+                className="input-box border p-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={loading}
+              >
+                <option value="">Select an Incident (Optional)</option>
+                {tickets
+                  .filter((t) => t.ticket_type === 'Incident')
+                  .map((ticket) => (
+                    <option key={ticket.id} value={ticket.id}>
+                      {ticket.ticket_number || `Ticket #${ticket.id}`} - {ticket.title}
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-gray-700 font-medium">Team</label>
+              <select
+                name="team_id"
+                value={formData.team_id}
+                onChange={handleChange}
+                className="input-box border p-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={loading}
+              >
+                <option value="">Select a Team (Optional)</option>
+                {teams.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {team.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-gray-700 font-medium">Assignee</label>
+              <select
+                name="assignee_id"
+                value={formData.assignee_id}
+                onChange={handleChange}
+                className="input-box border p-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={!formData.team_id || loading}
+              >
+                <option value="">Select an Assignee (Optional)</option>
+                {users
+                  .filter((user) => user.team_id === parseInt(formData.team_id))
+                  .map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.name || user.username}
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-gray-700 font-medium">Urgency *</label>
+              <select
+                name="urgency"
+                value={formData.urgency}
+                onChange={handleChange}
+                className="input-box border p-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+                disabled={loading}
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-gray-700 font-medium">Priority *</label>
+              <select
+                name="priority"
+                value={formData.priority}
+                onChange={handleChange}
+                className="input-box border p-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+                disabled={loading}
+              >
+                <option value={3}>P1</option>
+                <option value={2}>P2</option>
+                <option value={1}>P3</option>
+                <option value={0}>P4</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-gray-700 font-medium">Impact *</label>
+              <select
+                name="impact"
+                value={formData.impact}
+                onChange={handleChange}
+                className="input-box border p-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+                disabled={loading}
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
             </div>
           </div>
-
-          {/* Submit and Cancel Buttons */}
           <div className="flex justify-end mt-6 space-x-2">
             <button
               type="button"
-              className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500 transition duration-300"
+              className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500 transition duration-300 disabled:bg-gray-300"
               onClick={handleCancel}
+              disabled={loading}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="bg-blue-700 text-white px-4 py-2 rounded hover:bg-blue-600 transition duration-300"
+              className="bg-blue-700 text-white px-4 py-2 rounded hover:bg-blue-600 transition duration-300 disabled:bg-blue-400"
+              disabled={loading}
             >
-              Submit Problem
+              {loading ? 'Submitting...' : 'Submit Problem'}
             </button>
           </div>
         </form>
+
+        <div className="w-full bg-white shadow-lg rounded-lg p-6 mt-6">
+          <h2 className="text-2xl font-bold mb-6 text-gray-800">Problems List</h2>
+          {problems.length === 0 ? (
+            <p className="text-gray-500 italic">No problems available.</p>
+          ) : (
+            <div className="space-y-6">
+              {problems.map((problem) => (
+                <div
+                  key={problem.id}
+                  className="bg-gray-50 border border-gray-200 rounded-lg p-5 shadow-sm hover:shadow-md transition-shadow duration-200"
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        {problem.ticket_number || `Problem #${problem.id}`} - {problem.title}
+                      </h3>
+                      <p className="text-gray-700 mt-1">{problem.description}</p>
+                      <div className="mt-2 flex flex-wrap gap-4 text-sm">
+                        <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                          <span className="font-bold">Incident #:</span>{' '}
+                          {problem.related_incident_id
+                            ? tickets.find((t) => t.id === problem.related_incident_id)?.ticket_number || 'N/A'
+                            : 'N/A'}
+                        </span>
+                        <span className="bg-green-100 text-green-800 px-2 py-1 rounded">
+                          <span className="font-bold">Team:</span>{' '}
+                          {teams.find((t) => t.id === problem.team_id)?.name || 'Unassigned'}
+                        </span>
+                        <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                          <span className="font-bold">Assignee:</span>{' '}
+                          {users.find((u) => u.id === problem.assignee_id)?.name || 'Unassigned'}
+                        </span>
+                        <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                          <span className="font-bold">Status:</span> {problem.status || 'open'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => handleEdit(problem)}
+                        className="bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 transition duration-200 font-medium"
+                        disabled={loading}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleResolve(problem.id)}
+                        className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition duration-200 font-medium"
+                        disabled={loading || problem.status === 'resolved'}
+                      >
+                        Resolve
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
+
+      {showSuccessModal && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg text-center max-w-md">
+            <h2 className="text-3xl font-bold text-green-600 mb-4">Success!</h2>
+            <p className="text-lg text-gray-800">Problem created or resolved successfully!</p>
+            <p className="text-sm text-gray-500 mt-2">Closing in 3 seconds...</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

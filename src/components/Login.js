@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { useAuth } from '../contexts/authContext'; // Import useAuth from AuthContext
 import logor from '../assets/logor.png';
 import bg from '../assets/main_bg.png';
 import splashLogo from '../assets/splash_logo.png';
 
 const Login = ({ loginType, setLoggedIn, setEmail, setRole }) => {
-  const [email, setEmailInput] = useState('');
-  const [password, setPasswordInput] = useState('');
+  const [emailInput, setEmailInput] = useState('');
+  const [password, setPassword] = useState('');
   const [subdomain, setSubdomain] = useState('');
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
@@ -17,6 +18,7 @@ const Login = ({ loginType, setLoggedIn, setEmail, setRole }) => {
   const [showSplash, setShowSplash] = useState(true);
 
   const navigate = useNavigate();
+  const { login: authLogin } = useAuth(); // Get login function from AuthContext
 
   // Hide splash screen after 3 seconds
   useEffect(() => {
@@ -31,15 +33,18 @@ const Login = ({ loginType, setLoggedIn, setEmail, setRole }) => {
     setPasswordError('');
     setSubdomainError('');
 
-    if (!subdomain) {
+    if (!subdomain.trim()) {
       setSubdomainError('Organization subdomain is required');
       isValid = false;
     }
-    if (!email) {
+    if (!emailInput.trim()) {
       setEmailError('Email is required');
       isValid = false;
+    } else if (!/\S+@\S+\.\S+/.test(emailInput)) {
+      setEmailError('Please enter a valid email address');
+      isValid = false;
     }
-    if (!password) {
+    if (!password.trim()) {
       setPasswordError('Password is required');
       isValid = false;
     }
@@ -48,43 +53,52 @@ const Login = ({ loginType, setLoggedIn, setEmail, setRole }) => {
   };
 
   // Handle login submission
-  const handleLogin = async () => {
+  const handleLogin = async (e) => {
+    e.preventDefault();
     if (!validateForm()) return;
 
     setIsLoading(true);
-    const baseUrl = `http://${subdomain}.lvh.me:3000`; // Fixed for local development
-    const endpoint = `${baseUrl}/api/v1/login`;
-
-    console.log(`Logging in to: ${endpoint}`); // Debug log
+    setGeneralError('');
 
     try {
-      const response = await axios.post(endpoint, { email, password });
+      console.log(`Attempting login with subdomain: ${subdomain}`);
+      await authLogin(emailInput, password, subdomain); // Use AuthProvider's login
 
-      const { auth_token, user } = response.data;
+      // Since AuthProvider handles token and profile, fetch user details manually if needed
+      const token = localStorage.getItem('authToken');
+      const response = await axios.get(`http://${subdomain}.lvh.me:3000/api/v1/profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const user = response.data.user;
+      console.log('User profile fetched after login:', user);
 
-      // Store token and subdomain in localStorage
-      localStorage.setItem('token', auth_token);
-      localStorage.setItem('subdomain', subdomain);
-
-      // Update parent state
+      // Update parent state (passed from App.js)
+      localStorage.setItem('email', user.email);
+      localStorage.setItem('role', user.role || '');
       setLoggedIn(true);
       setEmail(user.email);
-      setRole(user.role);
+      setRole(user.role || '');
 
-      // Redirect based on role
-      const dashboardPath = user.role === 'admin' || user.role === 'super_user'
-        ? '/dashboard'
-        : '/user/dashboard';
+      // Navigate based on role
+      const dashboardPath =
+        user.role === 'admin' || user.role === 'super_user'
+          ? '/dashboard'
+          : '/user/dashboard';
+      console.log(`Navigating to: ${dashboardPath}`);
       navigate(dashboardPath);
     } catch (error) {
-      console.error('Login error:', error.response || error); // Debug log
+      console.error('Login error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
       if (error.response) {
         if (error.response.status === 401) {
           setEmailError('Invalid email or password');
         } else if (error.response.status === 404) {
           setSubdomainError('Organization not found');
         } else {
-          setGeneralError(error.response.data.error || 'An error occurred');
+          setGeneralError(error.response.data?.error || 'An error occurred during login');
         }
       } else {
         setGeneralError('Network error. Please check if the API is running.');
@@ -121,48 +135,61 @@ const Login = ({ loginType, setLoggedIn, setEmail, setRole }) => {
           {loginType} Login
         </h2>
 
-        {generalError && <div className="text-red-500 mb-4">{generalError}</div>}
+        {generalError && (
+          <div className="text-red-500 mb-4 bg-red-100 p-2 rounded">{generalError}</div>
+        )}
 
-        <div className="mb-4 w-full max-w-sm">
-          <input
-            value={subdomain}
-            type="text"
-            placeholder="Organization Subdomain (e.g., watoli)"
-            onChange={(e) => setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-            className={`border p-2 w-full rounded ${subdomainError ? 'border-red-500' : ''}`}
-          />
-          {subdomainError && <p className="text-red-500 text-sm">{subdomainError}</p>}
-        </div>
+        <form onSubmit={handleLogin} className="w-full max-w-sm">
+          <div className="mb-4">
+            <input
+              value={subdomain}
+              type="text"
+              placeholder="Organization Subdomain (e.g., kinzamba)"
+              onChange={(e) => setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+              className={`border p-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                subdomainError ? 'border-red-500' : ''
+              }`}
+              disabled={isLoading}
+            />
+            {subdomainError && <p className="text-red-500 text-sm mt-1">{subdomainError}</p>}
+          </div>
 
-        <div className="mb-4 w-full max-w-sm">
-          <input
-            value={email}
-            type="email"
-            placeholder="Email"
-            onChange={(e) => setEmailInput(e.target.value)}
-            className={`border p-2 w-full rounded ${emailError ? 'border-red-500' : ''}`}
-          />
-          {emailError && <p className="text-red-500 text-sm">{emailError}</p>}
-        </div>
+          <div className="mb-4">
+            <input
+              value={emailInput}
+              type="email"
+              placeholder="Email"
+              onChange={(e) => setEmailInput(e.target.value)}
+              className={`border p-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                emailError ? 'border-red-500' : ''
+              }`}
+              disabled={isLoading}
+            />
+            {emailError && <p className="text-red-500 text-sm mt-1">{emailError}</p>}
+          </div>
 
-        <div className="mb-4 w-full max-w-sm">
-          <input
-            value={password}
-            type="password"
-            placeholder="Password"
-            onChange={(e) => setPasswordInput(e.target.value)}
-            className={`border p-2 w-full rounded ${passwordError ? 'border-red-500' : ''}`}
-          />
-          {passwordError && <p className="text-red-500 text-sm">{passwordError}</p>}
-        </div>
+          <div className="mb-6">
+            <input
+              value={password}
+              type="password"
+              placeholder="Password"
+              onChange={(e) => setPassword(e.target.value)}
+              className={`border p-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                passwordError ? 'border-red-500' : ''
+              }`}
+              disabled={isLoading}
+            />
+            {passwordError && <p className="text-red-500 text-sm mt-1">{passwordError}</p>}
+          </div>
 
-        <button
-          onClick={handleLogin}
-          className="bg-blue-950 text-white rounded w-full max-w-sm p-2"
-          disabled={isLoading}
-        >
-          {isLoading ? 'Logging in...' : 'Log in'}
-        </button>
+          <button
+            type="submit"
+            className="bg-blue-950 text-white rounded w-full p-2 hover:bg-blue-800 transition duration-300 disabled:bg-blue-400"
+            disabled={isLoading}
+          >
+            {isLoading ? 'Logging in...' : 'Log in'}
+          </button>
+        </form>
       </div>
     </div>
   );

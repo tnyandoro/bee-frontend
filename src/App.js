@@ -22,15 +22,16 @@ function App() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('');
-  const profileImage = 'path_to_image'; // Replace with actual profile image URL
+  const profileImage = 'path_to_image'; // Replace with actual URL
 
-  // Check login state on mount
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('authToken'); // Changed to 'authToken'
     if (token) {
       setLoggedIn(true);
       setEmail(localStorage.getItem('email') || '');
       setRole(localStorage.getItem('role') || '');
+    } else {
+      setLoggedIn(false);
     }
   }, []);
 
@@ -38,7 +39,7 @@ function App() {
     setLoggedIn(false);
     setEmail('');
     setRole('');
-    localStorage.removeItem('token');
+    localStorage.removeItem('authToken'); // Sync with 'authToken'
     localStorage.removeItem('subdomain');
     localStorage.removeItem('email');
     localStorage.removeItem('role');
@@ -64,44 +65,25 @@ function App() {
 
         <div className={loggedIn ? 'pl-64' : ''}>
           <Routes>
-            {/* Public Routes */}
             <Route
               path="/"
-              element={
-                loggedIn ? (
-                  <Navigate to={role === 'admin' || role === 'super_user' ? '/dashboard' : '/user/dashboard'} />
-                ) : (
-                  <Home
-                    email={email}
-                    loggedIn={loggedIn}
-                    setLoggedIn={setLoggedIn}
-                    setEmail={setEmail}
-                    setRole={setRole}
-                  />
-                )
-              }
+              element={loggedIn ? <Navigate to="/dashboard" /> : <Home />}
             />
             <Route
               path="/login"
               element={
                 loggedIn ? (
-                  <Navigate to={role === 'admin' || role === 'super_user' ? '/dashboard' : '/user/dashboard'} />
+                  <Navigate to="/dashboard" />
                 ) : (
-                  <Login
-                    setLoggedIn={setLoggedIn}
-                    setEmail={setEmail}
-                    setRole={setRole}
-                  />
+                  <Login setLoggedIn={setLoggedIn} setEmail={setEmail} setRole={setRole} />
                 )
               }
             />
             <Route path="/admin/register" element={<AdminRegister />} />
-
-            {/* Protected Routes */}
             <Route
               path="/dashboard"
               element={
-                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['admin', 'super_user']}>
+                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['admin', 'super_user', 'agent', 'teamlead', 'viewer']}>
                   <Dashboard email={email} role={role} />
                 </PrivateRoute>
               }
@@ -110,7 +92,7 @@ function App() {
               path="/user/dashboard"
               element={
                 <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['agent', 'teamlead', 'viewer']}>
-                  <Dashboard email={email} role={role} /> {/* Reuse Dashboard or create UserDashboard */}
+                  <Dashboard email={email} role={role} />
                 </PrivateRoute>
               }
             />
@@ -195,7 +177,7 @@ function App() {
               }
             />
             <Route path="/home" element={<Home email={email} loggedIn={loggedIn} />} />
-            <Route path="*" element={<Navigate to="/" />} />
+            <Route path="*" element={<Navigate to="/login" />} />
           </Routes>
         </div>
       </div>

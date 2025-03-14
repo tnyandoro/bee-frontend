@@ -50,7 +50,7 @@ function AdminRegister() {
       }
 
       const response = await axios.post(
-        `http://localhost:3000/api/v1/register`, 
+        `http://https://itsm-api.onrender.com/api/v1/register`, 
         {
           organization: {
             name,
