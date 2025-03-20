@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { useLocation } from 'react-router-dom'; // To access navigation state
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/authContext';
+import ResolveTicket from './ResolveTicket';
 import {
   CheckCircleIcon,
   ExclamationCircleIcon,
@@ -12,13 +13,15 @@ import {
 const IncidentOverview = () => {
   const { token, subdomain } = useAuth();
   const [tickets, setTickets] = useState([]);
+  const [pagination, setPagination] = useState({ total_entries: 0, total_pages: 0 });
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedTicket, setSelectedTicket] = useState(null);
+  const [resolveTicket, setResolveTicket] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [ticketsPerPage, setTicketsPerPage] = useState(100);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const location = useLocation(); // Access navigation state
+  const location = useLocation();
 
   const baseUrl = `http://${subdomain || 'kinzamba'}.lvh.me:3000/api/v1`;
 
@@ -27,20 +30,25 @@ const IncidentOverview = () => {
       setError('Please log in to view incidents.');
       return;
     }
-
     setLoading(true);
     try {
-      const response = await axios.get(
-        `${baseUrl}/organizations/${subdomain}/tickets?page=${currentPage}&per_page=${ticketsPerPage}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      console.log('Tickets response:', response.data);
+      const url = `${baseUrl}/organizations/${subdomain}/tickets?page=${currentPage}&per_page=${ticketsPerPage}`;
+      console.log('Fetching tickets from:', url);
+      const response = await axios.get(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const fetchedTickets = Array.isArray(response.data.tickets)
         ? response.data.tickets
         : Array.isArray(response.data)
         ? response.data
         : [];
-      setTickets(fetchedTickets.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)));
+      setTickets(
+        fetchedTickets.sort((a, b) =>
+          new Date(b.reported_at || b.created_at || Date.now()) -
+          new Date(a.reported_at || a.created_at || Date.now())
+        )
+      );
+      setPagination(response.data.pagination || { total_entries: fetchedTickets.length, total_pages: 1 });
     } catch (err) {
       setError(`Failed to fetch incidents: ${err.response?.data?.error || err.message}`);
       console.error('Fetch tickets error:', err.response || err);
@@ -50,20 +58,22 @@ const IncidentOverview = () => {
     }
   }, [token, subdomain, currentPage, ticketsPerPage, baseUrl]);
 
-  // Handle new ticket from TicketForm navigation state
   useEffect(() => {
     if (location.state?.newTicket) {
-      const newTicket = location.state.newTicket;
       setTickets((prevTickets) => {
-        const updatedTickets = [newTicket, ...prevTickets].sort(
-          (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)
+        const newTicket = { ...location.state.newTicket, created_at: location.state.newTicket.reported_at || Date.now() };
+        const updatedTickets = [newTicket, ...prevTickets.filter(t => t.id !== newTicket.id)].sort(
+          (a, b) => new Date(b.reported_at || b.created_at || Date.now()) - new Date(a.reported_at || a.created_at || Date.now())
         );
         return updatedTickets;
       });
-      // Clear the state to avoid re-adding on page reload
+      setCurrentPage(1);
+      window.history.replaceState({}, document.title);
+    } else if (location.state?.refresh) {
+      fetchTickets();
       window.history.replaceState({}, document.title);
     }
-  }, [location.state]);
+  }, [location.state, fetchTickets]);
 
   useEffect(() => {
     if (token && subdomain) {
@@ -71,21 +81,25 @@ const IncidentOverview = () => {
     }
   }, [token, subdomain, currentPage, ticketsPerPage, fetchTickets]);
 
-  const handleResolve = async (ticketId) => {
-    if (!token) return;
-    try {
-      setLoading(true);
-      await axios.put(
-        `${baseUrl}/organizations/${subdomain}/tickets/${ticketId}`,
-        { ticket: { status: 'resolved' } },
-        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
-      );
-      fetchTickets();
-    } catch (err) {
-      setError(`Failed to resolve incident: ${err.response?.data?.error || err.message}`);
-    } finally {
-      setLoading(false);
-    }
+  const handleResolve = (ticket) => {
+    console.log('handleResolve called with ticket:', ticket);
+    setResolveTicket(ticket);
+    console.log('resolveTicket set to:', ticket);
+  };
+
+  const handleResolveSuccess = (updatedTicket) => {
+    setTickets((prevTickets) =>
+      prevTickets.map((t) =>
+        (t.ticket_number || `INC-${t.id}`) === (updatedTicket.ticket_number || `INC-${updatedTicket.id}`)
+          ? updatedTicket
+          : t
+      )
+    );
+    setResolveTicket(null);
+  };
+
+  const handleResolveCancel = () => {
+    setResolveTicket(null);
   };
 
   const handleEdit = (ticket) => {
@@ -96,52 +110,18 @@ const IncidentOverview = () => {
     setSelectedTicket(null);
   };
 
-  const indexOfLastTicket = currentPage * ticketsPerPage;
-  const indexOfFirstTicket = indexOfLastTicket - ticketsPerPage;
-  const filteredTickets = tickets.filter((ticket) => {
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      (ticket.ticket_number || `INC-${ticket.id || ''}`).toLowerCase().includes(searchLower) ||
-      (ticket.status || '').toLowerCase().includes(searchLower) || // Ensure status is searchable
-      (ticket.customer || '').toLowerCase().includes(searchLower) ||
-      (ticket.title || '').toLowerCase().includes(searchLower) ||
-      (ticket.priority || '').toString().toLowerCase().includes(searchLower) ||
-      (ticket.team?.name || '').toLowerCase().includes(searchLower) || // Search by team name
-      (ticket.assignee?.name || ticket.assignee || '').toLowerCase().includes(searchLower) ||
-      (ticket.urgency || '').toLowerCase().includes(searchLower) ||
-      (ticket.impact || '').toLowerCase().includes(searchLower) ||
-      (ticket.source || '').toLowerCase().includes(searchLower) ||
-      (ticket.category || '').toLowerCase().includes(searchLower) ||
-      (ticket.caller_name || '').toLowerCase().includes(searchLower) ||
-      (ticket.caller_surname || '').toLowerCase().includes(searchLower) ||
-      (ticket.caller_email || '').toLowerCase().includes(searchLower) ||
-      (ticket.caller_phone || '').toLowerCase().includes(searchLower)
-    );
-  });
-  const currentTickets = filteredTickets.slice(indexOfFirstTicket, indexOfLastTicket);
-  const totalPages = Math.ceil(filteredTickets.length / ticketsPerPage);
-
   const getStatusColor = (status) => {
     const statusLower = status ? status.toLowerCase() : 'unknown';
     switch (statusLower) {
-      case 'resolved':
-        return 'bg-green-100 text-green-800';
-      case 'pending':
-        return 'bg-orange-100 text-orange-800';
-      case 'closed':
-        return 'bg-black text-white';
-      case 'open':
-        return 'bg-blue-100 text-blue-800';
-      case 'assigned':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'escalated':
-        return 'bg-purple-100 text-purple-800';
-      case 'suspended':
-        return 'bg-gray-100 text-gray-800';
-      case 'draft':
-        return 'bg-gray-200 text-gray-600';
-      default:
-        return 'bg-gray-100 text-gray-800';
+      case 'resolved': return 'bg-green-100 text-green-800';
+      case 'pending': return 'bg-orange-100 text-orange-800';
+      case 'closed': return 'bg-black text-white';
+      case 'open': return 'bg-blue-100 text-blue-800';
+      case 'assigned': return 'bg-yellow-100 text-yellow-800';
+      case 'escalated': return 'bg-purple-100 text-purple-800';
+      case 'suspended': return 'bg-gray-100 text-gray-800';
+      case 'draft': return 'bg-gray-200 text-gray-600';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -149,10 +129,10 @@ const IncidentOverview = () => {
     const priorityNum = Number(priority);
     if (isNaN(priorityNum) || priorityNum < 0 || priorityNum > 3) return 'bg-gray-100 text-gray-800';
     switch (priorityNum) {
-      case 0: return 'bg-red-100 text-red-800'; // P4 (Emergency)
-      case 1: return 'bg-orange-100 text-orange-800'; // P3
-      case 2: return 'bg-yellow-100 text-yellow-800'; // P2
-      case 3: return 'bg-green-100 text-green-800'; // P1 (Low)
+      case 0: return 'bg-green-100 text-green-800';
+      case 1: return 'bg-yellow-100 text-yellow-800';
+      case 2: return 'bg-orange-100 text-orange-800';
+      case 3: return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -166,26 +146,43 @@ const IncidentOverview = () => {
   const getStatusIcon = (status) => {
     const statusLower = status ? status.toLowerCase() : 'unknown';
     switch (statusLower) {
-      case 'resolved':
-        return <CheckCircleIcon className="h-5 w-5" />;
-      case 'pending':
-        return <ExclamationCircleIcon className="h-5 w-5" />;
-      case 'closed':
-        return <XCircleIcon className="h-5 w-5" />;
-      case 'open':
-        return <InformationCircleIcon className="h-5 w-5" />;
-      case 'assigned':
-        return <CheckCircleIcon className="h-5 w-5 text-yellow-500" />;
-      case 'escalated':
-        return <ExclamationCircleIcon className="h-5 w-5 text-purple-500" />;
-      case 'suspended':
-        return <XCircleIcon className="h-5 w-5 text-gray-500" />;
-      case 'draft':
-        return <InformationCircleIcon className="h-5 w-5 text-gray-500" />;
-      default:
-        return <InformationCircleIcon className="h-5 w-5 text-gray-500" />;
+      case 'resolved': return <CheckCircleIcon className="h-5 w-5" />;
+      case 'pending': return <ExclamationCircleIcon className="h-5 w-5" />;
+      case 'closed': return <XCircleIcon className="h-5 w-5" />;
+      case 'open': return <InformationCircleIcon className="h-5 w-5" />;
+      case 'assigned': return <CheckCircleIcon className="h-5 w-5 text-yellow-500" />;
+      case 'escalated': return <ExclamationCircleIcon className="h-5 w-5 text-purple-500" />;
+      case 'suspended': return <XCircleIcon className="h-5 w-5 text-gray-500" />;
+      case 'draft': return <InformationCircleIcon className="h-5 w-5 text-gray-500" />;
+      default: return <InformationCircleIcon className="h-5 w-5 text-gray-500" />;
     }
   };
+
+  const filteredTickets = tickets.filter((ticket) => {
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      (ticket.ticket_number || `INC-${ticket.id || ''}`).toLowerCase().includes(searchLower) ||
+      (ticket.status || '').toLowerCase().includes(searchLower) ||
+      (ticket.customer || '').toLowerCase().includes(searchLower) ||
+      (ticket.title || '').toLowerCase().includes(searchLower) ||
+      (ticket.priority || '').toString().toLowerCase().includes(searchLower) ||
+      (ticket.team?.name || '').toLowerCase().includes(searchLower) ||
+      (ticket.assignee?.name || ticket.assignee || '').toLowerCase().includes(searchLower) ||
+      (ticket.urgency || '').toLowerCase().includes(searchLower) ||
+      (ticket.impact || '').toLowerCase().includes(searchLower) ||
+      (ticket.source || '').toLowerCase().includes(searchLower) ||
+      (ticket.category || '').toLowerCase().includes(searchLower) ||
+      (ticket.caller_name || '').toLowerCase().includes(searchLower) ||
+      (ticket.caller_surname || '').toLowerCase().includes(searchLower) ||
+      (ticket.caller_email || '').toLowerCase().includes(searchLower) ||
+      (ticket.caller_phone || '').toLowerCase().includes(searchLower)
+    );
+  });
+
+  const totalPages = pagination.total_pages || Math.ceil(filteredTickets.length / ticketsPerPage);
+  const indexOfLastTicket = currentPage * ticketsPerPage;
+  const indexOfFirstTicket = indexOfLastTicket - ticketsPerPage;
+  const currentTickets = filteredTickets.slice(indexOfFirstTicket, indexOfLastTicket);
 
   if (!token || !subdomain) {
     return <p className="text-red-500 text-center">Please log in to view incidents.</p>;
@@ -206,7 +203,6 @@ const IncidentOverview = () => {
           <h2 className="text-4xl mb-2 text-white">Incident Overview</h2>
         </div>
 
-        {/* Search Bar */}
         <div className="flex justify-center mb-6">
           <input
             type="text"
@@ -220,7 +216,6 @@ const IncidentOverview = () => {
           />
         </div>
 
-        {/* Reports and Actions */}
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">REPORTS</h2>
           <div className="space-x-2">
@@ -234,13 +229,12 @@ const IncidentOverview = () => {
           </div>
         </div>
 
-        {/* Tickets Table */}
         <div className="overflow-x-auto">
           <table className="min-w-full table-auto border-collapse border border-gray-300">
             <thead>
               <tr className="bg-gray-200 border-b border-gray-300">
                 <th className="px-4 py-2">Incident ID</th>
-                <th className="px-4 py-2">Status</th> {/* Highlighted for emphasis */}
+                <th className="px-4 py-2">Status</th>
                 <th className="px-4 py-2">Customer</th>
                 <th className="px-4 py-2">Subject</th>
                 <th className="px-4 py-2">Priority</th>
@@ -284,28 +278,38 @@ const IncidentOverview = () => {
                         {getPriorityLabel(ticket.priority)}
                       </span>
                     </td>
-                    <td className="border px-4 py-2">{ticket.created_at || 'N/A'}</td>
+                    <td className="border px-4 py-2">
+                      {new Date(ticket.reported_at || ticket.created_at || 'N/A').toLocaleString()}
+                    </td>
                     <td className="border px-4 py-2">{ticket.team?.name || 'Unassigned'}</td>
                     <td className="border px-4 py-2">
                       {ticket.assignee?.name || ticket.assignee || 'Unassigned'}
                     </td>
-                    <td className="border px-4 py-2">{ticket.updated_at || 'N/A'}</td>
-                    <td className="border px-4 py-2">{ticket.resolved_at || 'N/A'}</td>
+                    <td className="border px-4 py-2">
+                      {new Date(ticket.updated_at || 'N/A').toLocaleString()}
+                    </td>
+                    <td className="border px-4 py-2">
+                      {ticket.resolved_at ? new Date(ticket.resolved_at).toLocaleString() : 'N/A'}
+                    </td>
                     <td className="border px-4 py-2">{ticket.ticket_type || 'N/A'}</td>
                     <td className="border px-4 py-2">{ticket.urgency || 'N/A'}</td>
                     <td className="border px-4 py-2">{ticket.impact || 'N/A'}</td>
                     <td className="border px-4 py-2">{ticket.source || 'N/A'}</td>
                     <td className="border px-4 py-2">{ticket.category || 'N/A'}</td>
-                    <td className="border px-4 py-2">{ticket.response_due_at || 'N/A'}</td>
-                    <td className="border px-4 py-2">{ticket.resolution_due_at || 'N/A'}</td>
+                    <td className="border px-4 py-2">
+                      {ticket.response_due_at ? new Date(ticket.response_due_at).toLocaleString() : 'N/A'}
+                    </td>
+                    <td className="border px-4 py-2">
+                      {ticket.resolution_due_at ? new Date(ticket.resolution_due_at).toLocaleString() : 'N/A'}
+                    </td>
                     <td className="border px-4 py-2">{ticket.escalation_level || 'N/A'}</td>
-                    <td className="border px-4 py-2">{ticket.sla_breached ? 'Yes' : 'No' || 'N/A'}</td>
+                    <td className="border px-4 py-2">{ticket.sla_breached ? 'Yes' : 'No'}</td>
                     <td className="border px-4 py-2">{ticket.calculated_priority || 'N/A'}</td>
                     <td className="border px-4 py-2 flex space-x-2">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleResolve(ticket.id);
+                          handleResolve(ticket);
                         }}
                         className="bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600 disabled:bg-green-300"
                         disabled={ticket.status === 'resolved' || ticket.status === 'closed'}
@@ -335,17 +339,19 @@ const IncidentOverview = () => {
           </table>
         </div>
 
-        {/* Pagination */}
         <div className="flex justify-between items-center mt-4">
           <div>
             <p className="text-sm text-gray-700">
               Showing {indexOfFirstTicket + 1} to{' '}
               {indexOfLastTicket > filteredTickets.length ? filteredTickets.length : indexOfLastTicket}{' '}
-              of {filteredTickets.length} incidents
+              of {pagination.total_entries || filteredTickets.length} incidents
             </p>
             <select
               value={ticketsPerPage}
-              onChange={(e) => setTicketsPerPage(parseInt(e.target.value, 10))}
+              onChange={(e) => {
+                setTicketsPerPage(parseInt(e.target.value, 10));
+                setCurrentPage(1);
+              }}
               className="mt-2 px-2 py-1 border rounded"
             >
               <option value={100}>Page Size: 100</option>
@@ -377,28 +383,26 @@ const IncidentOverview = () => {
           </div>
         </div>
 
-        {/* Ticket Details Modal */}
+        {/* Edit Modal */}
         {selectedTicket && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white p-6 rounded shadow-lg max-w-3xl w-full">
               <h2 className="text-xl font-bold mb-4">Ticket: {selectedTicket.ticket_number || `INC-${selectedTicket.id}`}</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Left Column */}
                 <div>
-                  <p><strong>Ticket Status:</strong> {selectedTicket.status || 'Unknown'}</p> {/* Highlighted for emphasis */}
-                  <p><strong>Reported Date & Time:</strong> {selectedTicket.created_at || 'N/A'}</p>
-                  <p><strong>Expected Resolver Time:</strong> {selectedTicket.resolution_due_at || 'N/A'}</p>
-                  <p><strong>SLA Status:</strong> {selectedTicket.sla_breached ? 'Breached' : 'Met' || 'N/A'}</p>
-                  <p><strong>% of SLA Time Consumed:</strong> {selectedTicket.sla_breached ? '100%' : 'N/A' || 'N/A'}</p>
-                  <p><strong>Resolved Date & Time:</strong> {selectedTicket.resolved_at || 'N/A'}</p>
+                  <p><strong>Ticket Status:</strong> {selectedTicket.status || 'Unknown'}</p>
+                  <p><strong>Reported Date & Time:</strong> {new Date(selectedTicket.reported_at || selectedTicket.created_at || 'N/A').toLocaleString()}</p>
+                  <p><strong>Expected Resolver Time:</strong> {selectedTicket.resolution_due_at ? new Date(selectedTicket.resolution_due_at).toLocaleString() : 'N/A'}</p>
+                  <p><strong>SLA Status:</strong> {selectedTicket.sla_breached ? 'Breached' : 'Met'}</p>
+                  <p><strong>% of SLA Time Consumed:</strong> {selectedTicket.sla_breached ? '100%' : 'N/A'}</p>
+                  <p><strong>Resolved Date & Time:</strong> {selectedTicket.resolved_at ? new Date(selectedTicket.resolved_at).toLocaleString() : 'N/A'}</p>
                   <p><strong>Ticket Type:</strong> {selectedTicket.ticket_type || 'N/A'}</p>
                   <p><strong>Urgency:</strong> {selectedTicket.urgency || 'N/A'}</p>
                   <p><strong>Impact:</strong> {selectedTicket.impact || 'N/A'}</p>
-                  <p><strong>Response Due At:</strong> {selectedTicket.response_due_at || 'N/A'}</p>
-                  <p><strong>Resolution Due At:</strong> {selectedTicket.resolution_due_at || 'N/A'}</p>
+                  <p><strong>Response Due At:</strong> {selectedTicket.response_due_at ? new Date(selectedTicket.response_due_at).toLocaleString() : 'N/A'}</p>
+                  <p><strong>Resolution Due At:</strong> {selectedTicket.resolution_due_at ? new Date(selectedTicket.resolution_due_at).toLocaleString() : 'N/A'}</p>
                   <p><strong>Escalation Level:</strong> {selectedTicket.escalation_level || 'N/A'}</p>
                 </div>
-                {/* Right Column */}
                 <div>
                   <p><strong>Incident ID:</strong> {selectedTicket.ticket_number || `INC-${selectedTicket.id}`}</p>
                   <p><strong>Customer ID:</strong> {selectedTicket.customer || 'N/A'}</p>
@@ -408,13 +412,12 @@ const IncidentOverview = () => {
                   <p><strong>Priority:</strong> {getPriorityLabel(selectedTicket.priority)}</p>
                   <p><strong>Team (Assignment Group):</strong> {selectedTicket.team?.name || 'Unassigned'}</p>
                   <p><strong>Assignee:</strong> {selectedTicket.assignee?.name || selectedTicket.assignee || 'Unassigned'}</p>
-                  <p><strong>Last Updated:</strong> {selectedTicket.updated_at || 'N/A'}</p>
+                  <p><strong>Last Updated:</strong> {new Date(selectedTicket.updated_at || 'N/A').toLocaleString()}</p>
                   <p><strong>Source:</strong> {selectedTicket.source || 'N/A'}</p>
                   <p><strong>Category:</strong> {selectedTicket.category || 'N/A'}</p>
                   <p><strong>Calculated Priority:</strong> {selectedTicket.calculated_priority || 'N/A'}</p>
                 </div>
               </div>
-
               <div className="mt-4">
                 <label className="block font-semibold">Subject</label>
                 <input
@@ -435,7 +438,6 @@ const IncidentOverview = () => {
                   <p>{selectedTicket.journal || 'No journal entries available.'}</p>
                 </div>
               </div>
-
               <div className="mt-6 flex justify-end space-x-2">
                 <button
                   type="button"
@@ -453,6 +455,20 @@ const IncidentOverview = () => {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Resolve Modal */}
+        {resolveTicket && (
+          console.log('Rendering ResolveTicket modal with:', resolveTicket),
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <ResolveTicket
+              ticket={resolveTicket}
+              subdomain={subdomain}
+              authToken={token}
+              onResolve={handleResolveSuccess}
+              onCancel={handleResolveCancel}
+            />
           </div>
         )}
       </div>

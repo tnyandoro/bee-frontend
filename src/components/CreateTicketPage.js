@@ -1,25 +1,27 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import TicketForm from './TicketForm';
+import useAuth from '../hooks/useAuth';
 
-const CreateTicketPage = ({ email, role }) => { // Assuming props from PrivateRoute
-  const subdomain = localStorage.getItem('subdomain'); // Get subdomain from login
+const CreateTicketPage = ({ _email, _role }) => {
+  const { token, subdomain } = useAuth();
+  const navigate = useNavigate();
 
-  if (!subdomain) {
-    return <div>Please log in to create a ticket.</div>; // Fallback if not logged in
+  if (!token || !subdomain) {
+    navigate('/login');
+    return <p className="text-red-500">Redirecting to login...</p>;
   }
 
-  const organization = { subdomain }; // Minimal organization object
+  const organization = { subdomain };
 
   return (
-    <div className="bg-blue-700 container mx-auto p-1">
-      <div className="p-6 bg-gray-300 shadow rounded-lg mt-12">
-        <div className="p-6 mx-auto mb-3">
-          <div className="p-2 text-white mx-auto rounded-b-lg bg-blue-700 shadow-2xl mb-6">
-            <h2 className="text-2xl mb-2">Log a Ticket</h2>
-            <p className="text-sm mb-2">Log an issue as a Ticket to report an issue with a service or system.</p>
-          </div>
-          <TicketForm organization={organization} /> {/* Pass organization object */}
+    <div className="bg-blue-700 container mx-auto p-1 relative">
+      <div className="p-6 bg-gray-100 shadow-lg rounded-lg mt-12">
+        <div className="p-2 text-white rounded-t-lg bg-blue-700 shadow-xl mb-6">
+          <h2 className="text-2xl mb-1">Log a Ticket</h2>
+          <p className="text-sm">Log an issue as a ticket to report an issue with a service or system.</p>
         </div>
+        <TicketForm organization={organization} token={token} />
       </div>
     </div>
   );

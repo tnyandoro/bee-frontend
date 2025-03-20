@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/authContext';
+import useAuth from '../hooks/useAuth';
+import apiBaseUrl from '../config';
 
 const CreateProblems = () => {
   const { token, subdomain } = useAuth();
@@ -21,7 +22,7 @@ const CreateProblems = () => {
     source: 'Web',
     category: 'Technical',
     assignee_id: '',
-    related_incident_id: '', // Changed from ticket_id to clarify it’s a reference
+    related_incident_id: '',
   });
   const [tickets, setTickets] = useState([]);
   const [teams, setTeams] = useState([]);
@@ -31,17 +32,11 @@ const CreateProblems = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const navigate = useNavigate();
 
-  const baseUrl = `http://${subdomain || 'kinzamba'}.lvh.me:3000/api/v1`;
+  const baseUrl = subdomain ? `${apiBaseUrl}/organizations/${subdomain}` : null;
 
-  useEffect(() => {
-    if (token && subdomain) {
-      fetchData();
-    }
-  }, [token, subdomain]);
-
-  const fetchData = async () => {
-    if (!token) {
-      setError('Please log in to access this page.');
+  const fetchProblems = useCallback(async () => {
+    if (!token || !baseUrl) {
+      setError('Authentication required. Please log in.');
       navigate('/login');
       return;
     }
@@ -51,39 +46,40 @@ const CreateProblems = () => {
       const config = { headers: { Authorization: `Bearer ${token}` } };
 
       const [ticketsResponse, teamsResponse, usersResponse] = await Promise.all([
-        axios.get(`${baseUrl}/organizations/${subdomain}/tickets?page=1`, config), // Added page=1 for pagination
-        axios.get(`${baseUrl}/organizations/${subdomain}/teams`, config),
-        axios.get(`${baseUrl}/organizations/${subdomain}/users`, config),
+        axios.get(`${baseUrl}/tickets?page=1`, config),
+        axios.get(`${baseUrl}/teams`, config),
+        axios.get(`${baseUrl}/users`, config),
       ]);
 
-      console.log('Tickets:', ticketsResponse.data);
       const allTickets = Array.isArray(ticketsResponse.data.tickets)
         ? ticketsResponse.data.tickets
         : Array.isArray(ticketsResponse.data)
         ? ticketsResponse.data
         : [];
-      setTickets(allTickets.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
+      setTickets(allTickets);
 
-      console.log('Teams:', teamsResponse.data);
       setTeams(Array.isArray(teamsResponse.data) ? teamsResponse.data : teamsResponse.data.teams || []);
-
-      console.log('Users:', usersResponse.data);
       setUsers(Array.isArray(usersResponse.data) ? usersResponse.data : usersResponse.data.users || []);
     } catch (err) {
+      const status = err.response?.status;
       const errorMessage = err.response?.data?.error || err.message;
-      setError(`Failed to load data: ${errorMessage}`);
-      if (err.response?.status === 401) {
+      setError(`Failed to load data: ${errorMessage} ${status ? `(Status: ${status})` : ''}`);
+      if (status === 401) {
         localStorage.removeItem('authToken');
         navigate('/login');
       }
     } finally {
       setLoading(false);
     }
-  };
+  }, [token, baseUrl, navigate]);
+
+  useEffect(() => {
+    fetchProblems();
+  }, [fetchProblems]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+    setFormData((prev) => ({ ...prev, [name]: value }));
     if (name === 'related_incident_id' && value) {
       const ticket = tickets.find((t) => t.id === parseInt(value));
       if (ticket) {
@@ -103,75 +99,46 @@ const CreateProblems = () => {
     setError(null);
     setShowSuccessModal(false);
 
-    if (!token) {
-      setError('Please log in to submit a problem.');
+    if (!token || !baseUrl) {
+      setError('Authentication required. Please log in.');
       navigate('/login');
       return;
     }
 
     const ticketData = {
       ticket: {
-        title: formData.title,
-        description: formData.description,
-        ticket_type: 'Problem',
-        urgency: formData.urgency,
+        ...formData,
         priority: parseInt(formData.priority, 10),
-        impact: formData.impact,
         team_id: formData.team_id || null,
-        caller_name: formData.caller_name || 'System',
-        caller_surname: formData.caller_surname || 'Admin',
-        caller_email: formData.caller_email || 'admin@example.com',
-        caller_phone: formData.caller_phone || 'N/A',
-        customer: formData.customer || 'Internal',
-        source: formData.source,
-        category: formData.category,
         assignee_id: formData.assignee_id || null,
-        related_incident_id: formData.related_incident_id || null, // Custom field for linking
+        related_incident_id: formData.related_incident_id || null,
       },
     };
 
     try {
       setLoading(true);
-      const response = await axios.post(
-        `${baseUrl}/organizations/${subdomain}/tickets`,
-        ticketData,
-        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
-      );
-
-      console.log('Problem created:', response.data);
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+      await axios.post(`${baseUrl}/tickets`, ticketData, config);
       setShowSuccessModal(true);
       resetForm();
-      await fetchData();
-      setTimeout(() => {
-        setShowSuccessModal(false);
-      }, 3000);
+      fetchProblems();
     } catch (err) {
-      const errorMessage = err.response?.data?.errors?.join(', ') || err.response?.data?.error || err.message;
-      setError(`Failed to create problem: ${errorMessage}`);
-      if (err.response?.status === 401) {
-        localStorage.removeItem('authToken');
-        navigate('/login');
-      }
+      setError(`Failed to submit problem: ${err.response?.data?.error || err.message}`);
     } finally {
       setLoading(false);
     }
   };
 
   const handleResolve = async (ticketId) => {
-    if (!token) {
-      setError('Please log in to resolve a problem.');
-      return;
-    }
-
     try {
       setLoading(true);
       await axios.put(
-        `${baseUrl}/organizations/${subdomain}/tickets/${ticketId}`,
+        `${baseUrl}/tickets/${ticketId}`,
         { ticket: { status: 'resolved' } },
         { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
       );
       setShowSuccessModal(true);
-      await fetchData();
+      fetchProblems();
       setTimeout(() => setShowSuccessModal(false), 3000);
     } catch (err) {
       setError(`Failed to resolve problem: ${err.response?.data?.error || err.message}`);
@@ -182,9 +149,9 @@ const CreateProblems = () => {
 
   const handleEdit = (ticket) => {
     setFormData({
+      ...formData,
       title: ticket.title || '',
       description: ticket.description || '',
-      ticket_type: 'Problem',
       urgency: ticket.urgency || 'low',
       priority: ticket.priority !== undefined ? ticket.priority : 1,
       impact: ticket.impact || 'low',
@@ -223,16 +190,12 @@ const CreateProblems = () => {
     setError(null);
   };
 
-  const handleCancel = () => {
-    resetForm();
-    navigate('/dashboard');
-  };
-
-  if (!token || !subdomain) {
-    return <p className="text-red-500">Please log in to create or view problems.</p>;
+  if (!baseUrl) {
+    return <p className="text-red-500">Authentication required. Please log in.</p>;
   }
 
-  const problems = tickets.filter((ticket) => ticket.ticket_type === 'Problem');
+  const problems = tickets.filter((ticket) => ticket.ticket_type === 'Problem')
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
   return (
     <div className="bg-blue-700 container mx-auto p-1 relative">
@@ -376,7 +339,7 @@ const CreateProblems = () => {
             <button
               type="button"
               className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500 transition duration-300 disabled:bg-gray-300"
-              onClick={handleCancel}
+              onClick={() => navigate('/dashboard')}
               disabled={loading}
             >
               Cancel

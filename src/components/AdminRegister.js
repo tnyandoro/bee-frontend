@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import axios from 'axios';
 import bg from '../assets/bg.png';
+import apiBaseUrl from '../config';
 
 function AdminRegister() {
   const [name, setName] = useState('');
@@ -50,7 +51,7 @@ function AdminRegister() {
       }
 
       const response = await axios.post(
-        `http://https://itsm-api.onrender.com/api/v1/register`, 
+        `${apiBaseUrl}/register`, 
         {
           organization: {
             name,
@@ -127,7 +128,8 @@ function AdminRegister() {
               onChange={(e) => setSubdomain(e.target.value)}
               className="border p-2 w-full mb-4"
               required
-            />            <input
+            />            
+            <input
               type="email"
               placeholder="Organization Email"
               value={email}

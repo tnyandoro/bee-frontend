@@ -17,6 +17,7 @@ import Settings from './components/Settings';
 import Profile from './components/Profile';
 import CreateUserForm from './components/CreateUserForm';
 import AdminDashboard from './components/AdminDashboard';
+import ResolveTicket from './components/ResolveTicket'; // Add this import
 
 function App() {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -25,7 +26,7 @@ function App() {
   const profileImage = 'path_to_image'; // Replace with actual URL
 
   useEffect(() => {
-    const token = localStorage.getItem('authToken'); // Changed to 'authToken'
+    const token = localStorage.getItem('authToken');
     if (token) {
       setLoggedIn(true);
       setEmail(localStorage.getItem('email') || '');
@@ -39,7 +40,7 @@ function App() {
     setLoggedIn(false);
     setEmail('');
     setRole('');
-    localStorage.removeItem('authToken'); // Sync with 'authToken'
+    localStorage.removeItem('authToken');
     localStorage.removeItem('subdomain');
     localStorage.removeItem('email');
     localStorage.removeItem('role');
@@ -173,6 +174,14 @@ function App() {
               element={
                 <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['admin', 'super_user']}>
                   <AdminDashboard email={email} role={role} />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/resolve-ticket/:ticketNumber"
+              element={
+                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['admin', 'super_user', 'agent']}>
+                  <ResolveTicket />
                 </PrivateRoute>
               }
             />
