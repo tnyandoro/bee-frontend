@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom'; // Import useNavigate from react-router-dom
+import { useNavigate } from 'react-router-dom';
 
 import logor from '../assets/logor.png';
 import profileImage from '../assets/tendy.jpg';
 
-const Navbar = ({ name, email, role, loggedIn, onLogout, organizationName }) => { // Added organizationName here
+const Navbar = ({ name, email, role, loggedIn, onLogout, organizationName, subdomain }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const navigate = useNavigate(); // Initialize useNavigate
+  const navigate = useNavigate();
 
   const toggleDropdown = () => {
     setDropdownOpen(!dropdownOpen);
@@ -19,19 +19,18 @@ const Navbar = ({ name, email, role, loggedIn, onLogout, organizationName }) => 
   };
 
   const handleProfileClick = () => {
-    navigate('/profile'); // Navigate to the profile page
-    setDropdownOpen(false); // Close the dropdown
+    navigate('/profile');
+    setDropdownOpen(false);
   };
-  
 
-  if (!loggedIn) return null; // Only show the navbar if the user is logged in
+  if (!loggedIn) return null;
 
   return (
     <nav className="bg-slate-50 text-gray-800 p-4 flex justify-between items-center shadow-lg fixed top-0 left-0 right-0 z-50 border-b-4 border-blue-500">
       {/* Left Section: Logo and Organization Name */}
       <div className="flex items-center">
         <img src={logor} alt="Logo" className="h-12 mr-3" />
-        <span className="text-xl font-bold">{organizationName}</span>
+        <span className="text-xl font-bold text-black">{organizationName}</span>
       </div>
 
       {/* Mobile Menu Icon */}
@@ -78,6 +77,7 @@ const Navbar = ({ name, email, role, loggedIn, onLogout, organizationName }) => 
         {/* User Information */}
         <div className="text-right">
           <p className="font-medium">{name || email}</p>
+          <p className="font-bold text-black">{subdomain}</p> {/* Display subdomain here */}
           <p className="text-sm text-gray-300">{role}</p>
         </div>
 
@@ -95,10 +95,9 @@ const Navbar = ({ name, email, role, loggedIn, onLogout, organizationName }) => 
             <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-20">
               <button
                 onClick={() => {
-                  navigate('/profile'); // Navigate to profile page
-                  setDropdownOpen(false); // Close the dropdown
+                  navigate('/profile');
+                  setDropdownOpen(false);
                 }}
-
                 className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                 aria-label="Go to Profile"
               >

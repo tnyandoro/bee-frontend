@@ -1,34 +1,58 @@
-import React, { useState } from 'react';
-import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
-import Home from './components/home';
-import Login from './components/Login';
-import AdminRegister from './components/AdminRegister';
-import Navbar from './components/Navbar';
-import Sidebar from './components/Sidebar';
-import Dashboard from './components/Dashboard';
-import PrivateRoute from './components/PrivateRoute';
-import Incident from './components/Incident';
-import CreateTicketPage from './components/CreateTicketPage';
-import IncidentOverview from './components/IncidentOverview';
-import KnowledgeBase from './components/KnowledgeBase';
-import CreateProblems from './components/CreateProblems';
-import ProblemsOverview from './components/ProblemsOverview';
-import Settings from './components/Settings';
-import Profile from './components/Profile';
-import CreateUserForm from './components/CreateUserForm';
-import AdminDashboard from './components/AdminDashboard'; // Import AdminDashboard
+import React, { useState, useEffect } from "react";
+import {
+  BrowserRouter as Router,
+  Route,
+  Routes,
+  Navigate,
+} from "react-router-dom";
+import Home from "./components/home";
+import Header from "./components/Header";
+import Login from "./components/Login";
+import AdminRegister from "./components/AdminRegister";
+import Navbar from "./components/Navbar";
+import Sidebar from "./components/Sidebar";
+import Dashboard from "./components/Dashboard";
+import PrivateRoute from "./components/PrivateRoute";
+import Incident from "./components/Incidents";
+import CreateTicketPage from "./components/CreateTicketPage";
+import IncidentOverview from "./components/IncidentOverview";
+import KnowledgeBase from "./components/KnowledgeBase";
+import CreateProblems from "./components/CreateProblems";
+import ProblemsOverview from "./components/ProblemsOverview";
+import Settings from "./components/Settings";
+import Profile from "./components/Profile";
+import CreateUserForm from "./components/CreateUserForm";
+import AdminDashboard from "./components/AdminDashboard";
+import ResolveTicket from "./components/ResolveTicket";
 
 function App() {
   const [loggedIn, setLoggedIn] = useState(false);
-  const [email, setEmail] = useState('');
-  const [role, setRole] = useState('');
-  const profileImage = 'path_to_image'; // Replace with actual profile image URL
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState("");
+  const profileImage = "path_to_image";
+
+  useEffect(() => {
+    const token = localStorage.getItem("authToken");
+    if (token) {
+      const storedEmail = localStorage.getItem("email") || "";
+      const storedRole = localStorage.getItem("role") || "";
+      console.log("Logged in with:", { email: storedEmail, role: storedRole });
+      setLoggedIn(true);
+      setEmail(storedEmail);
+      setRole(storedRole);
+    } else {
+      setLoggedIn(false);
+    }
+  }, []);
 
   const handleLogout = () => {
     setLoggedIn(false);
-    setEmail('');
-    setRole('');
-    localStorage.removeItem('token');
+    setEmail("");
+    setRole("");
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("subdomain");
+    localStorage.removeItem("email");
+    localStorage.removeItem("role");
   };
 
   return (
@@ -36,6 +60,7 @@ function App() {
       <div className="App">
         {loggedIn && (
           <>
+            <Header />
             <Navbar
               logo="path_to_logo"
               name={email}
@@ -49,38 +74,53 @@ function App() {
           </>
         )}
 
-        <div className={loggedIn ? 'pl-64' : ''}>
+        <div className={loggedIn ? "pl-64" : ""}>
           <Routes>
-            {/* Public Routes */}
             <Route
               path="/"
-              element={
-                <Home
-                  email={email}
-                  loggedIn={loggedIn}
-                  setLoggedIn={setLoggedIn}
-                  setEmail={setEmail}
-                  setRole={setRole}
-                />
-              }
+              element={loggedIn ? <Navigate to="/dashboard" /> : <Home />}
             />
             <Route
               path="/login"
               element={
-                <Login
-                  setLoggedIn={setLoggedIn}
-                  setEmail={setEmail}
-                  setRole={setRole}
-                />
+                loggedIn ? (
+                  <Navigate to="/dashboard" />
+                ) : (
+                  <Login
+                    setLoggedIn={setLoggedIn}
+                    setEmail={setEmail}
+                    setRole={setRole}
+                  />
+                )
               }
             />
             <Route path="/admin/register" element={<AdminRegister />} />
-
-            {/* Protected Routes */}
             <Route
               path="/dashboard"
               element={
-                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin', 'User']}>
+                <PrivateRoute
+                  loggedIn={loggedIn}
+                  role={role}
+                  allowedRoles={[
+                    "admin",
+                    "super_user",
+                    "agent",
+                    "teamlead",
+                    "viewer",
+                  ]}
+                >
+                  <Dashboard email={email} role={role} />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/user/dashboard"
+              element={
+                <PrivateRoute
+                  loggedIn={loggedIn}
+                  role={role}
+                  allowedRoles={["agent", "teamlead", "viewer"]}
+                >
                   <Dashboard email={email} role={role} />
                 </PrivateRoute>
               }
@@ -88,7 +128,11 @@ function App() {
             <Route
               path="/incident"
               element={
-                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin', 'User']}>
+                <PrivateRoute
+                  loggedIn={loggedIn}
+                  role={role}
+                  allowedRoles={["admin", "super_user", "agent"]}
+                >
                   <Incident email={email} role={role} />
                 </PrivateRoute>
               }
@@ -96,7 +140,11 @@ function App() {
             <Route
               path="/create-ticket"
               element={
-                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin', 'User']}>
+                <PrivateRoute
+                  loggedIn={loggedIn}
+                  role={role}
+                  allowedRoles={["admin", "super_user", "agent"]}
+                >
                   <CreateTicketPage email={email} role={role} />
                 </PrivateRoute>
               }
@@ -104,7 +152,11 @@ function App() {
             <Route
               path="/incident-overview"
               element={
-                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin', 'User']}>
+                <PrivateRoute
+                  loggedIn={loggedIn}
+                  role={role}
+                  allowedRoles={["admin", "super_user", "agent"]}
+                >
                   <IncidentOverview email={email} role={role} />
                 </PrivateRoute>
               }
@@ -112,7 +164,17 @@ function App() {
             <Route
               path="/knowledge-base"
               element={
-                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin', 'User']}>
+                <PrivateRoute
+                  loggedIn={loggedIn}
+                  role={role}
+                  allowedRoles={[
+                    "admin",
+                    "super_user",
+                    "agent",
+                    "teamlead",
+                    "viewer",
+                  ]}
+                >
                   <KnowledgeBase email={email} role={role} />
                 </PrivateRoute>
               }
@@ -120,7 +182,11 @@ function App() {
             <Route
               path="/create-problems"
               element={
-                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin', 'User']}>
+                <PrivateRoute
+                  loggedIn={loggedIn}
+                  role={role}
+                  allowedRoles={["admin", "super_user", "agent"]}
+                >
                   <CreateProblems email={email} role={role} />
                 </PrivateRoute>
               }
@@ -128,15 +194,24 @@ function App() {
             <Route
               path="/problems-overview"
               element={
-                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin', 'User']}>
-                  <ProblemsOverview email={email} role={role} />
+                <PrivateRoute
+                  loggedIn={loggedIn}
+                  role={role}
+                  allowedRoles={["admin", "team_lead", "super_user"]}
+                >
+                  <ProblemsOverview />
                 </PrivateRoute>
               }
             />
+
             <Route
               path="/settings"
               element={
-                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin', 'User']}>
+                <PrivateRoute
+                  loggedIn={loggedIn}
+                  role={role}
+                  allowedRoles={["admin", "super_user"]}
+                >
                   <Settings email={email} role={role} />
                 </PrivateRoute>
               }
@@ -144,7 +219,17 @@ function App() {
             <Route
               path="/profile"
               element={
-                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin', 'User']}>
+                <PrivateRoute
+                  loggedIn={loggedIn}
+                  role={role}
+                  allowedRoles={[
+                    "admin",
+                    "super_user",
+                    "agent",
+                    "teamlead",
+                    "viewer",
+                  ]}
+                >
                   <Profile email={email} role={role} />
                 </PrivateRoute>
               }
@@ -152,7 +237,11 @@ function App() {
             <Route
               path="/create-user"
               element={
-                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin']}>
+                <PrivateRoute
+                  loggedIn={loggedIn}
+                  role={role}
+                  allowedRoles={["admin", "super_user"]}
+                >
                   <CreateUserForm email={email} role={role} />
                 </PrivateRoute>
               }
@@ -160,13 +249,40 @@ function App() {
             <Route
               path="/admin-dashboard"
               element={
-                <PrivateRoute loggedIn={loggedIn} role={role} allowedRoles={['Admin']}>
+                <PrivateRoute
+                  loggedIn={loggedIn}
+                  role={role}
+                  allowedRoles={["admin", "super_user"]}
+                >
                   <AdminDashboard email={email} role={role} />
                 </PrivateRoute>
               }
             />
-            {/* Redirect unknown paths to the home page */}
-            <Route path="*" element={<Navigate to="/" />} />
+            <Route
+              path="/resolve-ticket/:ticketNumber"
+              element={
+                <PrivateRoute
+                  loggedIn={loggedIn}
+                  role={role}
+                  allowedRoles={["admin", "super_user", "agent"]}
+                >
+                  <ResolveTicket />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/forbidden"
+              element={
+                <div className="text-red-500 text-center">
+                  Access Denied: Insufficient Permissions
+                </div>
+              }
+            />
+            <Route
+              path="/home"
+              element={<Home email={email} loggedIn={loggedIn} />}
+            />
+            <Route path="*" element={<Navigate to="/login" />} />
           </Routes>
         </div>
       </div>

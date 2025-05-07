@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import React, { useState } from "react";
+import { NavLink } from "react-router-dom";
 import {
   HomeIcon,
   TicketIcon,
@@ -8,23 +8,80 @@ import {
   EyeIcon,
   CogIcon,
   UserIcon,
-  UserPlusIcon, 
-  Squares2X2Icon, // Icon for "Admin Dashboard" (assuming Heroicons v2)
-} from '@heroicons/react/24/outline';
+  UserPlusIcon,
+  Squares2X2Icon,
+} from "@heroicons/react/24/outline";
 
 const Sidebar = ({ isLoggedIn }) => {
   const [selected, setSelected] = useState(null);
 
   const links = [
-    { id: 1, name: 'Admin Dashboard', path: '/admin-dashboard', icon: <Squares2X2Icon className="h-5 w-5" /> },
-    { id: 2, name: 'Dashboard', path: '/dashboard', icon: <HomeIcon className="h-5 w-5" /> },
-    { id: 3, name: 'Create Ticket', path: '/create-ticket', icon: <TicketIcon className="h-5 w-5" /> },
-    { id: 4, name: 'Overview', path: '/incident-overview', icon: <EyeIcon className="h-5 w-5" /> },
-    { id: 5, name: 'Knowledge Base', path: '/knowledge-base', icon: <BookOpenIcon className="h-5 w-5" /> },
-    { id: 6, name: 'Create Problems', path: '/create-problems', icon: <TicketIcon className="h-5 w-5" /> },
-    { id: 7, name: 'Problems', path: '/problems-overview', icon: <ExclamationTriangleIcon className="h-5 w-5" /> },
-    { id: 8, name: 'Settings', path: '/settings', icon: <CogIcon className="h-5 w-5" /> },
-    { id: 9, name: 'Profile', path: '/profile', icon: <UserIcon className="h-5 w-5" /> },
+    {
+      id: 1,
+      name: "Admin Dashboard",
+      path: "/admin-dashboard",
+      icon: <Squares2X2Icon className="h-5 w-5" />,
+    },
+    {
+      id: 2,
+      name: "Dashboard",
+      path: "/dashboard",
+      icon: <HomeIcon className="h-5 w-5" />,
+    },
+    {
+      id: 3,
+      name: "Create Ticket",
+      path: "/create-ticket",
+      icon: <TicketIcon className="h-5 w-5" />,
+    },
+    {
+      id: 4,
+      name: "Incidents",
+      path: "/incident",
+      icon: <TicketIcon className="h-5 w-5" />,
+    },
+    {
+      id: 5,
+      name: "Overview",
+      path: "/incident-overview",
+      icon: <EyeIcon className="h-5 w-5" />,
+    },
+    {
+      id: 6,
+      name: "Knowledge Base",
+      path: "/knowledge-base",
+      icon: <BookOpenIcon className="h-5 w-5" />,
+    },
+    {
+      id: 7,
+      name: "Create Problems",
+      path: "/create-problems",
+      icon: <TicketIcon className="h-5 w-5" />,
+    },
+    {
+      id: 8,
+      name: "Problems",
+      path: "/problems-overview",
+      icon: <ExclamationTriangleIcon className="h-5 w-5" />,
+    },
+    {
+      id: 9,
+      name: "Settings",
+      path: "/settings",
+      icon: <CogIcon className="h-5 w-5" />,
+    },
+    {
+      id: 10,
+      name: "Profile",
+      path: "/profile",
+      icon: <UserIcon className="h-5 w-5" />,
+    },
+    {
+      id: 11,
+      name: "Create User",
+      path: "/create-user",
+      icon: <UserPlusIcon className="h-5 w-5" />,
+    },
   ];
 
   if (!isLoggedIn) return null;
@@ -36,11 +93,13 @@ const Sidebar = ({ isLoggedIn }) => {
           <li key={link.id}>
             <NavLink
               to={link.path}
-              className={`flex items-center py-4 px-6 text-gray-700 ${
-                selected === link.id
-                  ? 'bg-blue-700 text-white rounded-l-full'
-                  : 'hover:bg-blue-700 hover:text-white rounded-l-full'
-              }`}
+              className={({ isActive }) =>
+                `flex items-center py-4 px-6 text-gray-700 ${
+                  isActive || selected === link.id
+                    ? "bg-blue-700 text-white rounded-l-full"
+                    : "hover:bg-blue-700 hover:text-white rounded-l-full"
+                }`
+              }
               onClick={() => setSelected(link.id)}
             >
               {link.icon}
