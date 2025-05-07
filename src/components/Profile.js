@@ -1,41 +1,45 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
-import { useAuth } from '../contexts/authContext';
-import { FaUpload, FaLock, FaUser, FaArrowLeft } from 'react-icons/fa';
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+import { useAuth } from "../contexts/authContext";
+import { FaUpload, FaLock, FaUser, FaArrowLeft } from "react-icons/fa";
 
 const Profile = () => {
   const { user } = useAuth();
   const [profile, setProfile] = useState(null);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('profile');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [activeTab, setActiveTab] = useState("profile");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [profilePicture, setProfilePicture] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
 
   useEffect(() => {
     const fetchProfile = async () => {
-      const token = localStorage.getItem('authToken');
-      const subdomain = localStorage.getItem('subdomain');
+      const token = localStorage.getItem("authToken");
+      const subdomain = localStorage.getItem("subdomain");
 
       if (!token || !subdomain) {
-        setError('Please log in to view your profile.');
+        setError("Please log in to view your profile.");
         setLoading(false);
         return;
       }
 
       try {
-        const response = await axios.get(`http://${subdomain}.lvh.me:3000/api/v1/profile`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        console.log('Profile response:', response.data);
+        const response = await axios.get(
+          `http://lvh.me:3000/api/v1/organizations/${subdomain}/profile`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        console.log("Profile response:", response.data);
         setProfile(response.data);
       } catch (err) {
-        setError('Failed to fetch profile data: ' + (err.response?.data?.error || err.message));
-        console.error('Profile fetch error:', err.response || err);
+        setError(
+          "Failed to fetch profile data: " +
+            (err.response?.data?.error || err.message)
+        );
+        console.error("Profile fetch error:", err.response || err);
       } finally {
         setLoading(false);
       }
@@ -43,12 +47,12 @@ const Profile = () => {
 
     fetchProfile();
 
-    const storedImage = localStorage.getItem('profilePicture');
+    const storedImage = localStorage.getItem("profilePicture");
     if (storedImage) {
       setProfilePicture(storedImage);
     }
 
-    console.log('Current user from context:', user);
+    console.log("Current user from context:", user);
   }, [user]);
 
   const handleImageUpload = () => {
@@ -57,7 +61,7 @@ const Profile = () => {
       reader.onloadend = () => {
         const imageUrl = reader.result;
         setProfilePicture(imageUrl);
-        localStorage.setItem('profilePicture', imageUrl);
+        localStorage.setItem("profilePicture", imageUrl);
       };
       reader.readAsDataURL(selectedFile);
       setSelectedFile(null);
@@ -67,16 +71,16 @@ const Profile = () => {
   const handleChangePassword = () => {
     if (newPassword === confirmPassword) {
       // TODO: Implement password change API call
-      alert('Password changed successfully!');
-      setNewPassword('');
-      setConfirmPassword('');
-      setActiveTab('profile');
+      alert("Password changed successfully!");
+      setNewPassword("");
+      setConfirmPassword("");
+      setActiveTab("profile");
     } else {
-      alert('Passwords do not match!');
+      alert("Passwords do not match!");
     }
   };
 
-  console.log('Profile state:', profile); // Debug profile state
+  console.log("Profile state:", profile); // Debug profile state
 
   if (loading) {
     return <div className="p-4">Loading profile...</div>;
@@ -91,7 +95,7 @@ const Profile = () => {
   }
 
   const userData = profile.user || {};
-  const isAdmin = userData.role === 'admin' || userData.role === 'super_user';
+  const isAdmin = userData.role === "admin" || userData.role === "super_user";
 
   return (
     <div className="bg-gray-300 p-5 mt-10 flex">
@@ -132,46 +136,54 @@ const Profile = () => {
         </label>
         <label
           className="flex items-center py-2 px-4 mb-2 bg-blue-700 hover:bg-blue-600 rounded cursor-pointer transition"
-          onClick={() => setActiveTab('profile')}
+          onClick={() => setActiveTab("profile")}
         >
           <FaUser className="mr-2" /> My Profile
         </label>
         <label
           className="flex items-center py-2 px-4 mb-2 bg-blue-700 hover:bg-blue-600 rounded cursor-pointer transition"
-          onClick={() => setActiveTab('settings')}
+          onClick={() => setActiveTab("settings")}
         >
           <FaLock className="mr-2" /> Change Password
         </label>
         <label
           className="flex items-center py-2 px-4 mb-2 bg-blue-700 hover:bg-blue-600 rounded cursor-pointer transition"
-          onClick={() => alert('Profile updated!')} // TODO: Implement update logic
+          onClick={() => alert("Profile updated!")} // TODO: Implement update logic
         >
           <FaArrowLeft className="mr-2" /> Update Profile
         </label>
       </div>
 
       <div className="flex-1 p-4">
-        {activeTab === 'profile' ? (
+        {activeTab === "profile" ? (
           <div>
             <div className="p-2 mt-6">
               {error && <p className="text-red-500">{error}</p>}
-              {isAdmin && <p className="text-green-500">You have admin privileges.</p>}
+              {isAdmin && (
+                <p className="text-green-500">You have admin privileges.</p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-2">
               {[
-                { key: 'ID', value: userData.id || 'N/A' },
-                { key: 'Full Name', value: userData.name || 'N/A' },
-                { key: 'Password', value: '*********' },
-                { key: 'Email', value: userData.email || 'N/A' },
-                { key: 'Username', value: userData.username || 'N/A' },
-                { key: 'Phone', value: userData.phone_number || 'N/A' },
-                { key: 'Department', value: userData.department || 'N/A' },
-                { key: 'Position', value: userData.position || 'N/A' },
-                { key: 'Organization ID', value: profile.organization?.id || 'N/A' },
-                { key: 'Organization Name', value: profile.organization?.name || 'N/A' },
-                { key: 'Team ID', value: userData.team_id || 'N/A' },
-                { key: 'Role', value: userData.role || 'N/A' },
+                { key: "ID", value: userData.id || "N/A" },
+                { key: "Full Name", value: userData.name || "N/A" },
+                { key: "Password", value: "*********" },
+                { key: "Email", value: userData.email || "N/A" },
+                { key: "Username", value: userData.username || "N/A" },
+                { key: "Phone", value: userData.phone_number || "N/A" },
+                { key: "Department", value: userData.department || "N/A" },
+                { key: "Position", value: userData.position || "N/A" },
+                {
+                  key: "Organization ID",
+                  value: profile.organization?.id || "N/A",
+                },
+                {
+                  key: "Organization Name",
+                  value: profile.organization?.name || "N/A",
+                },
+                { key: "Team ID", value: userData.team_id || "N/A" },
+                { key: "Role", value: userData.role || "N/A" },
               ].map(({ key, value }, index) => (
                 <div key={index} className="flex flex-col items-start mb-2">
                   <div className="font-bold text-lg">{key}</div>
@@ -182,7 +194,7 @@ const Profile = () => {
               ))}
             </div>
           </div>
-        ) : activeTab === 'settings' ? (
+        ) : activeTab === "settings" ? (
           <div>
             <h2 className="text-xl font-semibold mb-4">Change Password</h2>
             <input

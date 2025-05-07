@@ -1,141 +1,217 @@
-// src/components/CreateTeamForm.js
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect, useCallback } from "react";
+import createApiInstance from "../utils/api";
+import { useAuth } from "../contexts/authContext";
+import { useNavigate } from "react-router-dom";
 
-const CreateTeamForm = ({ onClose }) => {
+const CreateTeamForm = ({ onClose, onTeamCreated }) => {
+  const { token, subdomain } = useAuth();
+  const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
-    name: '',
-    user_ids: [], // Array to store selected user IDs
+    name: "",
+    user_ids: [],
   });
-  const [users, setUsers] = useState([]); // List of users from the organization
-  const [message, setMessage] = useState('');
+  const [users, setUsers] = useState([]);
+  const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const handleApiError = useCallback(
+    (error) => {
+      if (error.response?.status === 401) {
+        localStorage.removeItem("authToken");
+        navigate("/login");
+        return "Session expired. Please log in again.";
+      } else if (error.response?.data?.errors) {
+        return error.response.data.errors.join(", ");
+      } else if (error.response?.data?.error) {
+        return error.response.data.error;
+      } else {
+        return error.message;
+      }
+    },
+    [navigate]
+  );
+
+  const validateAuth = useCallback(() => {
+    if (!token || !subdomain) {
+      setMessage("Please log in to continue.");
+      setIsError(true);
+      navigate("/login");
+      return false;
+    }
+    return true;
+  }, [token, subdomain, navigate]);
+
+  const validateForm = () => {
+    if (!formData.name.trim()) {
+      setMessage("Please provide a team name.");
+      setIsError(true);
+      return false;
+    }
+    if (formData.user_ids.length === 0) {
+      setMessage("Please select at least one user.");
+      setIsError(true);
+      return false;
+    }
+    return true;
+  };
+
+  const withLoading = async (callback) => {
+    setLoading(true);
+    try {
+      await callback();
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchUsers = async () => {
-      const token = localStorage.getItem('token');
-      const subdomain = localStorage.getItem('subdomain');
-
-      if (!token || !subdomain) {
-        setMessage('Please log in to fetch users.');
-        setIsError(true);
-        return;
-      }
+      if (!validateAuth()) return;
+      const api = createApiInstance(token);
 
       try {
-        const response = await axios.get(`http://${subdomain}.lvh.me:3000/api/v1/organizations/${subdomain}/users`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        console.log('Users fetched:', response.data);
-        // Assuming response.data.users.data is the array of user objects from UserSerializer
-        setUsers(response.data.users.data || []);
+        const response = await api.get(`/organizations/${subdomain}/users`);
+        const usersData = Array.isArray(response.data.data)
+          ? response.data.data
+          : [];
+
+        if (usersData.length === 0) {
+          setMessage("No users found for this organization.");
+          setUsers([]);
+        } else {
+          setUsers(usersData);
+          setMessage("");
+        }
       } catch (error) {
-        setMessage('Failed to fetch users: ' + (error.response?.data?.error || error.message));
+        setMessage(handleApiError(error));
         setIsError(true);
-        console.error('Error fetching users:', error);
       }
     };
 
-    fetchUsers();
-  }, []);
+    withLoading(fetchUsers);
+  }, [token, subdomain, navigate, validateAuth, handleApiError]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleUserSelect = (e) => {
-    const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
-    setFormData({ ...formData, user_ids: selectedOptions });
+    const selectedOptions = Array.from(e.target.selectedOptions, (option) =>
+      parseInt(option.value, 10)
+    );
+    setFormData((prev) => ({ ...prev, user_ids: selectedOptions }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMessage('');
+    setMessage("");
     setIsError(false);
 
-    const token = localStorage.getItem('token');
-    const subdomain = localStorage.getItem('subdomain');
+    if (!validateAuth() || !validateForm()) return;
 
-    if (!token || !subdomain) {
-      setMessage('Please log in to create a team.');
-      setIsError(true);
-      return;
-    }
+    const api = createApiInstance(token);
 
     try {
-      const url = `http://${subdomain}.lvh.me:3000/api/v1/organizations/${subdomain}/teams`;
-      console.log('Making API call to create team with data:', {
-        url,
-        data: { team: formData },
-        headers: { Authorization: `Bearer ${token}` },
+      await api.post(`/organizations/${subdomain}/teams`, {
+        team: {
+          name: formData.name,
+          user_ids: formData.user_ids,
+        },
       });
 
-      const response = await axios.post(
-        url,
-        { team: formData },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      console.log('Team created successfully:', response.data);
-      setMessage('Team created successfully!');
+      setMessage("Team created successfully!");
+      setFormData({ name: "", user_ids: [] });
       setIsError(false);
-      setFormData({ name: '', user_ids: [] }); // Reset form
-      // Optionally close the form after success
-      // onClose();
+      onTeamCreated?.();
+      onClose?.();
     } catch (error) {
-      console.error('Error creating team:', error);
-      setMessage(error.response?.data?.errors?.join(', ') || error.message || 'Error creating team');
+      setMessage(handleApiError(error));
       setIsError(true);
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center p-8">
+        <p className="text-blue-700 animate-pulse">Loading users...</p>
+      </div>
+    );
+  }
+
   return (
-    <div>
-      <h2 className="text-2xl font-semibold mb-4">Create Team</h2>
+    <div className="p-4 max-w-md mx-auto">
+      <h2 className="text-2xl font-semibold mb-4 text-gray-800">Create Team</h2>
+
       {message && (
-        <p className={`mb-4 ${isError ? 'text-red-500' : 'text-green-500'}`}>{message}</p>
+        <div
+          className={`mb-4 p-3 rounded ${
+            isError ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
+          }`}
+        >
+          {message}
+        </div>
       )}
+
       <form onSubmit={handleSubmit} className="space-y-4">
-        <input
-          type="text"
-          name="name"
-          placeholder="Team Name"
-          value={formData.name}
-          onChange={handleChange}
-          className="border p-2 rounded w-full"
-          required
-        />
         <div>
-          <label className="block text-gray-700 mb-2">Assign Users</label>
+          <label className="block text-gray-700 mb-1 font-medium">
+            Team Name
+          </label>
+          <input
+            type="text"
+            name="name"
+            placeholder="Team Name"
+            value={formData.name}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            required
+            minLength="2"
+          />
+        </div>
+
+        <div>
+          <label className="block text-gray-700 mb-1 font-medium">
+            Assign Users
+          </label>
           <select
             multiple
             name="user_ids"
-            value={formData.user_ids}
+            value={formData.user_ids.map(String)} // Ensure it’s string array
             onChange={handleUserSelect}
-            className="border p-2 rounded w-full h-40"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md h-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            disabled={users.length === 0}
+            aria-label="Select team members"
           >
             {users.map((user) => (
               <option key={user.id} value={user.id}>
-                {user.attributes.name} ({user.attributes.email})
+                {user.name || user.email}
               </option>
             ))}
           </select>
-          <p className="text-sm text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple users</p>
+          <p className="text-sm text-gray-500 mt-1">
+            {users.length === 0
+              ? "No users available in this organization."
+              : "Hold Ctrl (Windows) or Cmd (Mac) to select multiple users."}
+          </p>
         </div>
-        <div className="flex justify-between mt-4">
-          <button
-            type="submit"
-            className="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded shadow"
-          >
-            Create Team
-          </button>
+
+        <div className="flex justify-end space-x-3 pt-4">
           <button
             type="button"
             onClick={onClose}
-            className="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded shadow"
+            className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500"
           >
             Cancel
+          </button>
+          <button
+            type="submit"
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+            disabled={loading}
+          >
+            Create Team
           </button>
         </div>
       </form>

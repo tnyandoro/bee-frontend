@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import logor from '../assets/logor.png';
-import bg from '../assets/main_bg.png';
-import splashLogo from '../assets/splash_logo.png'; // Assume you have a splash screen logo
-import axios from 'axios';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import logor from "../assets/logor.png";
+import bg from "../assets/main_bg.png";
+import splashLogo from "../assets/splash_logo.png"; // Assume you have a splash screen logo
+import axios from "axios";
 
 const AdminLogin = ({ setLoggedIn, setEmail, setRole }) => {
-  const [email, setEmailInput] = useState('');
-  const [password, setPasswordInput] = useState('');
-  const [emailError, setEmailError] = useState('');
-  const [passwordError, setPasswordError] = useState('');
+  const [email, setEmailInput] = useState("");
+  const [password, setPasswordInput] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showSplash, setShowSplash] = useState(true); // State to control splash screen
 
@@ -27,16 +27,16 @@ const AdminLogin = ({ setLoggedIn, setEmail, setRole }) => {
   // Validate form inputs
   const validateForm = () => {
     let isValid = true;
-    setEmailError('');
-    setPasswordError('');
+    setEmailError("");
+    setPasswordError("");
 
     if (!email) {
-      setEmailError('Email is required');
+      setEmailError("Email is required");
       isValid = false;
     }
 
     if (!password) {
-      setPasswordError('Password is required');
+      setPasswordError("Password is required");
       isValid = false;
     }
 
@@ -50,29 +50,32 @@ const AdminLogin = ({ setLoggedIn, setEmail, setRole }) => {
     setIsLoading(true);
 
     try {
-      const response = await axios.post('https://gss-itsm-platform-api-27vo.onrender.com/api/v1/admin_auth/login', {
-        email,
-        password,
-      });
+      const response = await axios.post(
+        "https://gss-itsm-platform-api-27vo.onrender.com/api/v1/admin_auth/login",
+        {
+          email,
+          password,
+        }
+      );
 
       // Store token in localStorage
       const token = response.data.token;
-      localStorage.setItem('token', token);
+      localStorage.setItem("token", token);
 
       // Update parent state with login status, email, and role
       setLoggedIn(true);
       setEmail(email);
-      setRole('Admin'); // Assuming the user is an admin after login
+      setRole("Admin"); // Assuming the user is an admin after login
 
       // Navigate to dashboard
-      navigate('/dashboard');
+      navigate("/dashboard");
 
-      console.log('Logged in successfully', response.data);
+      console.log("Logged in successfully", response.data);
     } catch (error) {
       if (error.response && error.response.status === 401) {
-        setEmailError('Invalid email or password');
+        setEmailError("Invalid email or password");
       } else {
-        setEmailError('Something went wrong, please try again later');
+        setEmailError("Something went wrong, please try again later");
       }
     } finally {
       setIsLoading(false); // Reset loading state
@@ -83,7 +86,11 @@ const AdminLogin = ({ setLoggedIn, setEmail, setRole }) => {
   if (showSplash) {
     return (
       <div className="flex items-center justify-center bg-white h-screen">
-        <img src={splashLogo} alt="Splash Logo" className="w-48 animate-pulse" />
+        <img
+          src={splashLogo}
+          alt="Splash Logo"
+          className="w-48 animate-pulse"
+        />
       </div>
     );
   }
@@ -94,10 +101,10 @@ const AdminLogin = ({ setLoggedIn, setEmail, setRole }) => {
       className="flex"
       style={{
         backgroundImage: `url(${bg})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-        height: '100vh',
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        height: "100vh",
       }}
     >
       <div className="w-1/2 flex items-center justify-center bg-gray-200">
@@ -137,7 +144,7 @@ const AdminLogin = ({ setLoggedIn, setEmail, setRole }) => {
             onClick={onButtonClick}
             disabled={isLoading}
           >
-            {isLoading ? 'Logging in...' : 'Log in'}
+            {isLoading ? "Logging in..." : "Log in"}
           </button>
         </div>
       </div>

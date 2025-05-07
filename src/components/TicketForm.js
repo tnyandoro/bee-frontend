@@ -1,29 +1,31 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
-import apiBaseUrl from '../config';
+import React, { useState, useEffect, useCallback } from "react";
+import axios from "axios";
+import { useNavigate } from "react-router-dom";
+import apiBaseUrl from "../config";
 
 const TicketForm = ({ organization, token }) => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    ticketNumber: `INC/REQ${Math.floor(Math.random() * 1000000000).toString().padStart(9, '0')}`,
-    ticketStatus: 'Open',
-    callerName: '',
-    callerSurname: '',
-    callerEmail: '',
-    callerContact: '',
-    callerLocation: '',
-    subject: '',
-    description: '',
+    ticketNumber: `INC/REQ${Math.floor(Math.random() * 1000000000)
+      .toString()
+      .padStart(9, "0")}`,
+    ticketStatus: "Open",
+    callerName: "",
+    callerSurname: "",
+    callerEmail: "",
+    callerContact: "",
+    callerLocation: "",
+    subject: "",
+    description: "",
     reportedDate: new Date().toISOString().slice(0, 16),
-    relatedRecord: '',
-    ticket_type: 'Incident',
-    category: 'Technical',
-    impact: 'medium',
-    urgency: 'medium',
-    priority: 'p3',
-    team_id: '',
-    assignee_id: '',
+    relatedRecord: "",
+    ticket_type: "Incident",
+    category: "Technical",
+    impact: "medium",
+    urgency: "medium",
+    priority: "p3",
+    team_id: "",
+    assignee_id: "",
   });
   const [teams, setTeams] = useState([]);
   const [teamUsers, setTeamUsers] = useState([]);
@@ -32,55 +34,68 @@ const TicketForm = ({ organization, token }) => {
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const baseUrl = apiBaseUrl; // Use global base URL for now
+  const baseUrl = apiBaseUrl;
   const ticketsUrl = organization?.subdomain
     ? `${apiBaseUrl}/organizations/${organization.subdomain}/tickets`
     : null;
 
   const fetchProfile = useCallback(async () => {
-    if (!token) {
-      setError('No token provided');
-      navigate('/login');
+    if (!token || !organization?.subdomain) {
+      setError("Missing organization context or authentication token");
       return;
     }
+
     setLoading(true);
-    const url = `${baseUrl}/profile`; // Global /profile endpoint
-    console.log('Fetching profile from:', url);
+    const url = `${baseUrl}/organizations/${organization.subdomain}/profile`;
+
     try {
       const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
+
       const user = response.data.user;
       setCurrentUser(user);
       setFormData((prev) => ({
         ...prev,
-        callerName: user.name || '',
-        callerSurname: user.surname || '',
-        callerEmail: user.email || '',
-        callerContact: user.phone_number || '',
+        callerName: user.name || "",
+        callerSurname: user.surname || "",
+        callerEmail: user.email || "",
+        callerContact: user.phone_number || "",
       }));
+
+      if (!["admin", "team_lead", "super_user"].includes(user.role)) {
+        setError("Only admins, team leads, or super users can create tickets.");
+        setCurrentUser(null);
+      }
     } catch (err) {
-      console.error('Profile fetch error:', err.response?.data || err.message);
-      setError(`Failed to fetch profile: ${err.response?.status} - ${err.response?.data?.error || err.message}`);
+      console.error("Profile fetch error:", err.response?.data || err.message);
+      setError(
+        `Failed to fetch profile: ${err.response?.status} - ${
+          err.response?.data?.error || err.message
+        }`
+      );
       setCurrentUser(null);
     } finally {
       setLoading(false);
     }
-  }, [token, baseUrl, navigate]);
+  }, [token, baseUrl, organization?.subdomain]);
 
   const fetchTeams = useCallback(async () => {
     if (!token || !organization?.subdomain) return;
     setLoading(true);
     const url = `${apiBaseUrl}/organizations/${organization.subdomain}/teams`;
-    console.log('Fetching teams from:', url);
     try {
       const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setTeams(Array.isArray(response.data) ? response.data : response.data.teams || []);
+      setTeams(
+        Array.isArray(response.data) ? response.data : response.data.teams || []
+      );
     } catch (err) {
-      console.error('Teams fetch error:', err.response?.data);
-      setError(`Failed to fetch teams: ${err.response?.data?.error || err.message}`);
+      console.error("Teams fetch error:", err.response?.data);
+      setError(
+        `Failed to fetch teams: ${err.response?.data?.error || err.message}`
+      );
       setTeams([]);
     } finally {
       setLoading(false);
@@ -94,15 +109,20 @@ const TicketForm = ({ organization, token }) => {
     }
     setLoading(true);
     const url = `${apiBaseUrl}/organizations/${organization.subdomain}/teams/${formData.team_id}/users`;
-    console.log('Fetching team users from:', url);
     try {
       const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setTeamUsers(Array.isArray(response.data) ? response.data : response.data.users || []);
+      setTeamUsers(
+        Array.isArray(response.data) ? response.data : response.data.users || []
+      );
     } catch (err) {
-      console.error('Team users fetch error:', err.response?.data);
-      setError(`Failed to fetch team users: ${err.response?.data?.error || err.message}`);
+      console.error("Team users fetch error:", err.response?.data);
+      setError(
+        `Failed to fetch team users: ${
+          err.response?.data?.error || err.message
+        }`
+      );
       setTeamUsers([]);
     } finally {
       setLoading(false);
@@ -110,11 +130,13 @@ const TicketForm = ({ organization, token }) => {
   }, [token, organization?.subdomain, formData.team_id]);
 
   useEffect(() => {
-    if (token) {
+    if (!token) {
+      navigate("/login");
+    } else {
       fetchProfile();
       fetchTeams();
     }
-  }, [token, fetchProfile, fetchTeams]);
+  }, [token, fetchProfile, fetchTeams, navigate]);
 
   useEffect(() => {
     fetchTeamUsers();
@@ -125,24 +147,24 @@ const TicketForm = ({ organization, token }) => {
     setFormData((prev) => ({
       ...prev,
       [name]: value,
-      ...(name === 'team_id' ? { assignee_id: '' } : {}),
+      ...(name === "team_id" ? { assignee_id: "" } : {}),
     }));
-    if (name === 'urgency' || name === 'impact') {
+    if (name === "urgency" || name === "impact") {
       calculatePriority({ ...formData, [name]: value });
     }
   };
 
   const calculatePriority = (data) => {
     const priorityMatrix = {
-      "high_high": "p1",
-      "high_medium": "p2",
-      "high_low": "p3",
-      "medium_high": "p2",
-      "medium_medium": "p3",
-      "medium_low": "p4",
-      "low_high": "p3",
-      "low_medium": "p4",
-      "low_low": "p4",
+      high_high: "p1",
+      high_medium: "p2",
+      high_low: "p3",
+      medium_high: "p2",
+      medium_medium: "p3",
+      medium_low: "p4",
+      low_high: "p3",
+      low_medium: "p4",
+      low_low: "p4",
     };
     const key = `${data.urgency}_${data.impact}`;
     const priority = priorityMatrix[key] || "p4";
@@ -152,11 +174,17 @@ const TicketForm = ({ organization, token }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!token || !ticketsUrl || !currentUser) {
-      setError('Please log in to submit a ticket.');
-      navigate('/login');
+      setError("Please log in to submit a ticket.");
+      navigate("/login");
       return;
     }
 
+    if (!["admin", "team_lead", "super_user"].includes(currentUser.role)) {
+      setError("Only admins, team leads, or super users can create tickets.");
+      return;
+    }
+
+    // Validate required fields
     const requiredFields = {
       subject: formData.subject,
       description: formData.description,
@@ -167,11 +195,21 @@ const TicketForm = ({ organization, token }) => {
       callerLocation: formData.callerLocation,
       team_id: formData.team_id,
     };
+
     const missingFields = Object.entries(requiredFields)
-      .filter(([_, value]) => !value)
+      .filter(([, value]) => !value)
       .map(([key]) => key);
+
     if (missingFields.length > 0) {
-      setError(`Missing required fields: ${missingFields.join(', ')}`);
+      setError(`Missing required fields: ${missingFields.join(", ")}`);
+      return;
+    }
+
+    if (
+      formData.assignee_id &&
+      !teamUsers.some((u) => u.id === parseInt(formData.assignee_id))
+    ) {
+      setError("Selected assignee is not a member of the chosen team");
       return;
     }
 
@@ -186,8 +224,8 @@ const TicketForm = ({ organization, token }) => {
         ticket_type: formData.ticket_type,
         urgency: formData.urgency,
         impact: formData.impact,
-        priority: formData.priority.replace('p', ''),
-        team_id: formData.team_id || null,
+        priority: formData.priority,
+        team_id: formData.team_id,
         assignee_id: formData.assignee_id || null,
         ticket_number: formData.ticketNumber,
         reported_at: formData.reportedDate,
@@ -196,60 +234,78 @@ const TicketForm = ({ organization, token }) => {
         caller_email: formData.callerEmail,
         caller_phone: formData.callerContact,
         customer: formData.callerLocation,
-        source: 'Web',
+        source: "Web",
         category: formData.category,
+        // user_id: currentUser.id,
         creator_id: currentUser.id,
         requester_id: currentUser.id,
       },
     };
 
     try {
-      console.log('Submitting ticket to:', ticketsUrl);
-      console.log('Ticket data:', JSON.stringify(ticketData, null, 2));
       const response = await axios.post(ticketsUrl, ticketData, {
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
       });
+
       setSuccess(true);
-      navigate('/incident-overview', { state: { newTicket: response.data, refresh: true } });
+      navigate("/incident-overview", {
+        state: { newTicket: response.data, refresh: true },
+      });
+
+      // Reset form
       setFormData({
-        ticketNumber: `INC/REQ${Math.floor(Math.random() * 1000000000).toString().padStart(9, '0')}`,
-        ticketStatus: 'Open',
-        callerName: currentUser.name || '',
-        callerSurname: currentUser.surname || '',
-        callerEmail: currentUser.email || '',
-        callerContact: currentUser.phone_number || '',
-        callerLocation: '',
-        subject: '',
-        description: '',
+        ticketNumber: `INC/REQ${Math.floor(Math.random() * 1000000000)
+          .toString()
+          .padStart(9, "0")}`,
+        ticketStatus: "Open",
+        callerName: currentUser.name || "",
+        callerSurname: currentUser.surname || "",
+        callerEmail: currentUser.email || "",
+        callerContact: currentUser.phone_number || "",
+        callerLocation: "",
+        subject: "",
+        description: "",
         reportedDate: new Date().toISOString().slice(0, 16),
-        relatedRecord: '',
-        ticket_type: 'Incident',
-        category: 'Technical',
-        impact: 'medium',
-        urgency: 'medium',
-        priority: 'p3',
-        team_id: '',
-        assignee_id: '',
+        relatedRecord: "",
+        ticket_type: "Incident",
+        category: "Technical",
+        impact: "medium",
+        urgency: "medium",
+        priority: "p3",
+        team_id: "",
+        assignee_id: "",
       });
       setTeamUsers([]);
     } catch (err) {
-      console.error('Ticket submission error:', err.response?.data);
-      setError(
-        `Failed to create ticket: ${
-          err.response?.data?.errors?.join(', ') ||
-          err.response?.data?.error ||
-          err.message
-        }`
-      );
+      console.error("Ticket submission error:", err.response?.data);
+
+      let errorMessage = "Failed to create ticket";
+
+      if (err.response?.data?.errors) {
+        if (Array.isArray(err.response.data.errors)) {
+          errorMessage = err.response.data.errors.join(", ");
+        } else if (typeof err.response.data.errors === "object") {
+          errorMessage = Object.entries(err.response.data.errors)
+            .map(([field, messages]) => {
+              if (Array.isArray(messages)) {
+                return `${field}: ${messages.join(", ")}`;
+              }
+              return `${field}: ${messages}`;
+            })
+            .join("; ");
+        }
+      } else if (err.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      }
+
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
   };
-
-  if (!token) {
-    navigate('/login');
-    return null;
-  }
 
   if (loading && !currentUser) {
     return <p className="text-blue-700 text-center">Loading...</p>;
@@ -257,9 +313,10 @@ const TicketForm = ({ organization, token }) => {
 
   return (
     <div className="max-w-4xl mx-auto bg-white shadow-lg p-6 rounded-lg">
-      <h2 className="text-xl font-semibold mb-4">Create Ticket</h2>
       {error && <p className="text-red-500 mb-4">{error}</p>}
-      {success && <p className="text-green-500 mb-4">Ticket submitted successfully!</p>}
+      {success && (
+        <p className="text-green-500 mb-4">Ticket submitted successfully!</p>
+      )}
 
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-3 gap-4">
@@ -285,7 +342,15 @@ const TicketForm = ({ organization, token }) => {
             <label className="block text-sm font-medium">Created By</label>
             <input
               type="text"
-              value={currentUser ? `${currentUser.name || currentUser.username} (You)` : 'Loading...'}
+              value={
+                currentUser
+                  ? `${
+                      currentUser.name ||
+                      currentUser.username ||
+                      currentUser.email
+                    } (You)`
+                  : "Loading..."
+              }
               readOnly
               className="w-full border px-3 py-2 rounded-md bg-gray-200 text-gray-600"
             />
@@ -293,7 +358,9 @@ const TicketForm = ({ organization, token }) => {
         </div>
 
         <div className="mt-4">
-          <h3 className="text-md font-semibold">Caller Details (Your Information)</h3>
+          <h3 className="text-md font-semibold">
+            Caller Details (Your Information)
+          </h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium">Name *</label>
@@ -525,7 +592,7 @@ const TicketForm = ({ organization, token }) => {
           <button
             type="button"
             className="bg-gray-400 text-white px-4 py-2 rounded-md hover:bg-gray-500 disabled:bg-gray-300"
-            onClick={() => navigate('/incident-overview')}
+            onClick={() => navigate("/incident-overview")}
             disabled={loading}
           >
             Cancel
@@ -535,7 +602,7 @@ const TicketForm = ({ organization, token }) => {
             className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 disabled:bg-green-300"
             disabled={loading}
           >
-            {loading ? 'Submitting...' : 'Submit'}
+            {loading ? "Submitting..." : "Submit"}
           </button>
         </div>
       </form>

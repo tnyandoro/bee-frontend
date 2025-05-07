@@ -1,14 +1,14 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import TicketForm from './TicketForm';
-import useAuth from '../hooks/useAuth';
+import React from "react";
+import { useNavigate } from "react-router-dom";
+import TicketForm from "./TicketForm";
+import useAuth from "../hooks/useAuth";
 
 const CreateTicketPage = ({ _email, _role }) => {
   const { token, subdomain } = useAuth();
   const navigate = useNavigate();
 
   if (!token || !subdomain) {
-    navigate('/login');
+    navigate("/login");
     return <p className="text-red-500">Redirecting to login...</p>;
   }
 
@@ -19,7 +19,10 @@ const CreateTicketPage = ({ _email, _role }) => {
       <div className="p-6 bg-gray-100 shadow-lg rounded-lg mt-12">
         <div className="p-2 text-white rounded-t-lg bg-blue-700 shadow-xl mb-6">
           <h2 className="text-2xl mb-1">Log a Ticket</h2>
-          <p className="text-sm">Log an issue as a ticket to report an issue with a service or system.</p>
+          <p className="text-sm">
+            Log an issue as a ticket to report an issue with a service or
+            system.
+          </p>
         </div>
         <TicketForm organization={organization} token={token} />
       </div>
