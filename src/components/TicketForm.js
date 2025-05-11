@@ -5,10 +5,25 @@ import apiBaseUrl from "../config";
 
 const TicketForm = ({ organization, token }) => {
   const navigate = useNavigate();
+
+  // Function to generate a valid ticket number
+  const generateTicketNumber = (ticketType) => {
+    const prefix =
+      {
+        Incident: "INC",
+        Request: "REQ",
+        Problem: "PRB",
+        Other: "TKT",
+      }[ticketType] || "TKT";
+    const randomString = Array(8)
+      .fill()
+      .map(() => Math.random().toString(36).charAt(2).toUpperCase())
+      .join("");
+    return `${prefix}${randomString}`;
+  };
+
   const [formData, setFormData] = useState({
-    ticketNumber: `INC/REQ${Math.floor(Math.random() * 1000000000)
-      .toString()
-      .padStart(9, "0")}`,
+    ticketNumber: generateTicketNumber("Incident"),
     ticketStatus: "Open",
     callerName: "",
     callerSurname: "",
@@ -144,11 +159,18 @@ const TicketForm = ({ organization, token }) => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-      ...(name === "team_id" ? { assignee_id: "" } : {}),
-    }));
+    setFormData((prev) => {
+      const updatedFormData = {
+        ...prev,
+        [name]: value,
+        ...(name === "team_id" ? { assignee_id: "" } : {}),
+        // Update ticketNumber when ticket_type changes
+        ...(name === "ticket_type"
+          ? { ticketNumber: generateTicketNumber(value) }
+          : {}),
+      };
+      return updatedFormData;
+    });
     if (name === "urgency" || name === "impact") {
       calculatePriority({ ...formData, [name]: value });
     }
@@ -236,7 +258,6 @@ const TicketForm = ({ organization, token }) => {
         customer: formData.callerLocation,
         source: "Web",
         category: formData.category,
-        // user_id: currentUser.id,
         creator_id: currentUser.id,
         requester_id: currentUser.id,
       },
@@ -257,9 +278,7 @@ const TicketForm = ({ organization, token }) => {
 
       // Reset form
       setFormData({
-        ticketNumber: `INC/REQ${Math.floor(Math.random() * 1000000000)
-          .toString()
-          .padStart(9, "0")}`,
+        ticketNumber: generateTicketNumber("Incident"),
         ticketStatus: "Open",
         callerName: currentUser.name || "",
         callerSurname: currentUser.surname || "",

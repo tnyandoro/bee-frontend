@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+
 import {
   BrowserRouter as Router,
   Route,
@@ -23,7 +24,6 @@ import Settings from "./components/Settings";
 import Profile from "./components/Profile";
 import CreateUserForm from "./components/CreateUserForm";
 import AdminDashboard from "./components/AdminDashboard";
-import ResolveTicket from "./components/ResolveTicket";
 
 function App() {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -203,7 +203,6 @@ function App() {
                 </PrivateRoute>
               }
             />
-
             <Route
               path="/settings"
               element={
@@ -255,18 +254,6 @@ function App() {
                   allowedRoles={["admin", "super_user"]}
                 >
                   <AdminDashboard email={email} role={role} />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/resolve-ticket/:ticketNumber"
-              element={
-                <PrivateRoute
-                  loggedIn={loggedIn}
-                  role={role}
-                  allowedRoles={["admin", "super_user", "agent"]}
-                >
-                  <ResolveTicket />
                 </PrivateRoute>
               }
             />

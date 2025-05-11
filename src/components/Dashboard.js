@@ -4,7 +4,7 @@ import MyChartComponent from "./MyChartComponent";
 import { useAuth } from "../contexts/authContext";
 
 const Dashboard = () => {
-  const { organization } = useAuth();
+  const { organization, user } = useAuth();
   const subdomain =
     organization?.subdomain || localStorage.getItem("subdomain");
 
@@ -14,6 +14,7 @@ const Dashboard = () => {
     high: 0,
     breaching: 0,
     missedSLA: 0,
+    resolved: 0,
   });
 
   const [tickets, setTickets] = useState([]);
@@ -22,17 +23,52 @@ const Dashboard = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [formError, setFormError] = useState("");
+  const [formSuccess, setFormSuccess] = useState("");
+  const [formData, setFormData] = useState({
+    title: "",
+    description: "",
+    priority: "2", // Default to Normal
+    team_id: "",
+  });
+  const [teams, setTeams] = useState([]);
+  const [isFormOpen, setIsFormOpen] = useState(false); // Collapsible form state
 
   const itemsPerPage = 10;
 
+  // Fetch teams for dropdown
+  const fetchTeams = useCallback(async () => {
+    const token = localStorage.getItem("authToken");
+    if (!token || !subdomain) return;
+
+    try {
+      const response = await axios.get(
+        `http://${subdomain}.lvh.me:3000/api/v1/organizations/${subdomain}/teams`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          timeout: 5000,
+        }
+      );
+      setTeams(Array.isArray(response.data.teams) ? response.data.teams : []);
+    } catch (err) {
+      console.error("Failed to fetch teams:", err);
+    }
+  }, [subdomain]);
+
+  // Fetch tickets
   const fetchTickets = useCallback(async () => {
     const token = localStorage.getItem("authToken");
 
-    if (!token || !subdomain) {
+    if (!token || !subdomain || !user?.id) {
       setError(
         !token
           ? "Authentication error. Please log in again."
-          : "Organization subdomain not found"
+          : !subdomain
+          ? "Organization subdomain not found"
+          : "User information not available"
       );
       setLoading(false);
       return;
@@ -49,7 +85,7 @@ const Dashboard = () => {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-          timeout: 10000, // 10 second timeout
+          timeout: 10000,
         }
       );
 
@@ -57,13 +93,20 @@ const Dashboard = () => {
         throw new Error("Invalid data format received from server");
       }
 
-      const fetchedTickets = Array.isArray(response.data.tickets)
+      let fetchedTickets = Array.isArray(response.data.tickets)
         ? response.data.tickets
         : [];
 
+      if (!["admin", "super_user"].includes(user.role)) {
+        fetchedTickets = fetchedTickets.filter(
+          (ticket) =>
+            ticket.assignee?.id === user.id ||
+            (ticket.team_id && user.team_ids?.includes(ticket.team_id))
+        );
+      }
+
       setTickets(fetchedTickets);
 
-      // Calculate metrics
       setTicketData({
         newTickets: fetchedTickets.filter((t) => t.status === "open").length,
         critical: fetchedTickets.filter((t) => t.priority === 0).length,
@@ -72,23 +115,24 @@ const Dashboard = () => {
           (t) => t.sla_breached && t.status !== "resolved"
         ).length,
         missedSLA: fetchedTickets.filter((t) => t.sla_breached).length,
+        resolved: fetchedTickets.filter((t) => t.status === "resolved").length,
       });
     } catch (err) {
       handleApiError(err);
     } finally {
       setLoading(false);
     }
-  }, [subdomain]);
+  }, [subdomain, user]);
 
   useEffect(() => {
-    if (subdomain) {
+    if (subdomain && user?.id) {
       fetchTickets();
+      fetchTeams();
     }
-  }, [subdomain, fetchTickets]);
+  }, [subdomain, user, fetchTickets, fetchTeams]);
 
   const handleApiError = (error) => {
     console.error("Dashboard API Error:", error);
-
     let errorMessage = "Failed to load dashboard data";
     if (error.response) {
       if (error.response.status === 401) {
@@ -101,7 +145,6 @@ const Dashboard = () => {
     } else if (error.message) {
       errorMessage = error.message;
     }
-
     setError(errorMessage);
     setTickets([]);
     setTicketData({
@@ -110,7 +153,58 @@ const Dashboard = () => {
       high: 0,
       breaching: 0,
       missedSLA: 0,
+      resolved: 0,
     });
+  };
+
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormError("");
+    setFormSuccess("");
+  };
+
+  const handleFormSubmit = async (e) => {
+    e.preventDefault();
+    const token = localStorage.getItem("authToken");
+
+    if (!formData.title.trim() || !formData.description.trim()) {
+      setFormError("Title and description are required");
+      return;
+    }
+
+    try {
+      const payload = {
+        ticket: {
+          title: formData.title,
+          description: formData.description,
+          priority: parseInt(formData.priority),
+          team_id: formData.team_id ? parseInt(formData.team_id) : null,
+        },
+      };
+
+      await axios.post(
+        `http://${subdomain}.lvh.me:3000/api/v1/organizations/${subdomain}/tickets`,
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          timeout: 10000,
+        }
+      );
+
+      setFormSuccess("Ticket created successfully!");
+      setFormData({ title: "", description: "", priority: "2", team_id: "" });
+      fetchTickets(); // Refresh tickets
+    } catch (err) {
+      console.error("Form submission error:", err);
+      setFormError(
+        err.response?.data?.error ||
+          "Failed to create ticket. Please try again."
+      );
+    }
   };
 
   const handleFilter = (title) => {
@@ -132,7 +226,8 @@ const Dashboard = () => {
       (selectedType === "Breaching in 2hrs" &&
         ticket.sla_breached &&
         ticket.status !== "resolved") ||
-      (selectedType === "Missed SLA" && ticket.sla_breached);
+      (selectedType === "Missed SLA" && ticket.sla_breached) ||
+      (selectedType === "Resolved" && ticket.status === "resolved");
 
     const matchesSearch = ticket.title
       ?.toLowerCase()
@@ -152,6 +247,7 @@ const Dashboard = () => {
     High: ticketData.high,
     "Breaching in 2hrs": ticketData.breaching,
     "Missed SLA": ticketData.missedSLA,
+    Resolved: ticketData.resolved,
   };
 
   if (loading) {
@@ -190,8 +286,137 @@ const Dashboard = () => {
             {organization?.name || subdomain} Dashboard
           </h1>
 
+          {/* Collapsible Form */}
+          <div className="mb-6">
+            <button
+              onClick={() => setIsFormOpen(!isFormOpen)}
+              className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-between sm:justify-center"
+              aria-expanded={isFormOpen}
+              aria-controls="ticket-form"
+            >
+              <span>{isFormOpen ? "Hide Form" : "Create New Ticket"}</span>
+              <svg
+                className={`h-5 w-5 transform ${
+                  isFormOpen ? "rotate-180" : ""
+                }`}
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </button>
+            <div
+              id="ticket-form"
+              className={`mt-4 ${isFormOpen ? "block" : "hidden"}`}
+            >
+              <form onSubmit={handleFormSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label
+                      htmlFor="title"
+                      className="block text-sm font-medium text-gray-700"
+                    >
+                      Title
+                    </label>
+                    <input
+                      type="text"
+                      id="title"
+                      name="title"
+                      value={formData.title}
+                      onChange={handleFormChange}
+                      className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Enter ticket title"
+                      aria-required="true"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="priority"
+                      className="block text-sm font-medium text-gray-700"
+                    >
+                      Priority
+                    </label>
+                    <select
+                      id="priority"
+                      name="priority"
+                      value={formData.priority}
+                      onChange={handleFormChange}
+                      className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      aria-required="true"
+                    >
+                      <option value="0">Critical</option>
+                      <option value="1">High</option>
+                      <option value="2">Normal</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label
+                      htmlFor="description"
+                      className="block text-sm font-medium text-gray-700"
+                    >
+                      Description
+                    </label>
+                    <textarea
+                      id="description"
+                      name="description"
+                      value={formData.description}
+                      onChange={handleFormChange}
+                      rows="4"
+                      className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Describe the issue"
+                      aria-required="true"
+                    ></textarea>
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="team_id"
+                      className="block text-sm font-medium text-gray-700"
+                    >
+                      Team (Optional)
+                    </label>
+                    <select
+                      id="team_id"
+                      name="team_id"
+                      value={formData.team_id}
+                      onChange={handleFormChange}
+                      className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Select a team</option>
+                      {teams.map((team) => (
+                        <option key={team.id} value={team.id}>
+                          {team.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                {formError && (
+                  <p className="text-red-500 text-sm">{formError}</p>
+                )}
+                {formSuccess && (
+                  <p className="text-green-500 text-sm">{formSuccess}</p>
+                )}
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Submit Ticket
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
           {/* Metrics Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
             {Object.entries(counts).map(([title, count]) => (
               <div
                 key={title}
@@ -256,7 +481,7 @@ const Dashboard = () => {
               Incident Trends
             </h2>
             <div className="bg-white p-4 rounded-lg shadow">
-              <MyChartComponent tickets={tickets} />
+              <MyChartComponent tickets={tickets} ticketData={ticketData} />
             </div>
           </div>
 
@@ -334,7 +559,7 @@ const Dashboard = () => {
                       colSpan="6"
                       className="px-4 py-6 text-center text-gray-500"
                     >
-                      No tickets found matching your criteria
+                      No tickets assigned to you or your team
                     </td>
                   </tr>
                 )}

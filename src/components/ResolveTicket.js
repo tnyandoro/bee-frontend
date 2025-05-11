@@ -1,229 +1,307 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
+import apiBaseUrl from "../config";
 
-const ResolveTicket = ({ ticket, subdomain, authToken, onResolve, onCancel }) => {
-  const [resolutionNote, setResolutionNote] = useState('');
-  const [reason, setReason] = useState('');
-  const [resolutionMethod, setResolutionMethod] = useState('');
-  const [causeCode, setCauseCode] = useState('');
-  const [resolutionDetails, setResolutionDetails] = useState('');
-  const [endCustomer, setEndCustomer] = useState('');
-  const [supportCenter, setSupportCenter] = useState('');
-  const [totalKilometer, setTotalKilometer] = useState('');
-  const [message, setMessage] = useState('');
+const ResolveTicket = ({
+  ticket,
+  subdomain,
+  authToken,
+  onSuccess,
+  onCancel,
+}) => {
+  console.log("ResolveTicket received props:", {
+    ticket,
+    subdomain,
+    authToken,
+  });
 
-  const ticketNumber = ticket?.ticket_number || `INC-${ticket?.id}`;
+  const [formData, setFormData] = useState({
+    resolution_note: "",
+    reason: "",
+    resolution_method: "",
+    cause_code: "",
+    resolution_details: "",
+    end_customer: "",
+    support_center: "",
+    total_kilometer: "",
+  });
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Sample options for dropdowns (replace with actual data from your backend if available)
-  const reasonOptions = ['Technical Issue', 'User Error', 'Hardware Failure', 'Software Bug', 'Other'];
-  const resolutionMethodOptions = ['Remote Fix', 'On-Site Visit', 'Replacement', 'Configuration Change', 'Other'];
-  const causeCodeOptions = ['Code 101', 'Code 102', 'Code 103', 'Code 104', 'Other'];
-
-  const handleResolve = async () => {
-    if (!ticket || !subdomain || !authToken) {
-      setMessage('Missing ticket details.');
-      return;
-    }
-
-    const url = `http://${subdomain}.lvh.me:3000/api/v1/organizations/${subdomain}/tickets/${ticketNumber}/resolve`;
-    console.log('Sending POST to:', url);
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`,
-        },
-        body: JSON.stringify({
-          resolution_note: resolutionNote,
-          reason: reason,
-          resolution_method: resolutionMethod,
-          cause_code: causeCode,
-          resolution_details: resolutionDetails,
-          end_customer: endCustomer,
-          support_center: supportCenter,
-          total_kilometer: totalKilometer,
-        }),
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setMessage(`Ticket ${ticketNumber} resolved successfully!`);
-        setTimeout(() => {
-          onResolve({
-            ...ticket,
-            status: 'resolved',
-            resolved_at: new Date().toISOString(),
-            resolution_note: resolutionNote,
-            reason,
-            resolution_method: resolutionMethod,
-            cause_code: causeCode,
-            resolution_details: resolutionDetails,
-            end_customer: endCustomer,
-            support_center: supportCenter,
-            total_kilometer: totalKilometer,
-          });
-        }, 1000);
-      } else {
-        console.log('Error response:', data);
-        setMessage(`Error: ${data.error || 'Failed to resolve ticket'}`);
-      }
-    } catch (error) {
-      setMessage(`Network error: ${error.message}`);
-    }
-  };
-
-  const handleCancel = () => {
-    onCancel();
-  };
-
-  if (!ticket || !subdomain || !authToken) {
+  // Early return for invalid ticket
+  if (!ticket || !ticket.ticket_number) {
+    console.error("Invalid ticket details:", { ticket });
     return (
-      <div className="bg-white p-6 rounded shadow-lg max-w-md w-full">
-        <p className="text-red-500 text-center">Invalid ticket details.</p>
-        <button
-          onClick={handleCancel}
-          className="mt-4 bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
-        >
-          Close
-        </button>
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md mx-4">
+          <h2 className="text-xl font-semibold text-red-600 mb-4">Error</h2>
+          <p className="text-red-500 mb-4">Invalid ticket details</p>
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 transition-colors"
+          >
+            Close
+          </button>
+        </div>
       </div>
     );
   }
 
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    setError(null); // Clear error on input change
+    setSuccess(null);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    const payload = {
+      ticket: {
+        status: "resolved",
+        resolved_at: new Date().toISOString(),
+        ...formData,
+      },
+    };
+
+    console.log("Submitting resolve payload:", payload);
+
+    try {
+      let response = await fetch(
+        `${apiBaseUrl}/organizations/${subdomain}/tickets/${ticket.ticket_number}/resolve`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${authToken}`,
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (!response.ok && response.status === 404) {
+        console.log("Falling back to PUT request");
+        response = await fetch(
+          `${apiBaseUrl}/organizations/${subdomain}/tickets/${ticket.ticket_number}`,
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${authToken}`,
+            },
+            body: JSON.stringify(payload),
+          }
+        );
+      }
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error("API error response:", data);
+        throw new Error(data.error || "Failed to resolve ticket");
+      }
+
+      setSuccess("Ticket resolved successfully");
+      setTimeout(() => {
+        onSuccess();
+      }, 1000);
+    } catch (err) {
+      console.error("Resolve ticket error:", err.message);
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
-    <div className="bg-white p-6 rounded shadow-lg max-w-md w-full">
-      <h3 className="text-xl font-bold mb-4">Resolve Ticket: {ticketNumber}</h3>
-
-      {/* Reason Dropdown */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700">Reason</label>
-        <select
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          className="w-full border px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">Select Reason</option>
-          {reasonOptions.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl mx-auto overflow-y-auto max-h-[90vh]">
+        <div className="p-6 sm:p-8">
+          <h2 className="text-2xl font-semibold text-gray-800 mb-6">
+            Resolve Ticket #{ticket.ticket_number}
+          </h2>
+          {error && (
+            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg">
+              {error}
+            </div>
+          )}
+          {success && (
+            <div className="mb-4 p-3 bg-green-100 text-green-700 rounded-lg">
+              {success}
+            </div>
+          )}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label
+                  htmlFor="resolution_note"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Resolution Note <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  id="resolution_note"
+                  name="resolution_note"
+                  value={formData.resolution_note}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows="4"
+                  placeholder="Describe the resolution"
+                  required
+                  aria-required="true"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="resolution_details"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Resolution Details
+                </label>
+                <textarea
+                  id="resolution_details"
+                  name="resolution_details"
+                  value={formData.resolution_details}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows="4"
+                  placeholder="Additional details"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label
+                  htmlFor="reason"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Reason
+                </label>
+                <input
+                  type="text"
+                  id="reason"
+                  name="reason"
+                  value={formData.reason}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Reason for resolution"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="resolution_method"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Resolution Method
+                </label>
+                <input
+                  type="text"
+                  id="resolution_method"
+                  name="resolution_method"
+                  value={formData.resolution_method}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Method used"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label
+                  htmlFor="cause_code"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Cause Code
+                </label>
+                <input
+                  type="text"
+                  id="cause_code"
+                  name="cause_code"
+                  value={formData.cause_code}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Cause code"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="end_customer"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  End Customer
+                </label>
+                <input
+                  type="text"
+                  id="end_customer"
+                  name="end_customer"
+                  value={formData.end_customer}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Customer name"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label
+                  htmlFor="support_center"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Support Center
+                </label>
+                <input
+                  type="text"
+                  id="support_center"
+                  name="support_center"
+                  value={formData.support_center}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Support center"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="total_kilometer"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Total Kilometer
+                </label>
+                <input
+                  type="text"
+                  id="total_kilometer"
+                  name="total_kilometer"
+                  value={formData.total_kilometer}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Kilometers traveled"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                type="button"
+                onClick={onCancel}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
+                aria-label="Cancel resolving ticket"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500"
+                aria-label={isLoading ? "Resolving ticket" : "Resolve ticket"}
+              >
+                {isLoading ? "Resolving..." : "Resolve"}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
-
-      {/* Resolution Method Dropdown */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700">Resolution Method</label>
-        <select
-          value={resolutionMethod}
-          onChange={(e) => setResolutionMethod(e.target.value)}
-          className="w-full border px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">Select Resolution Method</option>
-          {resolutionMethodOptions.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Cause Code Dropdown */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700">Cause Code</label>
-        <select
-          value={causeCode}
-          onChange={(e) => setCauseCode(e.target.value)}
-          className="w-full border px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">Select Cause Code</option>
-          {causeCodeOptions.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Resolution Details Textarea */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700">Resolution Details</label>
-        <textarea
-          value={resolutionDetails}
-          onChange={(e) => setResolutionDetails(e.target.value)}
-          placeholder="Enter resolution details"
-          className="w-full border px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-          rows={4}
-        />
-      </div>
-
-      {/* End Customer Input */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700">End Customer</label>
-        <input
-          type="text"
-          value={endCustomer}
-          onChange={(e) => setEndCustomer(e.target.value)}
-          placeholder="Enter end customer"
-          className="w-full border px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
-
-      {/* Support Center Input */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700">Support Center</label>
-        <input
-          type="text"
-          value={supportCenter}
-          onChange={(e) => setSupportCenter(e.target.value)}
-          placeholder="Enter support center"
-          className="w-full border px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
-
-      {/* Total Kilometer Input */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700">Total Kilometer</label>
-        <input
-          type="number"
-          value={totalKilometer}
-          onChange={(e) => setTotalKilometer(e.target.value)}
-          placeholder="Enter total kilometer"
-          className="w-full border px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-          min="0"
-        />
-      </div>
-
-      {/* Resolution Note Textarea */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700">Resolution Note</label>
-        <textarea
-          value={resolutionNote}
-          onChange={(e) => setResolutionNote(e.target.value)}
-          placeholder="Enter resolution note"
-          className="w-full border px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-          rows={4}
-        />
-      </div>
-
-      <div className="flex justify-end space-x-2">
-        <button
-          onClick={handleCancel}
-          className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={handleResolve}
-          className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
-        >
-          Resolve
-        </button>
-      </div>
-      {message && (
-        <p className={`mt-4 text-center ${message.includes('Error') ? 'text-red-500' : 'text-green-500'}`}>
-          {message}
-        </p>
-      )}
     </div>
   );
 };
