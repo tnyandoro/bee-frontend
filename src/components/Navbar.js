@@ -1,13 +1,20 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import logor from "../assets/logor.png";
+import profileImage from "../assets/tendy.jpg";
 
-import logor from '../assets/logor.png';
-import profileImage from '../assets/tendy.jpg';
-
-const Navbar = ({ name, email, role, loggedIn, onLogout, organizationName, subdomain }) => {
+const Navbar = ({
+  name,
+  email,
+  role,
+  loggedIn,
+  onLogout,
+  organizationName,
+  subdomain,
+}) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
   const navigate = useNavigate();
 
   const toggleDropdown = () => {
@@ -19,14 +26,24 @@ const Navbar = ({ name, email, role, loggedIn, onLogout, organizationName, subdo
   };
 
   const handleProfileClick = () => {
-    navigate('/profile');
+    navigate("/profile");
     setDropdownOpen(false);
+  };
+
+  const handleLogoutClick = () => {
+    onLogout();
+    toast.success("You have successfully logged out", {
+      position: "top-right",
+      autoClose: 3000,
+      hideProgressBar: true,
+    });
+    navigate("/");
   };
 
   if (!loggedIn) return null;
 
   return (
-    <nav className="bg-slate-50 text-gray-800 p-4 flex justify-between items-center shadow-lg fixed top-0 left-0 right-0 z-50 border-b-4 border-blue-500">
+    <nav className="bg-slate-50 text-gray-800 p-4 flex justify-between items-center shadow-lg fixed top-0 left-0 right-0 z-50 border-b-4 border-blue-500 mb-20">
       {/* Left Section: Logo and Organization Name */}
       <div className="flex items-center">
         <img src={logor} alt="Logo" className="h-12 mr-3" />
@@ -35,7 +52,11 @@ const Navbar = ({ name, email, role, loggedIn, onLogout, organizationName, subdo
 
       {/* Mobile Menu Icon */}
       <div className="md:hidden flex items-center">
-        <button onClick={toggleMobileMenu} className="focus:outline-none" aria-label="Toggle mobile menu">
+        <button
+          onClick={toggleMobileMenu}
+          className="focus:outline-none"
+          aria-label="Toggle mobile menu"
+        >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
@@ -77,7 +98,7 @@ const Navbar = ({ name, email, role, loggedIn, onLogout, organizationName, subdo
         {/* User Information */}
         <div className="text-right">
           <p className="font-medium">{name || email}</p>
-          <p className="font-bold text-black">{subdomain}</p> {/* Display subdomain here */}
+          <p className="font-bold text-black">{subdomain}</p>
           <p className="text-sm text-gray-300">{role}</p>
         </div>
 
@@ -94,17 +115,14 @@ const Navbar = ({ name, email, role, loggedIn, onLogout, organizationName, subdo
           {dropdownOpen && (
             <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-20">
               <button
-                onClick={() => {
-                  navigate('/profile');
-                  setDropdownOpen(false);
-                }}
+                onClick={handleProfileClick}
                 className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                 aria-label="Go to Profile"
               >
                 Profile
               </button>
               <button
-                onClick={onLogout}
+                onClick={handleLogoutClick}
                 className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                 aria-label="Logout"
               >
@@ -127,7 +145,7 @@ const Navbar = ({ name, email, role, loggedIn, onLogout, organizationName, subdo
               Profile
             </button>
             <button
-              onClick={onLogout}
+              onClick={handleLogoutClick}
               className="py-2 px-4 w-full text-left text-gray-700 hover:bg-gray-100"
               aria-label="Mobile Logout"
             >

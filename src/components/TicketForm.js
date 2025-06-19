@@ -78,8 +78,14 @@ const TicketForm = ({ organization, token }) => {
         callerContact: user.phone_number || "",
       }));
 
-      if (!["admin", "team_lead", "super_user"].includes(user.role)) {
-        setError("Only admins, team leads, or super users can create tickets.");
+      if (
+        !["admin", "team_leader", "super_user", "domain_admin"].includes(
+          user.role
+        )
+      ) {
+        setError(
+          "Only admins, team leaders, or super users can create tickets."
+        );
         setCurrentUser(null);
       }
     } catch (err) {
@@ -201,8 +207,12 @@ const TicketForm = ({ organization, token }) => {
       return;
     }
 
-    if (!["admin", "team_lead", "super_user"].includes(currentUser.role)) {
-      setError("Only admins, team leads, or super users can create tickets.");
+    if (
+      !["admin", "team_leader", "super_user", "domain_admin"].includes(
+        currentUser.role
+      )
+    ) {
+      setError("Only admins, team leaders, or super users can create tickets.");
       return;
     }
 
@@ -376,99 +386,6 @@ const TicketForm = ({ organization, token }) => {
           </div>
         </div>
 
-        <div className="mt-4">
-          <h3 className="text-md font-semibold">
-            Caller Details (Your Information)
-          </h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium">Name *</label>
-              <input
-                type="text"
-                name="callerName"
-                value={formData.callerName}
-                onChange={handleChange}
-                className="w-full border px-3 py-2 rounded-md"
-                required
-                disabled={loading}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium">Surname *</label>
-              <input
-                type="text"
-                name="callerSurname"
-                value={formData.callerSurname}
-                onChange={handleChange}
-                className="w-full border px-3 py-2 rounded-md"
-                required
-                disabled={loading}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium">Email *</label>
-              <input
-                type="email"
-                name="callerEmail"
-                value={formData.callerEmail}
-                onChange={handleChange}
-                className="w-full border px-3 py-2 rounded-md"
-                required
-                disabled={loading}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium">Contact *</label>
-              <input
-                type="text"
-                name="callerContact"
-                value={formData.callerContact}
-                onChange={handleChange}
-                className="w-full border px-3 py-2 rounded-md"
-                required
-                disabled={loading}
-              />
-            </div>
-            <div className="col-span-2">
-              <label className="block text-sm font-medium">Location *</label>
-              <input
-                type="text"
-                name="callerLocation"
-                value={formData.callerLocation}
-                onChange={handleChange}
-                className="w-full border px-3 py-2 rounded-md"
-                required
-                disabled={loading}
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-4">
-          <label className="block text-sm font-medium">Subject *</label>
-          <input
-            type="text"
-            name="subject"
-            value={formData.subject}
-            onChange={handleChange}
-            className="w-full border px-3 py-2 rounded-md"
-            required
-            disabled={loading}
-          />
-        </div>
-        <div className="mt-4">
-          <label className="block text-sm font-medium">Description *</label>
-          <textarea
-            name="description"
-            value={formData.description}
-            onChange={handleChange}
-            rows="4"
-            className="w-full border px-3 py-2 rounded-md"
-            required
-            disabled={loading}
-          />
-        </div>
-
         <div className="mt-4 grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium">Reported Date</label>
@@ -605,6 +522,99 @@ const TicketForm = ({ organization, token }) => {
               ))}
             </select>
           </div>
+        </div>
+
+        <div className="mt-4">
+          <h3 className="text-md font-semibold">
+            Caller Details (Your Information)
+          </h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium">Name *</label>
+              <input
+                type="text"
+                name="callerName"
+                value={formData.callerName}
+                onChange={handleChange}
+                className="w-full border px-3 py-2 rounded-md"
+                required
+                disabled={loading}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Surname *</label>
+              <input
+                type="text"
+                name="callerSurname"
+                value={formData.callerSurname}
+                onChange={handleChange}
+                className="w-full border px-3 py-2 rounded-md"
+                required
+                disabled={loading}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Email *</label>
+              <input
+                type="email"
+                name="callerEmail"
+                value={formData.callerEmail}
+                onChange={handleChange}
+                className="w-full border px-3 py-2 rounded-md"
+                required
+                disabled={loading}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Contact *</label>
+              <input
+                type="text"
+                name="callerContact"
+                value={formData.callerContact}
+                onChange={handleChange}
+                className="w-full border px-3 py-2 rounded-md"
+                required
+                disabled={loading}
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-sm font-medium">Location *</label>
+              <input
+                type="text"
+                name="callerLocation"
+                value={formData.callerLocation}
+                onChange={handleChange}
+                className="w-full border px-3 py-2 rounded-md"
+                required
+                disabled={loading}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <label className="block text-sm font-medium">Subject *</label>
+          <input
+            type="text"
+            name="subject"
+            value={formData.subject}
+            onChange={handleChange}
+            className="w-full border px-3 py-2 rounded-md"
+            required
+            disabled={loading}
+          />
+        </div>
+        <div className="mt-4">
+          <label className="block text-sm font-medium">Description *</label>
+          <textarea
+            name="description"
+            value={formData.description}
+            onChange={handleChange}
+            rows="4"
+            className="w-full border px-3 py-2 rounded-md"
+            required
+            disabled={loading}
+          />
         </div>
 
         <div className="flex justify-end space-x-4 mt-6">

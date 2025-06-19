@@ -335,7 +335,7 @@ const Incident = ({ email, role }) => {
   };
 
   return (
-    <div className="relative flex flex-col w-full px-4 py-3 min-h-screen sm:px-6 lg:px-8">
+    <div className="relative flex flex-col w-full px-4 py-3 mt-20 min-h-screen sm:px-6 lg:px-8">
       {loading && (
         <div className="absolute top-0 left-0 flex items-center justify-center w-full h-full bg-white opacity-50 z-10">
           <div>Loading...</div>

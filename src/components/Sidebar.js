@@ -72,7 +72,7 @@ const Sidebar = ({ isLoggedIn }) => {
     },
     {
       id: 10,
-      name: "Profile",
+      name: "My Profile",
       path: "/profile",
       icon: <UserIcon className="h-5 w-5" />,
     },
@@ -87,7 +87,7 @@ const Sidebar = ({ isLoggedIn }) => {
   if (!isLoggedIn) return null;
 
   return (
-    <div className="fixed mt-20 left-0 h-full bg-white shadow-lg w-64 overflow-y-auto z-40">
+    <div className="fixed mt-28 mb-8 pb-16 left-0 h-full bg-white shadow-lg w-64 overflow-y-auto z-40">
       <ul className="space-y-2">
         {links.map((link) => (
           <li key={link.id}>
