@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import MetricChart from "./MetricChart";
 import CreateUserForm from "./CreateUserForm";
 import CreateTeamForm from "./CreateTeamForm";
-import TeamList from "./TeamList";
+import TeamList from "./TeamList"; // Import the TeamList component
 import UserList from "./UserList";
 import createApiInstance from "../utils/api";
 import { useAuth } from "../contexts/authContext";
@@ -17,10 +17,10 @@ const AdminDashboard = ({ organizationSubdomain }) => {
   const [showUsers, setShowUsers] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [users, setUsers] = useState([]);
+  const [teams, setTeams] = useState([]);
 
   const getEffectiveSubdomain = useCallback(() => {
-    console.log("organizationSubdomain:", organizationSubdomain);
-    console.log("authSubdomain:", authSubdomain);
     const subdomain =
       organizationSubdomain &&
       organizationSubdomain !== "undefined" &&
@@ -33,7 +33,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
         : process.env.NODE_ENV === "development"
         ? "demo"
         : null;
-    console.log("Selected subdomain:", subdomain);
     return subdomain;
   }, [organizationSubdomain, authSubdomain]);
 
@@ -45,7 +44,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
           .then((newToken) => {
             if (newToken) {
               setError("");
-              return true; // Indicate retry
+              return true;
             } else {
               logout();
               navigate("/login");
@@ -81,6 +80,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     try {
       const api = createApiInstance(token, activeSubdomain);
       const response = await api.get(`/organizations/${activeSubdomain}/teams`);
+      setTeams(response.data || []);
       return response.data || [];
     } catch (err) {
       const errorMessage = handleApiError(err);
@@ -108,7 +108,18 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     try {
       const api = createApiInstance(token, activeSubdomain);
       const response = await api.get(`/organizations/${activeSubdomain}/users`);
-      return response.data.data || [];
+
+      // Enhance users with team names
+      const usersWithTeamNames = (response.data.data || []).map((user) => {
+        const userTeam = teams.find((team) => team.id === user.team_id);
+        return {
+          ...user,
+          team_name: userTeam ? userTeam.name : "Unassigned",
+        };
+      });
+
+      setUsers(usersWithTeamNames);
+      return usersWithTeamNames;
     } catch (err) {
       const errorMessage = handleApiError(err);
       setError(errorMessage);
@@ -116,7 +127,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     } finally {
       setLoading(false);
     }
-  }, [token, getEffectiveSubdomain, handleApiError, navigate]);
+  }, [token, getEffectiveSubdomain, handleApiError, navigate, teams]);
 
   const handleShowTeams = async () => {
     const newState = !showTeams;
@@ -130,6 +141,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     const newState = !showUsers;
     setShowUsers(newState);
     if (newState) {
+      await fetchTeams(); // First fetch teams to ensure we have team names
       await fetchUsers();
     }
   };
@@ -142,10 +154,14 @@ const AdminDashboard = ({ organizationSubdomain }) => {
   const handleCloseTeamForm = () => {
     setIsCreateTeamFormOpen(false);
     if (showTeams) fetchTeams();
+    if (showUsers) {
+      // Refresh users too since team changes might affect user displays
+      fetchTeams().then(fetchUsers);
+    }
   };
 
   return (
-    <div className="p-8">
+    <div className="mt-20 p-8">
       <h1 className="text-3xl font-semibold mb-6">Admin Dashboard</h1>
 
       {error && (
@@ -184,14 +200,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
       {showTeams && (
         <div className="mt-6 bg-white rounded-lg shadow p-6">
           <h2 className="text-2xl font-semibold mb-4">Teams</h2>
-          {loading ? (
-            <p>Loading teams...</p>
-          ) : (
-            <TeamList
-              organizationSubdomain={getEffectiveSubdomain()}
-              token={token}
-            />
-          )}
+          <TeamList organizationSubdomain={getEffectiveSubdomain()} />
         </div>
       )}
 
@@ -202,6 +211,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
             <p>Loading users...</p>
           ) : (
             <UserList
+              users={users}
               organizationSubdomain={getEffectiveSubdomain()}
               token={token}
             />

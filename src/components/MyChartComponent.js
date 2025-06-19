@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from "react";
 import {
   Chart,
   ArcElement,
@@ -10,7 +10,7 @@ import {
   Title,
   Tooltip,
   Legend,
-} from 'chart.js';
+} from "chart.js";
 
 // Register Chart.js components
 Chart.register(
@@ -25,127 +25,141 @@ Chart.register(
   Legend
 );
 
-const MyChartComponent = ({ tickets }) => {
+const MyChartComponent = ({
+  tickets,
+  groupBy = "day",
+  dateField = "created_at",
+}) => {
   const pieChartRef = useRef(null);
   const barChartRef = useRef(null);
   const pieChartInstance = useRef(null);
   const barChartInstance = useRef(null);
 
+  // Helper function to group tickets by day/month
+  const groupTicketsByDate = (tickets, field, mode) => {
+    const grouped = {};
+
+    tickets.forEach((t) => {
+      const dateStr = t[field] || t.created_at;
+      const date = new Date(dateStr);
+      if (isNaN(date)) return;
+
+      const key =
+        mode === "month"
+          ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+              2,
+              "0"
+            )}`
+          : date.toISOString().split("T")[0]; // YYYY-MM-DD
+
+      grouped[key] = (grouped[key] || 0) + 1;
+    });
+
+    return Object.entries(grouped)
+      .sort(([a], [b]) => new Date(a) - new Date(b))
+      .reduce(
+        (acc, [label, value]) => {
+          acc.labels.push(label);
+          acc.data.push(value);
+          return acc;
+        },
+        { labels: [], data: [] }
+      );
+  };
+
   useEffect(() => {
-    if (!tickets || tickets.length === 0) return; // Wait for tickets data
+    if (!tickets || tickets.length === 0) return;
 
-    const pieCtx = pieChartRef.current.getContext('2d');
-    const barCtx = barChartRef.current.getContext('2d');
+    const pieCtx = pieChartRef.current.getContext("2d");
+    const barCtx = barChartRef.current.getContext("2d");
 
-    // Destroy existing chart instances to prevent duplication
-    if (pieChartInstance.current) {
-      pieChartInstance.current.destroy();
-    }
-    if (barChartInstance.current) {
-      barChartInstance.current.destroy();
-    }
+    // Destroy existing charts
+    pieChartInstance.current?.destroy();
+    barChartInstance.current?.destroy();
 
-    // Calculate counts for pie chart (by priority)
+    // Pie chart: Priority distribution
     const priorityCounts = tickets.reduce((acc, ticket) => {
-      const priorityLabel = ticket.priority !== undefined ? `P${4 - ticket.priority}` : 'Unknown';
-      acc[priorityLabel] = (acc[priorityLabel] || 0) + 1;
+      const label =
+        ticket.priority !== undefined ? `P${4 - ticket.priority}` : "Unknown";
+      acc[label] = (acc[label] || 0) + 1;
       return acc;
     }, {});
 
-    // Calculate counts for bar chart (by status)
-    const statusCounts = tickets.reduce((acc, ticket) => {
-      const status = ticket.status || 'Open';
-      acc[status] = (acc[status] || 0) + 1;
-      return acc;
-    }, {});
-
-    // Pie Chart Configuration (Priority Distribution)
     const pieData = {
       labels: Object.keys(priorityCounts),
       datasets: [
         {
           data: Object.values(priorityCounts),
           backgroundColor: [
-            'rgba(54, 162, 235, 0.6)',  // Blue
-            'rgba(255, 99, 132, 0.6)',  // Red
-            'rgba(255, 206, 86, 0.6)',  // Yellow
-            'rgba(75, 192, 192, 0.6)',  // Teal
-            'rgba(153, 102, 255, 0.6)', // Purple
-          ].slice(0, Object.keys(priorityCounts).length), // Match label count
+            "rgba(54, 162, 235, 0.6)",
+            "rgba(255, 99, 132, 0.6)",
+            "rgba(255, 206, 86, 0.6)",
+            "rgba(75, 192, 192, 0.6)",
+            "rgba(153, 102, 255, 0.6)",
+          ].slice(0, Object.keys(priorityCounts).length),
           borderColor: [
-            'rgba(54, 162, 235, 1)',
-            'rgba(255, 99, 132, 1)',
-            'rgba(255, 206, 86, 1)',
-            'rgba(75, 192, 192, 1)',
-            'rgba(153, 102, 255, 1)',
+            "rgba(54, 162, 235, 1)",
+            "rgba(255, 99, 132, 1)",
+            "rgba(255, 206, 86, 1)",
+            "rgba(75, 192, 192, 1)",
+            "rgba(153, 102, 255, 1)",
           ].slice(0, Object.keys(priorityCounts).length),
           borderWidth: 1,
         },
       ],
     };
 
-    // Create Pie Chart
     pieChartInstance.current = new Chart(pieCtx, {
-      type: 'pie',
+      type: "pie",
       data: pieData,
       options: {
         responsive: true,
         plugins: {
-          legend: {
-            position: 'top',
-          },
-          title: {
-            display: true,
-            text: 'Ticket Distribution by Priority',
-          },
+          legend: { position: "top" },
+          title: { display: true, text: "Ticket Distribution by Priority" },
           tooltip: {
             callbacks: {
-              label: (context) => {
-                const label = context.label || '';
-                const value = context.raw || 0;
-                return `${label}: ${value} tickets`;
-              },
+              label: (context) => `${context.label}: ${context.raw} tickets`,
             },
           },
         },
       },
     });
 
-    // Bar Chart Configuration (Status Distribution)
+    // Bar chart: Time-based grouping
+    const { labels, data } = groupTicketsByDate(tickets, dateField, groupBy);
+
     const barData = {
-      labels: Object.keys(statusCounts),
+      labels,
       datasets: [
         {
-          label: 'Ticket Count by Status',
-          data: Object.values(statusCounts),
-          backgroundColor: 'rgba(75, 192, 192, 0.6)', // Consistent teal color
-          borderColor: 'rgba(75, 192, 192, 1)',
+          label: `Tickets by ${
+            groupBy === "month" ? "Month" : "Day"
+          } (${dateField})`,
+          data,
+          backgroundColor: "rgba(75, 192, 192, 0.6)",
+          borderColor: "rgba(75, 192, 192, 1)",
           borderWidth: 1,
         },
       ],
     };
 
-    // Create Bar Chart
     barChartInstance.current = new Chart(barCtx, {
-      type: 'bar',
+      type: "bar",
       data: barData,
       options: {
         responsive: true,
         plugins: {
-          legend: {
-            position: 'top',
-          },
+          legend: { position: "top" },
           title: {
             display: true,
-            text: 'Monthly Ticket Overview by Status',
+            text: `Ticket Volume Grouped by ${
+              groupBy === "month" ? "Month" : "Day"
+            } (${dateField})`,
           },
           tooltip: {
             callbacks: {
-              label: (context) => {
-                const label = context.label || '';
-                const value = context.raw || 0;
-                return `${label}: ${value} tickets`;
-              },
+              label: (context) => `${context.label}: ${context.raw} tickets`,
             },
           },
         },
@@ -153,32 +167,24 @@ const MyChartComponent = ({ tickets }) => {
           y: {
             beginAtZero: true,
             ticks: {
-              stepSize: 1, // Adjust based on ticket volume
+              stepSize: 1,
             },
           },
         },
       },
     });
 
-    // Cleanup on unmount
     return () => {
-      if (pieChartInstance.current) {
-        pieChartInstance.current.destroy();
-      }
-      if (barChartInstance.current) {
-        barChartInstance.current.destroy();
-      }
+      pieChartInstance.current?.destroy();
+      barChartInstance.current?.destroy();
     };
-  }, [tickets]); // Re-run when tickets change
+  }, [tickets, groupBy, dateField]);
 
   return (
     <div className="flex flex-col md:flex-row justify-between">
-      {/* Pie Chart Container */}
       <div className="w-full md:w-1/2 p-2">
         <canvas ref={pieChartRef} id="myPieChart"></canvas>
       </div>
-
-      {/* Bar Chart Container */}
       <div className="w-full md:w-1/2 p-2">
         <canvas ref={barChartRef} id="myBarChart"></canvas>
       </div>

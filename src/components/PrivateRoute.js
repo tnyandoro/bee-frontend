@@ -1,20 +1,18 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/authContext";
 
 const PrivateRoute = ({ children, allowedRoles = [] }) => {
-  const { user, loading, error, logout } = useAuth();
+  const { currentUser, loading, error, isAdmin } = useAuth();
   const location = useLocation();
 
-  // Prevent infinite logout loop
-  useEffect(() => {
-    const sessionExpired = error?.toLowerCase().includes("expired");
-    const isUnauthorized = error?.toLowerCase().includes("unauthorized");
-
-    if ((sessionExpired || isUnauthorized) && user) {
-      logout();
-    }
-  }, [error, user, logout]);
+  console.log("PrivateRoute: ", {
+    currentUser,
+    loading,
+    error,
+    isAdmin,
+    allowedRoles,
+  });
 
   if (loading) {
     return (
@@ -24,30 +22,42 @@ const PrivateRoute = ({ children, allowedRoles = [] }) => {
     );
   }
 
-  if (error) {
-    return (
-      <Navigate
-        to="/login"
-        state={{
-          from: location,
-          error: "Your session has expired. Please log in again.",
-        }}
-        replace
-      />
-    );
+  if (!currentUser) {
+    console.log("PrivateRoute: No user, redirecting to /login");
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (!user) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+  if (error) {
+    const sessionExpired = error.toLowerCase().includes("expired");
+    const isUnauthorized = error.toLowerCase().includes("unauthorized");
+    if (sessionExpired || isUnauthorized) {
+      console.log("PrivateRoute: Session error, redirecting to /login", {
+        error,
+      });
+      return (
+        <Navigate
+          to="/login"
+          state={{
+            from: location,
+            error: "Your session has expired. Please log in again.",
+          }}
+          replace
+        />
+      );
+    }
+    console.warn("PrivateRoute: Non-critical error, proceeding", { error });
   }
 
   if (allowedRoles.length > 0) {
     const hasAccess =
-      allowedRoles.includes(user.role) ||
-      (allowedRoles.includes("admin") && user.is_admin) ||
-      (allowedRoles.includes("super_user") && user.is_super_user);
+      allowedRoles.includes(currentUser.role) ||
+      (allowedRoles.includes("admin") && isAdmin);
 
     if (!hasAccess) {
+      console.log("PrivateRoute: No access, redirecting to /forbidden", {
+        userRole: currentUser.role,
+        allowedRoles,
+      });
       return <Navigate to="/forbidden" state={{ from: location }} replace />;
     }
   }

@@ -31,7 +31,6 @@ const ProblemsOverview = () => {
         `${baseUrl}/organizations/${subdomain}/tickets?ticket_type=Problem&page=${currentPage}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      console.log("Problems response:", response.data);
       const fetchedTickets = Array.isArray(response.data.tickets)
         ? response.data.tickets
         : Array.isArray(response.data)
@@ -46,7 +45,6 @@ const ProblemsOverview = () => {
       setError(
         `Failed to fetch problems: ${err.response?.data?.error || err.message}`
       );
-      console.error("Fetch problems error:", err.response || err);
       setTickets([]);
     } finally {
       setLoading(false);
@@ -207,7 +205,7 @@ const ProblemsOverview = () => {
       </div>
 
       {selectedTicket && (
-        <div className="mt-8 bg-white p-6 rounded-lg shadow-lg border border-gray-200">
+        <div className="mt-20 bg-white p-6 rounded-lg shadow-lg border border-gray-200">
           <h3 className="text-xl font-semibold mb-4">
             Problem Details -{" "}
             {selectedTicket.ticket_number || selectedTicket.id}
@@ -250,7 +248,6 @@ const ProblemsOverview = () => {
         </div>
       )}
 
-      {/* Pagination */}
       <div className="mt-6 flex justify-center items-center space-x-4">
         <button
           onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}

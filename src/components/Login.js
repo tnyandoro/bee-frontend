@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import { useNavigate, Link } from "react-router-dom";
+import { useAuth } from "../contexts/authContext";
+import { toast } from "react-toastify";
 import logor from "../assets/logor.png";
 import bg from "../assets/main_bg.png";
 import splashLogo from "../assets/splash_logo.png";
 
-const Login = ({ loginType, setLoggedIn, setEmail, setRole }) => {
+const Login = ({ loginType = "User" }) => {
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -19,7 +21,6 @@ const Login = ({ loginType, setLoggedIn, setEmail, setRole }) => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
-  const [apiBaseUrl, setApiBaseUrl] = useState("");
 
   const navigate = useNavigate();
 
@@ -34,12 +35,6 @@ const Login = ({ loginType, setLoggedIn, setEmail, setRole }) => {
       handleExistingSessionRedirect();
     }
   }, [navigate]);
-
-  useEffect(() => {
-    if (formData.subdomain) {
-      setApiBaseUrl(`http://${formData.subdomain}.lvh.me:3000`);
-    }
-  }, [formData.subdomain]);
 
   const sanitizeSubdomain = (input) => {
     return input
@@ -62,7 +57,7 @@ const Login = ({ loginType, setLoggedIn, setEmail, setRole }) => {
 
     if (storedSubdomain && storedRole) {
       navigate(
-        storedRole === "admin" || storedRole === "super_user"
+        storedRole === "system_admin" || storedRole === "domain_admin"
           ? "/dashboard"
           : "/user/dashboard"
       );
@@ -108,60 +103,44 @@ const Login = ({ loginType, setLoggedIn, setEmail, setRole }) => {
     setErrors((prev) => ({ ...prev, general: "" }));
 
     try {
-      const { data } = await axios.post(
-        `/api/v1/login`,
-        {
-          email: formData.email,
-          password: formData.password,
-          subdomain: formData.subdomain,
-        },
-        {
-          baseURL: apiBaseUrl,
-          timeout: 10000,
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      await login(formData.email, formData.password, formData.subdomain);
+      console.log("Login successful, navigating based on role");
 
-      if (!data.auth_token || !data.user?.role) {
-        throw new Error("Invalid server response");
-      }
+      toast.success("You have successfully logged in", {
+        position: "top-right",
+        autoClose: 6000,
+        hideProgressBar: true,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        theme: "light",
+      });
 
-      // Store authentication details
-      localStorage.setItem("authToken", data.auth_token);
-      localStorage.setItem("email", data.user.email);
-      localStorage.setItem("role", data.user.role);
-      localStorage.setItem("subdomain", formData.subdomain);
-
-      // Update parent component state
-      setLoggedIn(true);
-      setEmail(data.user.email);
-      setRole(data.user.role);
-
-      // Force full page reload to reset all states
-      window.location.href =
-        data.user.role === "admin" || data.user.role === "super_user"
+      const storedRole = localStorage.getItem("role");
+      navigate(
+        storedRole === "system_admin" || storedRole === "domain_admin"
           ? "/dashboard"
-          : "/user/dashboard";
+          : "/user/dashboard"
+      );
     } catch (error) {
-      console.error("Login error:", error);
-      const errorStatus = error.response?.status;
+      console.error("Login error:", error.message);
       let errorMessage = "Login failed. Please try again";
 
-      if (error.code === "ECONNABORTED") {
+      if (error.message.includes("timeout")) {
         errorMessage = "Request timed out. Please try again";
-      } else if (errorStatus === 404) {
+      } else if (error.message.includes("Organization not found")) {
         errorMessage = "Organization not found";
-      } else if (errorStatus === 401) {
+      } else if (error.message.includes("Invalid credentials")) {
         errorMessage = "Invalid credentials";
-      } else if (error.response?.data?.error) {
-        errorMessage = error.response.data.error;
+      } else if (error.message.includes("Invalid role")) {
+        errorMessage = "User role is invalid or missing";
+      } else if (error.message) {
+        errorMessage = error.message;
       }
 
       setErrors({
-        subdomain: errorStatus === 404 ? errorMessage : "",
-        password: errorStatus === 401 ? errorMessage : "",
+        subdomain: errorMessage.includes("Organization") ? errorMessage : "",
+        password: errorMessage.includes("credentials") ? errorMessage : "",
         general: errorMessage,
       });
     } finally {
@@ -285,6 +264,15 @@ const Login = ({ loginType, setLoggedIn, setEmail, setRole }) => {
               {errors.password && (
                 <p className="mt-1 text-sm text-red-600">{errors.password}</p>
               )}
+              <div className="mt-2 text-right">
+                <Link
+                  to="/forgot-password"
+                  className="text-sm sm:text-base text-blue-600 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  aria-label="Forgot your password?"
+                >
+                  Forgot Password?
+                </Link>
+              </div>
             </div>
 
             <div className="pt-2">

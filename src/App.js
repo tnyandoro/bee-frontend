@@ -1,14 +1,15 @@
-import React, { useState, useEffect } from "react";
-
+import React from "react";
 import {
   BrowserRouter as Router,
   Route,
   Routes,
   Navigate,
 } from "react-router-dom";
+import { useAuth } from "./contexts/authContext";
 import Home from "./components/home";
 import Header from "./components/Header";
 import Login from "./components/Login";
+import ResetPassword from "./components/ResetPassword";
 import AdminRegister from "./components/AdminRegister";
 import Navbar from "./components/Navbar";
 import Sidebar from "./components/Sidebar";
@@ -26,72 +27,51 @@ import CreateUserForm from "./components/CreateUserForm";
 import AdminDashboard from "./components/AdminDashboard";
 
 function App() {
-  const [loggedIn, setLoggedIn] = useState(false);
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState("");
-  const profileImage = "path_to_image";
-
-  useEffect(() => {
-    const token = localStorage.getItem("authToken");
-    if (token) {
-      const storedEmail = localStorage.getItem("email") || "";
-      const storedRole = localStorage.getItem("role") || "";
-      console.log("Logged in with:", { email: storedEmail, role: storedRole });
-      setLoggedIn(true);
-      setEmail(storedEmail);
-      setRole(storedRole);
-    } else {
-      setLoggedIn(false);
-    }
-  }, []);
+  const { currentUser, isAuthenticated, logout, subdomain } = useAuth();
 
   const handleLogout = () => {
-    setLoggedIn(false);
-    setEmail("");
-    setRole("");
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("subdomain");
-    localStorage.removeItem("email");
-    localStorage.removeItem("role");
+    logout();
   };
 
   return (
     <Router>
-      <div className="App">
-        {loggedIn && (
+      <div className="App min-h-screen flex flex-col">
+        {isAuthenticated && (
           <>
             <Header />
             <Navbar
-              logo="path_to_logo"
-              name={email}
-              email={email}
-              role={role}
-              profileImage={profileImage}
-              loggedIn={loggedIn}
+              logo={process.env.REACT_APP_LOGO_URL || "/path_to_logo"}
+              name={currentUser?.email}
+              email={currentUser?.email}
+              role={currentUser?.role}
+              profileImage={
+                process.env.REACT_APP_PROFILE_IMAGE_URL || "/path_to_image"
+              }
+              loggedIn={isAuthenticated}
               onLogout={handleLogout}
+              organizationName={currentUser?.organization?.name || ""}
+              subdomain={subdomain || ""}
+              className="fixed top-0 left-0 right-0 z-10"
             />
-            <Sidebar isLoggedIn={loggedIn} />
+            <Sidebar
+              isLoggedIn={isAuthenticated}
+              className="fixed top-16 left-0 h-[calc(100vh-4rem)] w-64"
+            />
           </>
         )}
 
-        <div className={loggedIn ? "pl-64" : ""}>
+        <div className={isAuthenticated ? "ml-64 pt-16 flex-1" : "flex-1"}>
           <Routes>
             <Route
               path="/"
-              element={loggedIn ? <Navigate to="/dashboard" /> : <Home />}
+              element={
+                isAuthenticated ? <Navigate to="/dashboard" /> : <Home />
+              }
             />
             <Route
               path="/login"
               element={
-                loggedIn ? (
-                  <Navigate to="/dashboard" />
-                ) : (
-                  <Login
-                    setLoggedIn={setLoggedIn}
-                    setEmail={setEmail}
-                    setRole={setRole}
-                  />
-                )
+                isAuthenticated ? <Navigate to="/dashboard" /> : <Login />
               }
             />
             <Route path="/admin/register" element={<AdminRegister />} />
@@ -99,17 +79,23 @@ function App() {
               path="/dashboard"
               element={
                 <PrivateRoute
-                  loggedIn={loggedIn}
-                  role={role}
                   allowedRoles={[
-                    "admin",
-                    "super_user",
-                    "agent",
-                    "teamlead",
-                    "viewer",
+                    "system_admin",
+                    "domain_admin",
+                    "service_desk_agent",
+                    "team_leader",
+                    "level_1_2_support",
+                    "level_3_support",
+                    "incident_manager",
+                    "problem_manager",
+                    "problem_coordinator",
+                    "change_manager",
+                    "change_coordinator",
+                    "department_manager",
+                    "general_manager",
                   ]}
                 >
-                  <Dashboard email={email} role={role} />
+                  <Dashboard />
                 </PrivateRoute>
               }
             />
@@ -117,11 +103,14 @@ function App() {
               path="/user/dashboard"
               element={
                 <PrivateRoute
-                  loggedIn={loggedIn}
-                  role={role}
-                  allowedRoles={["agent", "teamlead", "viewer"]}
+                  allowedRoles={[
+                    "service_desk_agent",
+                    "team_leader",
+                    "level_1_2_support",
+                    "level_3_support",
+                  ]}
                 >
-                  <Dashboard email={email} role={role} />
+                  <Dashboard />
                 </PrivateRoute>
               }
             />
@@ -129,11 +118,14 @@ function App() {
               path="/incident"
               element={
                 <PrivateRoute
-                  loggedIn={loggedIn}
-                  role={role}
-                  allowedRoles={["admin", "super_user", "agent"]}
+                  allowedRoles={[
+                    "system_admin",
+                    "domain_admin",
+                    "service_desk_agent",
+                    "incident_manager",
+                  ]}
                 >
-                  <Incident email={email} role={role} />
+                  <Incident />
                 </PrivateRoute>
               }
             />
@@ -141,11 +133,15 @@ function App() {
               path="/create-ticket"
               element={
                 <PrivateRoute
-                  loggedIn={loggedIn}
-                  role={role}
-                  allowedRoles={["admin", "super_user", "agent"]}
+                  allowedRoles={[
+                    "system_admin",
+                    "domain_admin",
+                    "service_desk_agent",
+                    "incident_manager",
+                    "team_leader",
+                  ]}
                 >
-                  <CreateTicketPage email={email} role={role} />
+                  <CreateTicketPage />
                 </PrivateRoute>
               }
             />
@@ -153,11 +149,15 @@ function App() {
               path="/incident-overview"
               element={
                 <PrivateRoute
-                  loggedIn={loggedIn}
-                  role={role}
-                  allowedRoles={["admin", "super_user", "agent"]}
+                  allowedRoles={[
+                    "system_admin",
+                    "domain_admin",
+                    "service_desk_agent",
+                    "incident_manager",
+                    "team_leader",
+                  ]}
                 >
-                  <IncidentOverview email={email} role={role} />
+                  <IncidentOverview />
                 </PrivateRoute>
               }
             />
@@ -165,17 +165,23 @@ function App() {
               path="/knowledge-base"
               element={
                 <PrivateRoute
-                  loggedIn={loggedIn}
-                  role={role}
                   allowedRoles={[
-                    "admin",
-                    "super_user",
-                    "agent",
-                    "teamlead",
-                    "viewer",
+                    "system_admin",
+                    "domain_admin",
+                    "service_desk_agent",
+                    "team_leader",
+                    "level_1_2_support",
+                    "level_3_support",
+                    "incident_manager",
+                    "problem_manager",
+                    "problem_coordinator",
+                    "change_manager",
+                    "change_coordinator",
+                    "department_manager",
+                    "general_manager",
                   ]}
                 >
-                  <KnowledgeBase email={email} role={role} />
+                  <KnowledgeBase />
                 </PrivateRoute>
               }
             />
@@ -183,11 +189,15 @@ function App() {
               path="/create-problems"
               element={
                 <PrivateRoute
-                  loggedIn={loggedIn}
-                  role={role}
-                  allowedRoles={["admin", "super_user", "agent"]}
+                  allowedRoles={[
+                    "system_admin",
+                    "domain_admin",
+                    "problem_manager",
+                    "problem_coordinator",
+                    "team_leader",
+                  ]}
                 >
-                  <CreateProblems email={email} role={role} />
+                  <CreateProblems />
                 </PrivateRoute>
               }
             />
@@ -195,9 +205,13 @@ function App() {
               path="/problems-overview"
               element={
                 <PrivateRoute
-                  loggedIn={loggedIn}
-                  role={role}
-                  allowedRoles={["admin", "team_lead", "super_user"]}
+                  allowedRoles={[
+                    "system_admin",
+                    "domain_admin",
+                    "team_leader",
+                    "problem_manager",
+                    "problem_coordinator",
+                  ]}
                 >
                   <ProblemsOverview />
                 </PrivateRoute>
@@ -206,12 +220,8 @@ function App() {
             <Route
               path="/settings"
               element={
-                <PrivateRoute
-                  loggedIn={loggedIn}
-                  role={role}
-                  allowedRoles={["admin", "super_user"]}
-                >
-                  <Settings email={email} role={role} />
+                <PrivateRoute allowedRoles={["system_admin", "domain_admin"]}>
+                  <Settings />
                 </PrivateRoute>
               }
             />
@@ -219,29 +229,31 @@ function App() {
               path="/profile"
               element={
                 <PrivateRoute
-                  loggedIn={loggedIn}
-                  role={role}
                   allowedRoles={[
-                    "admin",
-                    "super_user",
-                    "agent",
-                    "teamlead",
-                    "viewer",
+                    "system_admin",
+                    "domain_admin",
+                    "service_desk_agent",
+                    "team_leader",
+                    "level_1_2_support",
+                    "level_3_support",
+                    "incident_manager",
+                    "problem_manager",
+                    "problem_coordinator",
+                    "change_manager",
+                    "change_coordinator",
+                    "department_manager",
+                    "general_manager",
                   ]}
                 >
-                  <Profile email={email} role={role} />
+                  <Profile />
                 </PrivateRoute>
               }
             />
             <Route
               path="/create-user"
               element={
-                <PrivateRoute
-                  loggedIn={loggedIn}
-                  role={role}
-                  allowedRoles={["admin", "super_user"]}
-                >
-                  <CreateUserForm email={email} role={role} />
+                <PrivateRoute allowedRoles={["system_admin", "domain_admin"]}>
+                  <CreateUserForm />
                 </PrivateRoute>
               }
             />
@@ -249,11 +261,9 @@ function App() {
               path="/admin-dashboard"
               element={
                 <PrivateRoute
-                  loggedIn={loggedIn}
-                  role={role}
-                  allowedRoles={["admin", "super_user"]}
+                  allowedRoles={["system_admin", "domain_admin", "team_leader"]}
                 >
-                  <AdminDashboard email={email} role={role} />
+                  <AdminDashboard />
                 </PrivateRoute>
               }
             />
@@ -265,11 +275,10 @@ function App() {
                 </div>
               }
             />
-            <Route
-              path="/home"
-              element={<Home email={email} loggedIn={loggedIn} />}
-            />
+            <Route path="/home" element={<Home loggedIn={isAuthenticated} />} />
             <Route path="*" element={<Navigate to="/login" />} />
+            <Route path="/forgot-password" element={<ResetPassword />} />
+            <Route path="/reset-password/:token" element={<ResetPassword />} />
           </Routes>
         </div>
       </div>

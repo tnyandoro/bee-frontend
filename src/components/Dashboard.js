@@ -4,7 +4,7 @@ import MyChartComponent from "./MyChartComponent";
 import { useAuth } from "../contexts/authContext";
 
 const Dashboard = () => {
-  const { organization, user } = useAuth();
+  const { organization, currentUser } = useAuth();
   const subdomain =
     organization?.subdomain || localStorage.getItem("subdomain");
 
@@ -25,6 +25,13 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [formError, setFormError] = useState("");
   const [formSuccess, setFormSuccess] = useState("");
+  const [groupBy, setGroupBy] = useState("day");
+  const [dateField, setDateField] = useState("created_at");
+
+  // Add missing date range state variables
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -39,9 +46,19 @@ const Dashboard = () => {
   // Fetch teams for dropdown
   const fetchTeams = useCallback(async () => {
     const token = localStorage.getItem("authToken");
-    if (!token || !subdomain) return;
+    if (!token || !subdomain) {
+      console.error("Missing token or subdomain for fetchTeams", {
+        token,
+        subdomain,
+      });
+      return;
+    }
 
     try {
+      console.log(
+        "Fetching teams from:",
+        `http://${subdomain}.lvh.me:3000/api/v1/organizations/${subdomain}/teams`
+      );
       const response = await axios.get(
         `http://${subdomain}.lvh.me:3000/api/v1/organizations/${subdomain}/teams`,
         {
@@ -49,9 +66,10 @@ const Dashboard = () => {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-          timeout: 5000,
+          timeout: 15000, // Increased from 5000
         }
       );
+      console.log("Teams response:", response.data);
       setTeams(Array.isArray(response.data.teams) ? response.data.teams : []);
     } catch (err) {
       console.error("Failed to fetch teams:", err);
@@ -62,14 +80,14 @@ const Dashboard = () => {
   const fetchTickets = useCallback(async () => {
     const token = localStorage.getItem("authToken");
 
-    if (!token || !subdomain || !user?.id) {
-      setError(
-        !token
-          ? "Authentication error. Please log in again."
-          : !subdomain
-          ? "Organization subdomain not found"
-          : "User information not available"
-      );
+    if (!token || !subdomain || !currentUser?.id) {
+      const errorMsg = !token
+        ? "Authentication error. Please log in again."
+        : !subdomain
+        ? "Organization subdomain not found"
+        : "Current User information not available";
+      console.error("Fetch tickets failed:", errorMsg);
+      setError(errorMsg);
       setLoading(false);
       return;
     }
@@ -77,6 +95,10 @@ const Dashboard = () => {
     try {
       setLoading(true);
       setError("");
+      console.log(
+        "Fetching tickets from:",
+        `http://${subdomain}.lvh.me:3000/api/v1/organizations/${subdomain}/tickets`
+      );
 
       const response = await axios.get(
         `http://${subdomain}.lvh.me:3000/api/v1/organizations/${subdomain}/tickets`,
@@ -85,9 +107,11 @@ const Dashboard = () => {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-          timeout: 10000,
+          timeout: 15000, // Increased from 10000
         }
       );
+
+      console.log("Tickets response:", response.data);
 
       if (!response.data?.tickets) {
         throw new Error("Invalid data format received from server");
@@ -97,14 +121,28 @@ const Dashboard = () => {
         ? response.data.tickets
         : [];
 
-      if (!["admin", "super_user"].includes(user.role)) {
+      console.log(
+        "User role:",
+        currentUser.role,
+        "User team_ids:",
+        currentUser.team_ids
+      );
+      const globalAccessRoles = [
+        "system_admin",
+        "domain_admin",
+        "admin",
+        "super_user",
+      ];
+
+      if (!globalAccessRoles.includes(currentUser.role)) {
         fetchedTickets = fetchedTickets.filter(
           (ticket) =>
-            ticket.assignee?.id === user.id ||
-            (ticket.team_id && user.team_ids?.includes(ticket.team_id))
+            ticket.assignee?.id === currentUser.id ||
+            (ticket.team_id && currentUser.team_ids?.includes(ticket.team_id))
         );
       }
 
+      console.log("Filtered tickets:", fetchedTickets);
       setTickets(fetchedTickets);
 
       setTicketData({
@@ -122,14 +160,22 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  }, [subdomain, user]);
+  }, [subdomain, currentUser]);
 
   useEffect(() => {
-    if (subdomain && user?.id) {
+    console.log("Dashboard useEffect triggered:", {
+      subdomain,
+      userId: currentUser?.id,
+    });
+    if (subdomain && currentUser?.id) {
       fetchTickets();
       fetchTeams();
+    } else {
+      console.error("Missing subdomain or user ID", { subdomain, currentUser });
+      setError("Authentication data missing. Please log in again.");
+      setLoading(false);
     }
-  }, [subdomain, user, fetchTickets, fetchTeams]);
+  }, [subdomain, currentUser, fetchTickets, fetchTeams]);
 
   const handleApiError = (error) => {
     console.error("Dashboard API Error:", error);
@@ -137,6 +183,8 @@ const Dashboard = () => {
     if (error.response) {
       if (error.response.status === 401) {
         errorMessage = "Session expired. Please log in again.";
+      } else if (error.response.status === 404) {
+        errorMessage = "No tickets found for your organization.";
       } else if (error.response.data?.error) {
         errorMessage = error.response.data.error;
       }
@@ -183,6 +231,7 @@ const Dashboard = () => {
         },
       };
 
+      console.log("Submitting ticket:", payload);
       await axios.post(
         `http://${subdomain}.lvh.me:3000/api/v1/organizations/${subdomain}/tickets`,
         payload,
@@ -191,7 +240,7 @@ const Dashboard = () => {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-          timeout: 10000,
+          timeout: 15000,
         }
       );
 
@@ -233,6 +282,22 @@ const Dashboard = () => {
       ?.toLowerCase()
       .includes(searchQuery.toLowerCase());
 
+    // Check if ticket has the required date field
+    const rawDate = ticket[dateField];
+    if (!rawDate) return matchesType && matchesSearch; // Return early if no date
+
+    // Date range filtering (only if date range is specified)
+    if (startDate || endDate) {
+      const ticketDate = new Date(rawDate);
+      const start = startDate ? new Date(startDate + "T00:00:00") : null;
+      const end = endDate ? new Date(endDate + "T23:59:59") : null;
+
+      const isInRange =
+        (!start || ticketDate >= start) && (!end || ticketDate <= end);
+
+      return matchesType && matchesSearch && isInRange;
+    }
+
     return matchesType && matchesSearch;
   });
 
@@ -267,19 +332,27 @@ const Dashboard = () => {
         <div className="max-w-md p-6 bg-red-50 rounded-lg shadow">
           <h2 className="text-xl font-semibold text-red-600 mb-4">Error</h2>
           <p className="text-red-500 mb-4">{error}</p>
-          <button
-            onClick={fetchTickets}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-          >
-            Retry
-          </button>
+          <div className="flex gap-4">
+            <button
+              onClick={fetchTickets}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+            >
+              Retry
+            </button>
+            <button
+              onClick={() => (window.location.href = "/login")}
+              className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
+            >
+              Log Out
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-4">
+    <div className="container mx-auto mt-20 p-4">
       <div className="bg-white rounded-lg shadow-lg p-6">
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-gray-800 mb-4">
@@ -475,11 +548,75 @@ const Dashboard = () => {
             </button>
           </div>
 
+          {/* Date Range Filters */}
+          <div className="flex flex-wrap gap-4 mb-6 items-center">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Start Date
+              </label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                End Date
+              </label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            {(startDate || endDate) && (
+              <button
+                onClick={() => {
+                  setStartDate("");
+                  setEndDate("");
+                }}
+                className="px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors mt-6"
+              >
+                Clear Dates
+              </button>
+            )}
+          </div>
+
           {/* Data Visualization */}
           <div className="mb-8">
             <h2 className="text-xl font-semibold mb-4 text-gray-700">
               Incident Trends
             </h2>
+            <div className="flex flex-wrap gap-4 mb-4 items-center">
+              <label className="text-sm font-medium text-gray-700">
+                Group by:
+                <select
+                  value={groupBy}
+                  onChange={(e) => setGroupBy(e.target.value)}
+                  className="ml-2 px-2 py-1 border border-gray-300 rounded"
+                >
+                  <option value="day">Daily</option>
+                  <option value="month">Monthly</option>
+                </select>
+              </label>
+
+              <label className="text-sm font-medium text-gray-700">
+                Filter by date field:
+                <select
+                  value={dateField}
+                  onChange={(e) => setDateField(e.target.value)}
+                  className="ml-2 px-2 py-1 border border-gray-300 rounded"
+                >
+                  <option value="created_at">Created At</option>
+                  <option value="updated_at">Updated At</option>
+                  <option value="resolved_at">Resolved At</option>
+                </select>
+              </label>
+            </div>
+
             <div className="bg-white p-4 rounded-lg shadow">
               <MyChartComponent tickets={tickets} ticketData={ticketData} />
             </div>
@@ -624,7 +761,7 @@ const Dashboard = () => {
                   >
                     <path
                       fillRule="evenodd"
-                      d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                      d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414z"
                       clipRule="evenodd"
                     />
                   </svg>

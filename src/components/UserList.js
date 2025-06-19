@@ -21,19 +21,36 @@ const UserList = ({ organizationSubdomain }) => {
     }
   }, [message]);
 
-  const handleApiError = (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem("authToken");
-      navigate("/login");
-      return "Session expired. Please log in again.";
-    } else if (error.response?.data?.errors) {
-      return error.response.data.errors.join(", ");
-    } else if (error.response?.data?.error) {
-      return error.response.data.error;
-    } else {
-      return error.message;
+  const handleApiError = useCallback(
+    (error) => {
+      if (error.response?.status === 401) {
+        localStorage.removeItem("authToken");
+        navigate("/login");
+        return "Session expired. Please log in again.";
+      } else if (error.response?.data?.errors) {
+        return error.response.data.errors.join(", ");
+      } else if (error.response?.data?.error) {
+        return error.response.data.error;
+      } else {
+        return error.message;
+      }
+    },
+    [navigate]
+  );
+
+  const fetchTeams = useCallback(async () => {
+    try {
+      const api = createApiInstance(token);
+      const response = await api.get(
+        `/organizations/${effectiveSubdomain}/teams`
+      );
+      return response.data || [];
+    } catch (error) {
+      setMessage(handleApiError(error));
+      setIsError(true);
+      return [];
     }
-  };
+  }, [token, effectiveSubdomain, handleApiError]);
 
   const fetchUsers = useCallback(async () => {
     if (!token || !effectiveSubdomain) {
@@ -44,27 +61,38 @@ const UserList = ({ organizationSubdomain }) => {
     }
 
     try {
-      const api = createApiInstance(token);
-      const response = await api.get(
-        `/organizations/${effectiveSubdomain}/users`
-      );
+      const [teamsData, usersResponse] = await Promise.all([
+        fetchTeams(),
+        createApiInstance(token).get(
+          `/organizations/${effectiveSubdomain}/users`
+        ),
+      ]);
 
-      const usersData = Array.isArray(response.data.data)
-        ? response.data.data
+      const usersData = Array.isArray(usersResponse.data.data)
+        ? usersResponse.data.data
         : [];
 
-      if (usersData.length === 0) {
+      // Enhance users with team names
+      const usersWithTeamNames = usersData.map((user) => {
+        const userTeam = teamsData.find((team) => team.id === user.team_id);
+        return {
+          ...user,
+          team_name: userTeam ? userTeam.name : "Unassigned",
+        };
+      });
+
+      if (usersWithTeamNames.length === 0) {
         setMessage("No users found for this organization.");
       }
 
-      setUsers(usersData);
+      setUsers(usersWithTeamNames);
     } catch (error) {
       setMessage(handleApiError(error));
       setIsError(true);
     } finally {
       setLoading(false);
     }
-  }, [token, effectiveSubdomain]);
+  }, [token, effectiveSubdomain, fetchTeams, handleApiError]);
 
   useEffect(() => {
     fetchUsers();
@@ -126,7 +154,7 @@ const UserList = ({ organizationSubdomain }) => {
                   <td className="py-2 px-4 border">{user.email}</td>
                   <td className="py-2 px-4 border capitalize">{user.role}</td>
                   <td className="py-2 px-4 border">
-                    {user.team_id ? `Team ${user.team_id}` : "No team"}
+                    {user.team_name || "No team"}
                   </td>
                   <td className="py-2 px-4 border space-x-2">
                     <button
