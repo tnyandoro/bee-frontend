@@ -18,6 +18,15 @@ export const useAuth = () => {
   return context;
 };
 
+// 🔧 Helper to determine the correct API base URL
+const getApiBaseUrl = (subdomain) => {
+  if (process.env.NODE_ENV === "development") {
+    return `http://${subdomain}.lvh.me:3000/api/v1`;
+  } else {
+    return `https://itsm-api.onrender.com/api/v1`;
+  }
+};
+
 export const AuthProvider = ({ children }) => {
   const [state, setState] = useState({
     currentUser: null,
@@ -92,9 +101,7 @@ export const AuthProvider = ({ children }) => {
         setState((prev) => ({ ...prev, loading: true, error: null }));
         console.log("Verifying auth with:", { token, subdomain });
 
-        const apiBase =
-          process.env.REACT_APP_API_URL ||
-          `http://${subdomain}.lvh.me:3000/api/v1`;
+        const apiBase = getApiBaseUrl(subdomain);
 
         const response = await axios.get(
           `${apiBase}/organizations/${subdomain}/profile`,
@@ -192,9 +199,7 @@ export const AuthProvider = ({ children }) => {
 
         console.log("Logging in with:", { email, domain: effectiveDomain });
 
-        const apiBase =
-          process.env.REACT_APP_API_URL ||
-          `http://${effectiveDomain}.lvh.me:3000/api/v1`;
+        const apiBase = getApiBaseUrl(effectiveDomain);
 
         const response = await axios.post(`${apiBase}/login`, {
           email,
