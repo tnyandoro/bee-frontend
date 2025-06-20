@@ -20,11 +20,14 @@ export const useAuth = () => {
 
 // 🔧 Helper to determine the correct API base URL
 const getApiBaseUrl = (subdomain) => {
+  const envBase = process.env.REACT_APP_API_BASE_URL;
+  if (envBase) return envBase;
+
   if (process.env.NODE_ENV === "development") {
     return `http://${subdomain}.lvh.me:3000/api/v1`;
-  } else {
-    return `https://itsm-api.onrender.com/api/v1`;
   }
+
+  throw new Error("API base URL not configured");
 };
 
 export const AuthProvider = ({ children }) => {
