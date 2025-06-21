@@ -4,10 +4,14 @@ import MyChartComponent from "./MyChartComponent";
 import { useAuth } from "../contexts/authContext";
 
 // Define getApiBaseUrl if not imported from elsewhere
-function getApiBaseUrl() {
-  // You can adjust this logic as needed for your environment
-  return process.env.REACT_APP_API_BASE_URL || "https://api.example.com";
-}
+const getApiBaseUrl = () => {
+  return process.env.REACT_APP_API_BASE_URL || "http://localhost:3000/api/v1";
+};
+
+// function getApiBaseUrl() {
+//   // You can adjust this logic as needed for your environment
+//   return process.env.REACT_APP_API_BASE_URL || "https://api.example.com";
+// }
 
 const Dashboard = () => {
   const { organization, currentUser } = useAuth();
