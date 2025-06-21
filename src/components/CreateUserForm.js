@@ -3,6 +3,7 @@ import axios from "axios";
 import { useAuth } from "../contexts/authContext";
 import { useNavigate } from "react-router-dom";
 import PrivateRoute from "./PrivateRoute";
+import createApiInstance from "../utils/apiClient";
 
 const CreateUserForm = ({ onClose }) => {
   const { currentUser, token, subdomain } = useAuth();

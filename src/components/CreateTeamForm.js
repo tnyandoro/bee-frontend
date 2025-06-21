@@ -1,12 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
-import createApiClient from "../utils/apiClient";
-import { useAuth } from "../contexts/authContext";
+import createApiInstance from "../utils/api"; // Using your existing api.js
 import { useNavigate } from "react-router-dom";
 
 const CreateTeamForm = ({ onClose, onTeamCreated }) => {
-  const { token, subdomain, currentUser } = useAuth();
   const navigate = useNavigate();
-
   const [formData, setFormData] = useState({
     name: "",
     user_ids: [],
@@ -34,15 +31,18 @@ const CreateTeamForm = ({ onClose, onTeamCreated }) => {
     [navigate]
   );
 
-  const validateAuth = useCallback(() => {
+  const getAuthCredentials = useCallback(() => {
+    const token = localStorage.getItem("authToken");
+    const subdomain = localStorage.getItem("orgSubdomain");
+
     if (!token || !subdomain) {
       setMessage("Please log in to continue.");
       setIsError(true);
       navigate("/login");
-      return false;
+      return null;
     }
-    return true;
-  }, [token, subdomain, navigate]);
+    return { token, subdomain };
+  }, [navigate]);
 
   const validateForm = () => {
     if (!formData.name.trim()) {
@@ -58,41 +58,47 @@ const CreateTeamForm = ({ onClose, onTeamCreated }) => {
     return true;
   };
 
-  const withLoading = async (callback) => {
-    setLoading(true);
-    try {
-      await callback();
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    let isMounted = true;
+
     const fetchUsers = async () => {
-      if (!validateAuth()) return;
+      const credentials = getAuthCredentials();
+      if (!credentials) return;
 
       try {
-        const api = createApiClient(token, subdomain);
+        const { token, subdomain } = credentials;
+        const api = createApiInstance(token, subdomain);
         const response = await api.get("/users");
         const usersData = Array.isArray(response.data.data)
           ? response.data.data
           : [];
 
-        if (usersData.length === 0) {
-          setMessage("No users found for this organization.");
-          setUsers([]);
-        } else {
-          setUsers(usersData);
-          setMessage("");
+        if (isMounted) {
+          if (usersData.length === 0) {
+            setMessage("No users found for this organization.");
+            setUsers([]);
+          } else {
+            setUsers(usersData);
+            setMessage("");
+          }
         }
       } catch (error) {
-        setMessage(handleApiError(error));
-        setIsError(true);
+        if (isMounted) {
+          setMessage(handleApiError(error));
+          setIsError(true);
+        }
+      } finally {
+        if (isMounted) setLoading(false);
       }
     };
 
-    withLoading(fetchUsers);
-  }, [token, subdomain, validateAuth, handleApiError]);
+    setLoading(true);
+    fetchUsers();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [getAuthCredentials, handleApiError]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -111,10 +117,12 @@ const CreateTeamForm = ({ onClose, onTeamCreated }) => {
     setMessage("");
     setIsError(false);
 
-    if (!validateAuth() || !validateForm()) return;
+    const credentials = getAuthCredentials();
+    if (!credentials || !validateForm()) return;
 
     try {
-      const api = createApiClient(token, subdomain);
+      const { token, subdomain } = credentials;
+      const api = createApiInstance(token, subdomain);
       await api.post("/teams", {
         team: {
           name: formData.name,
