@@ -3,6 +3,12 @@ import axios from "axios";
 import MyChartComponent from "./MyChartComponent";
 import { useAuth } from "../contexts/authContext";
 
+// Define getApiBaseUrl if not imported from elsewhere
+function getApiBaseUrl() {
+  // You can adjust this logic as needed for your environment
+  return process.env.REACT_APP_API_BASE_URL || "https://api.example.com";
+}
+
 const Dashboard = () => {
   const { organization, currentUser } = useAuth();
   const subdomain =
@@ -57,10 +63,10 @@ const Dashboard = () => {
     try {
       console.log(
         "Fetching teams from:",
-        `http://${subdomain}.lvh.me:3000/api/v1/organizations/${subdomain}/teams`
+        `${getApiBaseUrl()}/organizations/${subdomain}//organizations/${subdomain}/teams`
       );
       const response = await axios.get(
-        `http://${subdomain}.lvh.me:3000/api/v1/organizations/${subdomain}/teams`,
+        `${getApiBaseUrl()}/organizations/${subdomain}//organizations/${subdomain}/teams`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -97,11 +103,11 @@ const Dashboard = () => {
       setError("");
       console.log(
         "Fetching tickets from:",
-        `http://${subdomain}.lvh.me:3000/api/v1/organizations/${subdomain}/tickets`
+        `${getApiBaseUrl()}/organizations/${subdomain}//organizations/${subdomain}/tickets`
       );
 
       const response = await axios.get(
-        `http://${subdomain}.lvh.me:3000/api/v1/organizations/${subdomain}/tickets`,
+        `${getApiBaseUrl()}/organizations/${subdomain}//organizations/${subdomain}/tickets`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -233,7 +239,7 @@ const Dashboard = () => {
 
       console.log("Submitting ticket:", payload);
       await axios.post(
-        `http://${subdomain}.lvh.me:3000/api/v1/organizations/${subdomain}/tickets`,
+        `${getApiBaseUrl()}/organizations/${subdomain}//organizations/${subdomain}/tickets`,
         payload,
         {
           headers: {
