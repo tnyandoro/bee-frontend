@@ -49,7 +49,7 @@ const Dashboard = () => {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        timeout: 15000,
+        timeout: 30000,
       });
       setTeams(Array.isArray(response.data.teams) ? response.data.teams : []);
     } catch (err) {
@@ -72,7 +72,7 @@ const Dashboard = () => {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        timeout: 15000,
+        timeout: 30000,
       });
 
       const allTickets = Array.isArray(response.data.tickets)
@@ -154,7 +154,7 @@ const Dashboard = () => {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        timeout: 15000,
+        timeout: 30000,
       });
 
       setFormSuccess("Ticket created successfully!");
