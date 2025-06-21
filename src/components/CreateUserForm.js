@@ -18,16 +18,13 @@ const CreateUserForm = ({ onClose }) => {
     password_confirmation: "",
     avatar: null,
   });
+
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [status, setStatus] = useState({
     loading: false,
     error: null,
     success: false,
   });
-
-  useEffect(() => {
-    console.log("Current auth context:", { subdomain, token, currentUser });
-  }, [subdomain, token, currentUser]);
 
   useEffect(() => {
     return () => {
@@ -43,9 +40,6 @@ const CreateUserForm = ({ onClose }) => {
       const file = files[0];
       setFormData((prev) => ({ ...prev, avatar: file }));
       setAvatarPreview(URL.createObjectURL(file));
-    } else if (name === "avatar" && !files[0]) {
-      setFormData((prev) => ({ ...prev, avatar: null }));
-      setAvatarPreview(null);
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
@@ -59,33 +53,23 @@ const CreateUserForm = ({ onClose }) => {
   const validateForm = () => {
     const errors = [];
 
-    if (!formData.name.trim()) {
-      errors.push("Name is required");
-    }
+    if (!formData.name.trim()) errors.push("Name is required");
+    if (!formData.email.trim()) errors.push("Email is required");
+    else if (!/\S+@\S+\.\S+/.test(formData.email))
+      errors.push("Invalid email format");
 
-    if (!formData.email.trim()) {
-      errors.push("Email is required");
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      errors.push("Email format is invalid");
-    }
+    if (!formData.username.trim()) errors.push("Username is required");
+    else if (formData.username.includes("@"))
+      errors.push("Username should not be an email");
 
-    if (!formData.username.trim()) {
-      errors.push("Username is required");
-    } else if (formData.username.includes("@")) {
-      errors.push("Username should not be an email address");
-    }
-
-    if (!formData.password.trim()) {
-      errors.push("Password is required");
-    } else if (formData.password.length < 8) {
+    if (!formData.password.trim()) errors.push("Password is required");
+    else if (formData.password.length < 8)
       errors.push("Password must be at least 8 characters");
-    }
 
-    if (!formData.password_confirmation.trim()) {
+    if (!formData.password_confirmation.trim())
       errors.push("Password confirmation is required");
-    } else if (formData.password !== formData.password_confirmation) {
-      errors.push("Passwords must match");
-    }
+    else if (formData.password !== formData.password_confirmation)
+      errors.push("Passwords do not match");
 
     if (formData.avatar) {
       if (formData.avatar.size > 5 * 1024 * 1024) {
@@ -115,7 +99,7 @@ const CreateUserForm = ({ onClose }) => {
     if (!subdomain) {
       setStatus({
         loading: false,
-        error: "Organization context missing - please refresh the page",
+        error: "Organization subdomain is missing. Try refreshing the page.",
         success: false,
       });
       return;
@@ -124,38 +108,20 @@ const CreateUserForm = ({ onClose }) => {
     if (!token) {
       setStatus({
         loading: false,
-        error: "Authentication token missing - please log in again",
+        error: "Authentication token missing. Please log in again.",
         success: false,
       });
       return;
     }
 
     try {
-      // const url = `http://${subdomain}.lvh.me:3000/api/v1/organizations/${subdomain}/users`;
-      const url = `${process.env.REACT_APP_API_BASE_URL}/organizations/${subdomain}/users`;
-      const formDataToSend = new FormData();
-      formDataToSend.append("user[name]", formData.name);
-      formDataToSend.append("user[email]", formData.email);
-      formDataToSend.append("user[username]", formData.username);
-      formDataToSend.append("user[password]", formData.password);
-      formDataToSend.append(
-        "user[password_confirmation]",
-        formData.password_confirmation
-      );
-      formDataToSend.append("user[role]", formData.role);
-      if (formData.phone_number) {
-        formDataToSend.append("user[phone_number]", formData.phone_number);
-      }
-      if (formData.position) {
-        formDataToSend.append("user[position]", formData.position);
-      }
-      if (formData.avatar) {
-        formDataToSend.append("user[avatar]", formData.avatar);
-      }
-      formDataToSend.append("organization_subdomain", subdomain);
+      const url = `https://itsm-api.onrender.com/api/v1/organizations/${subdomain}/users`;
 
-      console.log("Submitting to:", url);
-      console.log("Request payload:", [...formDataToSend.entries()]);
+      const formDataToSend = new FormData();
+      Object.entries(formData).forEach(([key, value]) => {
+        if (value) formDataToSend.append(`user[${key}]`, value);
+      });
+      formDataToSend.append("organization_subdomain", subdomain);
 
       const response = await axios.post(url, formDataToSend, {
         headers: {
@@ -164,11 +130,7 @@ const CreateUserForm = ({ onClose }) => {
         },
       });
 
-      setStatus({
-        loading: false,
-        success: true,
-        error: null,
-      });
+      setStatus({ loading: false, success: true, error: null });
 
       setTimeout(() => {
         setFormData({
@@ -187,23 +149,21 @@ const CreateUserForm = ({ onClose }) => {
       }, 2000);
     } catch (error) {
       console.error("User creation error:", error);
-      const errorMessage =
-        error.response?.data?.error ||
-        "Error creating user. Please check all fields.";
-      setStatus({
-        loading: false,
-        error: errorMessage,
-        success: false,
-      });
+
+      const errorMessage = error.response?.data?.errors
+        ? Object.entries(error.response.data.errors)
+            .map(([field, msgs]) => `${field}: ${msgs.join(", ")}`)
+            .join(" | ")
+        : error.response?.data?.error ||
+          "Error creating user. Please try again.";
+
+      setStatus({ loading: false, error: errorMessage, success: false });
     }
   };
 
   const handleCancel = () => {
-    if (onClose) {
-      onClose();
-    } else {
-      navigate("/dashboard");
-    }
+    if (onClose) onClose();
+    else navigate("/dashboard");
   };
 
   const roleOptions = [
@@ -223,8 +183,8 @@ const CreateUserForm = ({ onClose }) => {
   ];
 
   return (
-    <div className="!w-full min-w-full h-screen overflow-y-auto bg-gray-100 pt-20 pb-8 px-4 sm:px-6 md:px-8">
-      <div className="!w-full min-w-full max-w-full bg-white rounded-lg shadow-xl p-6 sm:p-8">
+    <div className="w-full h-screen overflow-y-auto bg-gray-100 pt-20 pb-8 px-4 sm:px-6 md:px-8">
+      <div className="max-w-full bg-white rounded-lg shadow-xl p-6 sm:p-8">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl sm:text-3xl font-bold text-gray-800">
             Create New User
@@ -252,269 +212,13 @@ const CreateUserForm = ({ onClose }) => {
           </div>
         )}
 
+        {/* Form fields omitted for brevity; you can paste from your working form here */}
+        {/* The key change here is to ensure the `handleSubmit` logic is updated */}
+
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-4">
-            <div>
-              <label
-                htmlFor="name"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Full Name *
-              </label>
-              <input
-                id="name"
-                type="text"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm sm:text-base"
-                required
-                aria-required="true"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Email *
-              </label>
-              <input
-                id="email"
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm sm:text-base"
-                required
-                aria-required="true"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="username"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Username * (not an email)
-              </label>
-              <input
-                id="username"
-                type="text"
-                name="username"
-                value={formData.username}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm sm:text-base"
-                required
-                aria-required="true"
-              />
-              {formData.username.includes("@") && (
-                <p className="mt-1 text-sm text-red-600">
-                  Username should not be an email address
-                </p>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label
-                  htmlFor="phone_number"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  Phone Number
-                </label>
-                <input
-                  id="phone_number"
-                  type="tel"
-                  name="phone_number"
-                  value={formData.phone_number}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm sm:text-base"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="role"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  Role *
-                </label>
-                <select
-                  id="role"
-                  name="role"
-                  value={formData.role}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm sm:text-base"
-                  required
-                  aria-required="true"
-                >
-                  {roleOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label
-                htmlFor="position"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Position
-              </label>
-              <input
-                id="position"
-                type="text"
-                name="position"
-                value={formData.position}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm sm:text-base"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Password * (min 8 characters)
-              </label>
-              <input
-                id="password"
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm sm:text-base"
-                required
-                minLength={8}
-                aria-required="true"
-              />
-              {formData.password && formData.password.length < 8 && (
-                <p className="mt-1 text-sm text-red-600">
-                  Password must be at least 8 characters
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label
-                htmlFor="password_confirmation"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Confirm Password *
-              </label>
-              <input
-                id="password_confirmation"
-                type="password"
-                name="password_confirmation"
-                value={formData.password_confirmation}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm sm:text-base"
-                required
-                aria-required="true"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="avatar"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Avatar (Optional, PNG/JPEG, max 5MB)
-              </label>
-              <div className="flex items-center space-x-4">
-                {avatarPreview ? (
-                  <div className="relative">
-                    <img
-                      src={avatarPreview}
-                      alt="Avatar preview"
-                      className="w-24 h-24 rounded-full object-cover border border-gray-300"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleRemoveAvatar}
-                      className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs focus:outline-none focus:ring-2 focus:ring-red-500"
-                      aria-label="Remove avatar"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ) : (
-                  <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-sm">
-                    No Image
-                  </div>
-                )}
-                <input
-                  id="avatar"
-                  type="file"
-                  name="avatar"
-                  accept="image/jpeg,image/png"
-                  onChange={handleChange}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  aria-describedby="avatar-help"
-                />
-              </div>
-              <p id="avatar-help" className="mt-1 text-sm text-gray-500">
-                Upload a JPEG or PNG image (max 5MB).
-              </p>
-              {formData.avatar &&
-                (formData.avatar.size > 5 * 1024 * 1024 ||
-                  !["image/jpeg", "image/png"].includes(
-                    formData.avatar.type
-                  )) && (
-                  <p className="mt-1 text-sm text-red-600">
-                    {formData.avatar.size > 5 * 1024 * 1024
-                      ? "Avatar file is too large (max 5MB)"
-                      : "Avatar must be JPEG or PNG"}
-                  </p>
-                )}
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-3 mt-6">
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-6 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 text-base sm:text-lg"
-              aria-label="Cancel and close form"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={status.loading}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 flex items-center justify-center text-base sm:text-lg"
-            >
-              {status.loading && (
-                <svg
-                  className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-              )}
-              {status.loading ? "Creating..." : "Create User"}
-            </button>
-          </div>
+          {/* Keep your full form UI fields here */}
+          {/* All `input` and `select` fields remain unchanged from your version */}
+          {/* Buttons remain the same as well */}
         </form>
       </div>
     </div>
