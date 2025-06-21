@@ -20,15 +20,8 @@ export const useAuth = () => {
 
 // 🔧 Helper to determine the correct API base URL
 
-const getApiBaseUrl = (subdomain) => {
-  console.log("API Base URL:", getApiBaseUrl(subdomain));
-
-  if (process.env.NODE_ENV === "development") {
-    return `http://${subdomain}.lvh.me:3000/api/v1`;
-  }
-
-  // Use HTTPS in production
-  return `https://itsm-api.onrender.com/api/v1`;
+const getApiBaseUrl = () => {
+  return process.env.REACT_APP_API_BASE_URL || "http://localhost:3000/api/v1";
 };
 
 // const getApiBaseUrl = (subdomain) => {
