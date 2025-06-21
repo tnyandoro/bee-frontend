@@ -131,7 +131,8 @@ const CreateUserForm = ({ onClose }) => {
     }
 
     try {
-      const url = `http://${subdomain}.lvh.me:3000/api/v1/organizations/${subdomain}/users`;
+      // const url = `http://${subdomain}.lvh.me:3000/api/v1/organizations/${subdomain}/users`;
+      const url = `${process.env.REACT_APP_API_BASE_URL}/organizations/${subdomain}/users`;
       const formDataToSend = new FormData();
       formDataToSend.append("user[name]", formData.name);
       formDataToSend.append("user[email]", formData.email);
