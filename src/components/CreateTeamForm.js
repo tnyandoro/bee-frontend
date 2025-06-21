@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useCallback } from "react";
-import createApiInstance from "../utils/api";
+import createApiClient from "../utils/apiClient";
 import { useAuth } from "../contexts/authContext";
 import { useNavigate } from "react-router-dom";
 
 const CreateTeamForm = ({ onClose, onTeamCreated }) => {
-  const { token, subdomain } = useAuth();
+  const { token, subdomain, currentUser } = useAuth();
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
     name: "",
     user_ids: [],
   });
+
   const [users, setUsers] = useState([]);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
@@ -69,10 +70,10 @@ const CreateTeamForm = ({ onClose, onTeamCreated }) => {
   useEffect(() => {
     const fetchUsers = async () => {
       if (!validateAuth()) return;
-      const api = createApiInstance(token);
 
       try {
-        const response = await api.get(`/organizations/${subdomain}/users`);
+        const api = createApiClient(token, subdomain);
+        const response = await api.get("/users");
         const usersData = Array.isArray(response.data.data)
           ? response.data.data
           : [];
@@ -91,7 +92,7 @@ const CreateTeamForm = ({ onClose, onTeamCreated }) => {
     };
 
     withLoading(fetchUsers);
-  }, [token, subdomain, navigate, validateAuth, handleApiError]);
+  }, [token, subdomain, validateAuth, handleApiError]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -112,10 +113,9 @@ const CreateTeamForm = ({ onClose, onTeamCreated }) => {
 
     if (!validateAuth() || !validateForm()) return;
 
-    const api = createApiInstance(token);
-
     try {
-      await api.post(`/organizations/${subdomain}/teams`, {
+      const api = createApiClient(token, subdomain);
+      await api.post("/teams", {
         team: {
           name: formData.name,
           user_ids: formData.user_ids,
@@ -179,7 +179,7 @@ const CreateTeamForm = ({ onClose, onTeamCreated }) => {
           <select
             multiple
             name="user_ids"
-            value={formData.user_ids.map(String)} // Ensure it’s string array
+            value={formData.user_ids.map(String)}
             onChange={handleUserSelect}
             className="w-full px-3 py-2 border border-gray-300 rounded-md h-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
             disabled={users.length === 0}
