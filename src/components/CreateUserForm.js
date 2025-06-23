@@ -207,19 +207,21 @@ const CreateUserForm = ({ onClose }) => {
   };
 
   const roleOptions = [
+    { value: "call_center_agent", label: "Call Center Agent" },
     { value: "service_desk_agent", label: "Service Desk Agent" },
-    { value: "level_1_2_support", label: "Level 1/2 Support" },
-    { value: "team_leader", label: "Team Leader" },
-    { value: "level_3_support", label: "Level 3 Support" },
+    { value: "service_desk_tl", label: "Service Desk Team Leader" },
+    { value: "assignee_lvl_1_2", label: "Level 1/2 Support" },
+    { value: "assignee_lvl_3", label: "Level 3 Support" },
+    { value: "assignment_group_tl", label: "Assignment Group Team Lead" },
+    { value: "service_desk_manager", label: "Service Desk Manager" },
     { value: "incident_manager", label: "Incident Manager" },
     { value: "problem_manager", label: "Problem Manager" },
-    { value: "problem_coordinator", label: "Problem Coordinator" },
     { value: "change_manager", label: "Change Manager" },
-    { value: "change_coordinator", label: "Change Coordinator" },
     { value: "department_manager", label: "Department Manager" },
     { value: "general_manager", label: "General Manager" },
-    { value: "system_admin", label: "System Admin" },
+    { value: "sub_domain_admin", label: "Sub-Domain Admin" },
     { value: "domain_admin", label: "Domain Admin" },
+    { value: "system_admin", label: "System Admin" },
   ];
 
   return (
