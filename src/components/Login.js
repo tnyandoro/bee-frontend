@@ -21,6 +21,7 @@ const Login = ({ loginType = "User" }) => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
 
   const navigate = useNavigate();
 
@@ -238,7 +239,6 @@ const Login = ({ loginType = "User" }) => {
                 <p className="mt-1 text-sm text-red-600">{errors.email}</p>
               )}
             </div>
-
             <div>
               <label
                 htmlFor="password"
@@ -246,21 +246,61 @@ const Login = ({ loginType = "User" }) => {
               >
                 Password
               </label>
-              <input
-                id="password"
-                name="password"
-                value={formData.password}
-                type="password"
-                placeholder="••••••••"
-                onChange={handleChange}
-                className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none ${
-                  errors.password
-                    ? "border-red-500"
-                    : "border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                }`}
-                disabled={isLoading}
-                autoComplete="current-password"
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  name="password"
+                  value={formData.password}
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  onChange={handleChange}
+                  className={`w-full px-3 py-2 border rounded-md shadow-sm pr-10 focus:outline-none ${
+                    errors.password
+                      ? "border-red-500"
+                      : "border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                  }`}
+                  disabled={isLoading}
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-2 px-2 flex items-center text-gray-500 hover:text-gray-700 focus:outline-none"
+                  tabIndex={-1}
+                >
+                  {showPassword ? (
+                    // Eye-off icon
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M17.94 17.94A10.06 10.06 0 0 1 12 20C6.477 20 2 12 2 12a16.9 16.9 0 0 1 5.06-5.94" />
+                      <path d="M1 1l22 22" />
+                    </svg>
+                  ) : (
+                    // Eye icon
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
+                </button>
+              </div>
               {errors.password && (
                 <p className="mt-1 text-sm text-red-600">{errors.password}</p>
               )}
