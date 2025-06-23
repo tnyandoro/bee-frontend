@@ -40,7 +40,11 @@ const CreateUserForm = ({ onClose, onUserCreated }) => {
 
     try {
       const api = createApiInstance(token, subdomain);
-      await api.post("/users", {
+      // await api.post("/users", {
+      //   user: formData,
+      // });
+
+      await api.post(`/organizations/${subdomain}/users`, {
         user: formData,
       });
 
