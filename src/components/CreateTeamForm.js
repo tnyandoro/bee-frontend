@@ -69,7 +69,8 @@ const CreateTeamForm = ({ onClose, onTeamCreated }) => {
   useEffect(() => {
     const fetchUsers = async () => {
       if (!validateAuth()) return;
-      const api = createApiInstance(token);
+      // const api = createApiInstance(token);
+      const api = createApiInstance(token, subdomain);
 
       try {
         const response = await api.get(`/organizations/${subdomain}/users`);
@@ -112,7 +113,8 @@ const CreateTeamForm = ({ onClose, onTeamCreated }) => {
 
     if (!validateAuth() || !validateForm()) return;
 
-    const api = createApiInstance(token);
+    // const api = createApiInstance(token);
+    const api = createApiInstance(token, subdomain);
 
     try {
       await api.post(`/organizations/${subdomain}/teams`, {
