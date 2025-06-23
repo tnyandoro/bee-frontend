@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+iimport React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useAuth } from "../contexts/authContext";
 import { useNavigate } from "react-router-dom";
@@ -6,6 +6,8 @@ import PrivateRoute from "./PrivateRoute";
 
 const CreateUserForm = ({ onClose }) => {
   const { currentUser, token, subdomain } = useAuth();
+  const [roleOptions, setRoleOptions] = useState([]);
+  const [rolesLoading, setRolesLoading] = useState(true);
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: "",
@@ -26,8 +28,53 @@ const CreateUserForm = ({ onClose }) => {
   });
 
   useEffect(() => {
-    console.log("Current auth context:", { subdomain, token, currentUser });
-  }, [subdomain, token, currentUser]);
+    const fetchRoles = async () => {
+      try {
+        const url = `https://itsm-api.onrender.com/api/v1/organizations/${subdomain}/users/roles`;
+        const response = await axios.get(url, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        // Fallback: if API returns array of strings, convert to label/value pair
+        const fetchedRoles = response.data.map((role) =>
+          typeof role === "string"
+            ? { value: role, label: role.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()) }
+            : role
+        );
+
+        setRoleOptions(fetchedRoles);
+      } catch (error) {
+        console.error("Failed to fetch roles:", error);
+
+        // Hardcoded fallback roles
+        setRoleOptions([
+          { value: "call_center_agent", label: "Call Center Agent" },
+          { value: "service_desk_agent", label: "Service Desk Agent" },
+          { value: "service_desk_tl", label: "Service Desk Team Leader" },
+          { value: "assignee_lvl_1_2", label: "Level 1/2 Support" },
+          { value: "assignee_lvl_3", label: "Level 3 Support" },
+          { value: "assignment_group_tl", label: "Assignment Group Team Lead" },
+          { value: "service_desk_manager", label: "Service Desk Manager" },
+          { value: "incident_manager", label: "Incident Manager" },
+          { value: "problem_manager", label: "Problem Manager" },
+          { value: "change_manager", label: "Change Manager" },
+          { value: "department_manager", label: "Department Manager" },
+          { value: "general_manager", label: "General Manager" },
+          { value: "sub_domain_admin", label: "Sub-Domain Admin" },
+          { value: "domain_admin", label: "Domain Admin" },
+          { value: "system_admin", label: "System Admin" },
+        ]);
+      } finally {
+        setRolesLoading(false);
+      }
+    };
+
+    if (subdomain && token) {
+      fetchRoles();
+    }
+  }, [subdomain, token]);
 
   useEffect(() => {
     return () => {
@@ -59,10 +106,7 @@ const CreateUserForm = ({ onClose }) => {
   const validateForm = () => {
     const errors = [];
 
-    if (!formData.name.trim()) {
-      errors.push("Name is required");
-    }
-
+    if (!formData.name.trim()) errors.push("Name is required");
     if (!formData.email.trim()) {
       errors.push("Email is required");
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
@@ -112,36 +156,25 @@ const CreateUserForm = ({ onClose }) => {
       return;
     }
 
-    if (!subdomain) {
+    if (!subdomain || !token) {
       setStatus({
         loading: false,
-        error: "Organization context missing - please refresh the page",
-        success: false,
-      });
-      return;
-    }
-
-    if (!token) {
-      setStatus({
-        loading: false,
-        error: "Authentication token missing - please log in again",
+        error: !subdomain
+          ? "Organization context missing - please refresh the page"
+          : "Authentication token missing - please log in again",
         success: false,
       });
       return;
     }
 
     try {
-      // const url = `http://${subdomain}.lvh.me:3000/api/v1/organizations/${subdomain}/users`;
       const url = `https://itsm-api.onrender.com/api/v1/organizations/${subdomain}/users`;
       const formDataToSend = new FormData();
       formDataToSend.append("user[name]", formData.name);
       formDataToSend.append("user[email]", formData.email);
       formDataToSend.append("user[username]", formData.username);
       formDataToSend.append("user[password]", formData.password);
-      formDataToSend.append(
-        "user[password_confirmation]",
-        formData.password_confirmation
-      );
+      formDataToSend.append("user[password_confirmation]", formData.password_confirmation);
       formDataToSend.append("user[role]", formData.role);
       if (formData.phone_number) {
         formDataToSend.append("user[phone_number]", formData.phone_number);
@@ -154,21 +187,14 @@ const CreateUserForm = ({ onClose }) => {
       }
       formDataToSend.append("organization_subdomain", subdomain);
 
-      console.log("Submitting to:", url);
-      console.log("Request payload:", [...formDataToSend.entries()]);
-
-      const response = await axios.post(url, formDataToSend, {
+      await axios.post(url, formDataToSend, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "multipart/form-data",
         },
       });
 
-      setStatus({
-        loading: false,
-        success: true,
-        error: null,
-      });
+      setStatus({ loading: false, success: true, error: null });
 
       setTimeout(() => {
         setFormData({
@@ -184,45 +210,18 @@ const CreateUserForm = ({ onClose }) => {
         });
         setAvatarPreview(null);
         if (onClose) onClose();
-      }, 2000);
+      }, 1500);
     } catch (error) {
       console.error("User creation error:", error);
       const errorMessage =
-        error.response?.data?.error ||
-        "Error creating user. Please check all fields.";
-      setStatus({
-        loading: false,
-        error: errorMessage,
-        success: false,
-      });
+        error.response?.data?.error || "Error creating user. Please check all fields.";
+      setStatus({ loading: false, error: errorMessage, success: false });
     }
   };
 
   const handleCancel = () => {
-    if (onClose) {
-      onClose();
-    } else {
-      navigate("/dashboard");
-    }
+    onClose ? onClose() : navigate("/dashboard");
   };
-
-  const roleOptions = [
-    { value: "call_center_agent", label: "Call Center Agent" },
-    { value: "service_desk_agent", label: "Service Desk Agent" },
-    { value: "service_desk_tl", label: "Service Desk Team Leader" },
-    { value: "assignee_lvl_1_2", label: "Level 1/2 Support" },
-    { value: "assignee_lvl_3", label: "Level 3 Support" },
-    { value: "assignment_group_tl", label: "Assignment Group Team Lead" },
-    { value: "service_desk_manager", label: "Service Desk Manager" },
-    { value: "incident_manager", label: "Incident Manager" },
-    { value: "problem_manager", label: "Problem Manager" },
-    { value: "change_manager", label: "Change Manager" },
-    { value: "department_manager", label: "Department Manager" },
-    { value: "general_manager", label: "General Manager" },
-    { value: "sub_domain_admin", label: "Sub-Domain Admin" },
-    { value: "domain_admin", label: "Domain Admin" },
-    { value: "system_admin", label: "System Admin" },
-  ];
 
   return (
     <div className="!w-full min-w-full h-screen overflow-y-auto bg-gray-100 pt-20 pb-8 px-4 sm:px-6 md:px-8">
@@ -518,7 +517,7 @@ const CreateUserForm = ({ onClose }) => {
             </button>
           </div>
         </form>
-      </div>
+        </div>
     </div>
   );
 };
