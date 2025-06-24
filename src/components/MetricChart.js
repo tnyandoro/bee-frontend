@@ -89,7 +89,7 @@ const MetricChart = () => {
   // Show intent to use these variables
   useEffect(() => {
     if (currentUser && token) {
-      console.log("User authenticated:", currentUser.name || currentUser.email);
+      // console.log("User authenticated:", currentUser.name || currentUser.email);
       setRolesLoading(true);
 
       // TODO: Implement role fetching logic here
@@ -105,9 +105,9 @@ const MetricChart = () => {
 
           setRoleOptions(mockRoles);
           setRolesLoading(false);
-          console.log("Roles loaded for subdomain:", subdomain, mockRoles);
+          // console.log("Roles loaded for subdomain:", subdomain, mockRoles);
         } catch (error) {
-          console.error("Error fetching roles:", error);
+          // console.error("Error fetching roles:", error);
           setRolesLoading(false);
         }
       };
@@ -119,8 +119,8 @@ const MetricChart = () => {
   // Handle authentication state
   useEffect(() => {
     if (!currentUser && !rolesLoading) {
-      console.log("No user found, redirecting to login");
-      // navigate('/login'); // Uncomment when ready to implement
+      // console.log("No user found, redirecting to login");
+      navigate("/login"); // Uncomment when ready to implement
     }
   }, [currentUser, rolesLoading, navigate]);
 
