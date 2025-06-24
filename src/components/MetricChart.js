@@ -13,7 +13,7 @@ import {
   Legend,
 } from "chart.js";
 import { Pie, Bar } from "react-chartjs-2";
-import useAuth from "../hooks/useAuth";
+import { useAuth } from "../contexts/authContext";
 
 Chart.register(
   ArcElement,
