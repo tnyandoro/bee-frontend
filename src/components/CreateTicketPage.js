@@ -1,14 +1,19 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import TicketForm from "./TicketForm";
 import useAuth from "../hooks/useAuth";
 
-const CreateTicketPage = ({ _email, _role }) => {
+const CreateTicketPage = () => {
   const { token, subdomain } = useAuth();
   const navigate = useNavigate();
 
+  useEffect(() => {
+    if (!token || !subdomain) {
+      navigate("/login");
+    }
+  }, [token, subdomain, navigate]);
+
   if (!token || !subdomain) {
-    navigate("/login");
     return <p className="text-red-500">Redirecting to login...</p>;
   }
 
