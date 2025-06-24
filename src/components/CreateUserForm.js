@@ -1,4 +1,4 @@
-iimport React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useAuth } from "../contexts/authContext";
 import { useNavigate } from "react-router-dom";
@@ -40,7 +40,12 @@ const CreateUserForm = ({ onClose }) => {
         // Fallback: if API returns array of strings, convert to label/value pair
         const fetchedRoles = response.data.map((role) =>
           typeof role === "string"
-            ? { value: role, label: role.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()) }
+            ? {
+                value: role,
+                label: role
+                  .replace(/_/g, " ")
+                  .replace(/\b\w/g, (l) => l.toUpperCase()),
+              }
             : role
         );
 
@@ -174,7 +179,10 @@ const CreateUserForm = ({ onClose }) => {
       formDataToSend.append("user[email]", formData.email);
       formDataToSend.append("user[username]", formData.username);
       formDataToSend.append("user[password]", formData.password);
-      formDataToSend.append("user[password_confirmation]", formData.password_confirmation);
+      formDataToSend.append(
+        "user[password_confirmation]",
+        formData.password_confirmation
+      );
       formDataToSend.append("user[role]", formData.role);
       if (formData.phone_number) {
         formDataToSend.append("user[phone_number]", formData.phone_number);
@@ -214,7 +222,8 @@ const CreateUserForm = ({ onClose }) => {
     } catch (error) {
       console.error("User creation error:", error);
       const errorMessage =
-        error.response?.data?.error || "Error creating user. Please check all fields.";
+        error.response?.data?.error ||
+        "Error creating user. Please check all fields.";
       setStatus({ loading: false, error: errorMessage, success: false });
     }
   };
@@ -517,7 +526,7 @@ const CreateUserForm = ({ onClose }) => {
             </button>
           </div>
         </form>
-        </div>
+      </div>
     </div>
   );
 };
