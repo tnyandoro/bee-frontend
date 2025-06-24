@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Chart,
   ArcElement,
@@ -12,6 +13,7 @@ import {
   Legend,
 } from "chart.js";
 import { Pie, Bar } from "react-chartjs-2";
+import useAuth from "../hooks/useAuth";
 
 Chart.register(
   ArcElement,
@@ -79,7 +81,61 @@ const barChartData = {
 };
 
 const MetricChart = () => {
-  console.log("Rendering MetricChart");
+  const { currentUser, token, subdomain } = useAuth();
+  const [roleOptions, setRoleOptions] = useState([]);
+  const [rolesLoading, setRolesLoading] = useState(true);
+  const navigate = useNavigate();
+
+  // Show intent to use these variables
+  useEffect(() => {
+    if (currentUser && token) {
+      console.log("User authenticated:", currentUser.name || currentUser.email);
+      setRolesLoading(true);
+
+      // TODO: Implement role fetching logic here
+      // Simulate fetching roles for the subdomain
+      const fetchRoles = async () => {
+        try {
+          // Mock API call - replace with actual API
+          const mockRoles = [
+            { id: 1, name: "Admin", permissions: ["read", "write", "delete"] },
+            { id: 2, name: "User", permissions: ["read"] },
+            { id: 3, name: "Manager", permissions: ["read", "write"] },
+          ];
+
+          setRoleOptions(mockRoles);
+          setRolesLoading(false);
+          console.log("Roles loaded for subdomain:", subdomain, mockRoles);
+        } catch (error) {
+          console.error("Error fetching roles:", error);
+          setRolesLoading(false);
+        }
+      };
+
+      fetchRoles();
+    }
+  }, [currentUser, token, subdomain]);
+
+  // Handle authentication state
+  useEffect(() => {
+    if (!currentUser && !rolesLoading) {
+      console.log("No user found, redirecting to login");
+      // navigate('/login'); // Uncomment when ready to implement
+    }
+  }, [currentUser, rolesLoading, navigate]);
+
+  // Use roleOptions in component logic
+  useEffect(() => {
+    if (roleOptions.length > 0) {
+      console.log(
+        "Available roles:",
+        roleOptions.map((role) => role.name)
+      );
+      // TODO: Use roles for permission-based UI rendering
+    }
+  }, [roleOptions]);
+
+  console.log("Rendering MetricChart for user:", !!currentUser);
 
   return (
     <div className="mt-8">
