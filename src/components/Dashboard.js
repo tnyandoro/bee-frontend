@@ -1,7 +1,10 @@
+// Dashboard.js
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import MyChartComponent from "./MyChartComponent";
 import { useAuth } from "../contexts/authContext";
+import { useNavigate } from "react-router-dom";
+import { canViewAllTickets, canCreateTicket } from "../utils/rolePermissions";
 
 const getApiBaseUrl = () => {
   return process.env.REACT_APP_API_BASE_URL || "http://localhost:3000/api/v1";
@@ -11,6 +14,7 @@ const Dashboard = () => {
   const { organization, currentUser } = useAuth();
   const subdomain =
     organization?.subdomain || localStorage.getItem("subdomain");
+  const navigate = useNavigate();
 
   const [ticketData, setTicketData] = useState({
     newTickets: 0,
@@ -26,36 +30,7 @@ const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [error, setError] = useState("");
-  const [formError, setFormError] = useState("");
-  const [formSuccess, setFormSuccess] = useState("");
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    priority: "2",
-    team_id: "",
-  });
-  const [teams, setTeams] = useState([]);
-  const [isFormOpen, setIsFormOpen] = useState(false);
   const itemsPerPage = 10;
-
-  const fetchTeams = useCallback(async () => {
-    const token = localStorage.getItem("authToken");
-    if (!token || !subdomain) return;
-
-    try {
-      const url = `${getApiBaseUrl()}/organizations/${subdomain}/teams`;
-      const response = await axios.get(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        timeout: 30000,
-      });
-      setTeams(Array.isArray(response.data.teams) ? response.data.teams : []);
-    } catch (err) {
-      console.error("Failed to fetch teams:", err);
-    }
-  }, [subdomain]);
 
   const fetchTickets = useCallback(async () => {
     const token = localStorage.getItem("authToken");
@@ -80,10 +55,12 @@ const Dashboard = () => {
         : [];
 
       const globalRoles = [
-        "system_admin",
-        "domain_admin",
         "admin",
         "super_user",
+        "system_admin",
+        "domain_admin",
+        "general_manager",
+        "department_manager",
       ];
 
       const visibleTickets = globalRoles.includes(currentUser.role)
@@ -116,57 +93,11 @@ const Dashboard = () => {
   useEffect(() => {
     if (subdomain && currentUser?.id) {
       fetchTickets();
-      fetchTeams();
     } else {
       setError("Missing authentication data.");
     }
-  }, [subdomain, currentUser, fetchTickets, fetchTeams]);
+  }, [subdomain, currentUser, fetchTickets]);
 
-  const handleFormChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    setFormError("");
-    setFormSuccess("");
-  };
-
-  const handleFormSubmit = async (e) => {
-    e.preventDefault();
-    const token = localStorage.getItem("authToken");
-
-    if (!formData.title.trim() || !formData.description.trim()) {
-      setFormError("Title and description are required");
-      return;
-    }
-
-    try {
-      const payload = {
-        ticket: {
-          title: formData.title,
-          description: formData.description,
-          priority: parseInt(formData.priority),
-          team_id: formData.team_id ? parseInt(formData.team_id) : null,
-        },
-      };
-
-      const url = `${getApiBaseUrl()}/organizations/${subdomain}/tickets`;
-      await axios.post(url, payload, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        timeout: 30000,
-      });
-
-      setFormSuccess("Ticket created successfully!");
-      setFormData({ title: "", description: "", priority: "2", team_id: "" });
-      fetchTickets();
-    } catch (err) {
-      console.error("Form submission error:", err);
-      setFormError("Failed to create ticket.");
-    }
-  };
-
-  // 🔍 Filtering logic
   const filteredTickets = tickets.filter((ticket) => {
     const matchesType =
       selectedType === "All" || ticket.status === selectedType;
@@ -219,71 +150,15 @@ const Dashboard = () => {
           <option value="resolved">Resolved</option>
           <option value="closed">Closed</option>
         </select>
-        <button
-          className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-          onClick={() => setIsFormOpen(!isFormOpen)}
-        >
-          {isFormOpen ? "Close" : "Create Ticket"}
-        </button>
-      </div>
-
-      {isFormOpen && (
-        <form
-          onSubmit={handleFormSubmit}
-          className="bg-white p-4 shadow mb-4 rounded"
-        >
-          {formError && <p className="text-red-500 mb-2">{formError}</p>}
-          {formSuccess && <p className="text-green-500 mb-2">{formSuccess}</p>}
-          <div className="mb-2">
-            <input
-              name="title"
-              value={formData.title}
-              onChange={handleFormChange}
-              placeholder="Title"
-              className="w-full p-2 border rounded"
-            />
-          </div>
-          <div className="mb-2">
-            <textarea
-              name="description"
-              value={formData.description}
-              onChange={handleFormChange}
-              placeholder="Description"
-              className="w-full p-2 border rounded"
-            />
-          </div>
-          <div className="mb-2">
-            <select
-              name="priority"
-              value={formData.priority}
-              onChange={handleFormChange}
-              className="w-full p-2 border rounded"
-            >
-              <option value="0">Critical</option>
-              <option value="1">High</option>
-              <option value="2">Normal</option>
-            </select>
-          </div>
-          <div className="mb-2">
-            <select
-              name="team_id"
-              value={formData.team_id}
-              onChange={handleFormChange}
-              className="w-full p-2 border rounded"
-            >
-              <option value="">Select Team</option>
-              {teams.map((team) => (
-                <option key={team.id} value={team.id}>
-                  {team.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <button className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-            Submit
+        {canCreateTicket(currentUser.role) && (
+          <button
+            className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+            onClick={() => navigate("/tickets/create")}
+          >
+            Create Ticket
           </button>
-        </form>
-      )}
+        )}
+      </div>
 
       <MyChartComponent data={filteredTickets} />
 
