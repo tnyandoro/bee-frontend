@@ -64,7 +64,8 @@ const useAuth = () => {
   const fetchProfile = useCallback(
     async (authToken, profileSubdomain) => {
       try {
-        const baseURL = API_BASE.replace("://", `://${profileSubdomain}.`);
+        // const baseURL = API_BASE.replace("://", `://${profileSubdomain}.`);
+        const baseURL = API_BASE;
         const response = await fetch(
           `${baseURL}/organizations/${profileSubdomain}/profile`,
           {

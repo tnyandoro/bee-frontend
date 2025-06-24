@@ -1,9 +1,10 @@
+// Dashboard.js
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import MyChartComponent from "./MyChartComponent";
 import { useAuth } from "../contexts/authContext";
-import { canViewAllTickets, canCreateTicket } from "../utils/rolePermissions";
 import { useNavigate } from "react-router-dom";
+import { canViewAllTickets, canCreateTicket } from "../utils/rolePermissions";
 
 const getApiBaseUrl = () => {
   return process.env.REACT_APP_API_BASE_URL || "http://localhost:3000/api/v1";
@@ -29,7 +30,6 @@ const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [error, setError] = useState("");
-
   const itemsPerPage = 10;
 
   const fetchTickets = useCallback(async () => {
@@ -54,7 +54,16 @@ const Dashboard = () => {
         ? response.data.tickets
         : [];
 
-      const visibleTickets = canViewAllTickets(currentUser.role)
+      const globalRoles = [
+        "admin",
+        "super_user",
+        "system_admin",
+        "domain_admin",
+        "general_manager",
+        "department_manager",
+      ];
+
+      const visibleTickets = globalRoles.includes(currentUser.role)
         ? allTickets
         : allTickets.filter(
             (ticket) =>
@@ -141,11 +150,10 @@ const Dashboard = () => {
           <option value="resolved">Resolved</option>
           <option value="closed">Closed</option>
         </select>
-
-        {canCreateTicket(currentUser?.role) && (
+        {canCreateTicket(currentUser.role) && (
           <button
             className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-            onClick={() => navigate("/create-ticket")}
+            onClick={() => navigate("/tickets/create")}
           >
             Create Ticket
           </button>
