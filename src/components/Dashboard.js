@@ -1,10 +1,8 @@
-// Dashboard.js
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import MyChartComponent from "./MyChartComponent";
 import { useAuth } from "../contexts/authContext";
 import { useNavigate } from "react-router-dom";
-import { canViewAllTickets, canCreateTicket } from "../utils/rolePermissions";
 
 const getApiBaseUrl = () => {
   return process.env.REACT_APP_API_BASE_URL || "http://localhost:3000/api/v1";
@@ -23,10 +21,13 @@ const Dashboard = () => {
     breaching: 0,
     missedSLA: 0,
     resolved: 0,
+    closed: 0,
   });
 
   const [tickets, setTickets] = useState([]);
-  const [selectedType, setSelectedType] = useState("All");
+  const [selectedType, setSelectedType] = useState(
+    localStorage.getItem("ticketFilter") || "All"
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [error, setError] = useState("");
@@ -82,6 +83,7 @@ const Dashboard = () => {
         ).length,
         missedSLA: visibleTickets.filter((t) => t.sla_breached).length,
         resolved: visibleTickets.filter((t) => t.status === "resolved").length,
+        closed: visibleTickets.filter((t) => t.status === "closed").length,
       });
     } catch (err) {
       console.error("Dashboard API Error:", err);
@@ -113,6 +115,12 @@ const Dashboard = () => {
     currentPage * itemsPerPage
   );
 
+  const handleTabClick = (type) => {
+    setSelectedType(type);
+    setCurrentPage(1);
+    localStorage.setItem("ticketFilter", type);
+  };
+
   return (
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-4">Dashboard</h1>
@@ -132,7 +140,27 @@ const Dashboard = () => {
         <StatCard label="Resolved" value={ticketData.resolved} color="green" />
       </div>
 
-      <div className="mb-4 flex gap-4 flex-wrap">
+      <div className="mb-4">
+        <div className="flex flex-wrap gap-2 mb-3">
+          {["All", "open", "resolved", "closed"].map((type) => (
+            <button
+              key={type}
+              onClick={() => handleTabClick(type)}
+              className={`px-4 py-1 rounded border ${
+                selectedType === type
+                  ? "bg-indigo-600 text-white"
+                  : "bg-white text-gray-800"
+              }`}
+            >
+              {type.charAt(0).toUpperCase() + type.slice(1)} (
+              {type === "All"
+                ? tickets.length
+                : tickets.filter((t) => t.status === type).length}
+              )
+            </button>
+          ))}
+        </div>
+
         <input
           type="text"
           placeholder="Search by title..."
@@ -140,24 +168,6 @@ const Dashboard = () => {
           onChange={(e) => setSearchQuery(e.target.value)}
           className="p-2 border rounded w-full sm:w-64"
         />
-        <select
-          value={selectedType}
-          onChange={(e) => setSelectedType(e.target.value)}
-          className="p-2 border rounded w-full sm:w-48"
-        >
-          <option value="All">All</option>
-          <option value="open">Open</option>
-          <option value="resolved">Resolved</option>
-          <option value="closed">Closed</option>
-        </select>
-        {canCreateTicket(currentUser.role) && (
-          <button
-            className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-            onClick={() => navigate("/tickets/create")}
-          >
-            Create Ticket
-          </button>
-        )}
       </div>
 
       <MyChartComponent data={filteredTickets} />
