@@ -35,6 +35,17 @@ const options = {
   },
 };
 
+// Specific options for pie chart to make it smaller
+const pieOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      position: "top",
+    },
+  },
+};
+
 const slaData = {
   labels: ["Met", "In Progress", "Breached", "About to Breach (2hrs)"],
   datasets: [
@@ -74,23 +85,23 @@ const MetricChart = () => {
     <div className="mt-8">
       <h2 className="text-2xl font-semibold mb-4">Service Metrics</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {[
-          {
-            title: "SLA Performance Pie Chart",
-            ChartComponent: Pie,
-            data: slaData,
-          },
-          {
-            title: "SLA Performance Bar Chart",
-            ChartComponent: Bar,
-            data: barChartData,
-          },
-        ].map(({ title, ChartComponent, data }, index) => (
-          <div key={index} className="bg-white rounded-lg shadow p-4">
-            <h3 className="text-lg font-semibold mb-2">{title}</h3>
-            <ChartComponent data={data} options={options} />
+        {/* Pie Chart with fixed height */}
+        <div className="bg-white rounded-lg shadow p-4">
+          <h3 className="text-lg font-semibold mb-2">
+            SLA Performance Pie Chart
+          </h3>
+          <div className="h-64">
+            <Pie data={slaData} options={pieOptions} />
           </div>
-        ))}
+        </div>
+
+        {/* Bar Chart */}
+        <div className="bg-white rounded-lg shadow p-4">
+          <h3 className="text-lg font-semibold mb-2">
+            SLA Performance Bar Chart
+          </h3>
+          <Bar data={barChartData} options={options} />
+        </div>
       </div>
     </div>
   );
