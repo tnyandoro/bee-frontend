@@ -40,7 +40,8 @@ const UserList = ({ organizationSubdomain }) => {
 
   const fetchTeams = useCallback(async () => {
     try {
-      const api = createApiInstance(token);
+      // Fixed: Pass both token and subdomain to createApiInstance
+      const api = createApiInstance(token, effectiveSubdomain);
       const response = await api.get(
         `/organizations/${effectiveSubdomain}/teams`
       );
@@ -63,7 +64,8 @@ const UserList = ({ organizationSubdomain }) => {
     try {
       const [teamsData, usersResponse] = await Promise.all([
         fetchTeams(),
-        createApiInstance(token).get(
+        // Fixed: Pass both token and subdomain to createApiInstance
+        createApiInstance(token, effectiveSubdomain).get(
           `/organizations/${effectiveSubdomain}/users`
         ),
       ]);
@@ -102,7 +104,8 @@ const UserList = ({ organizationSubdomain }) => {
     if (!window.confirm("Are you sure you want to delete this user?")) return;
 
     try {
-      const api = createApiInstance(token);
+      // Fixed: Pass both token and subdomain to createApiInstance
+      const api = createApiInstance(token, effectiveSubdomain);
       await api.delete(`/organizations/${effectiveSubdomain}/users/${userId}`);
       setMessage("User deleted successfully!");
       setIsError(false);
