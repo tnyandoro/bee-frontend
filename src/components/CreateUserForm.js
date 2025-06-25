@@ -150,7 +150,7 @@ const CreateUserForm = ({ onClose }) => {
   return (
     <PrivateRoute allowedRoles={["system_admin", "domain_admin"]}>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 overflow-y-auto p-4">
-        <div className="w-full max-w-3xl sm:rounded-lg bg-white p-6 shadow-xl">
+        <div className="w-full max-w-6xl sm:rounded-lg bg-white p-6 shadow-xl">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
               Create New User
@@ -176,7 +176,7 @@ const CreateUserForm = ({ onClose }) => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               <input
                 name="name"
                 value={formData.name}
