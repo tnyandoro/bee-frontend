@@ -100,6 +100,36 @@ const Dashboard = () => {
     }
   }, [subdomain, currentUser, fetchTickets]);
 
+  const getPriorityLabel = (priority) => {
+    switch (priority) {
+      case 0:
+        return "Critical";
+      case 1:
+        return "High";
+      case 2:
+        return "Medium";
+      case 3:
+        return "Low";
+      default:
+        return "Unknown";
+    }
+  };
+
+  const getPriorityBadgeClass = (priority) => {
+    switch (priority) {
+      case 0:
+        return "bg-red-100 text-red-700";
+      case 1:
+        return "bg-orange-100 text-orange-700";
+      case 2:
+        return "bg-yellow-100 text-yellow-700";
+      case 3:
+        return "bg-green-100 text-green-700";
+      default:
+        return "bg-gray-100 text-gray-700";
+    }
+  };
+
   const filteredTickets = tickets.filter((ticket) => {
     const matchesType =
       selectedType === "All" || ticket.status === selectedType;
@@ -187,7 +217,15 @@ const Dashboard = () => {
               <tr key={ticket.id}>
                 <td className="border px-4 py-2">{ticket.title}</td>
                 <td className="border px-4 py-2">{ticket.status}</td>
-                <td className="border px-4 py-2">{ticket.priority}</td>
+                <td className="border px-4 py-2">
+                  <span
+                    className={`px-2 py-1 rounded text-sm font-medium ${getPriorityBadgeClass(
+                      ticket.priority
+                    )}`}
+                  >
+                    {getPriorityLabel(ticket.priority)}
+                  </span>
+                </td>
                 <td className="border px-4 py-2">
                   {ticket.assignee?.name || "N/A"}
                 </td>
