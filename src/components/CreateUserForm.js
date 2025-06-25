@@ -5,11 +5,10 @@ import { useNavigate } from "react-router-dom";
 import PrivateRoute from "./PrivateRoute";
 
 const CreateUserForm = ({ onClose }) => {
-  const { token, subdomain } = useAuth();
-  const navigate = useNavigate();
+  const { currentUser, token, subdomain } = useAuth();
   const [roleOptions, setRoleOptions] = useState([]);
   const [rolesLoading, setRolesLoading] = useState(true);
-  const [avatarPreview, setAvatarPreview] = useState(null);
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -21,6 +20,7 @@ const CreateUserForm = ({ onClose }) => {
     password_confirmation: "",
     avatar: null,
   });
+  const [avatarPreview, setAvatarPreview] = useState(null);
   const [status, setStatus] = useState({
     loading: false,
     error: null,
@@ -34,21 +34,34 @@ const CreateUserForm = ({ onClose }) => {
         const response = await axios.get(url, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        const roles = response.data.map((role) =>
+        const fetchedRoles = response.data.map((role) =>
           typeof role === "string"
             ? {
                 value: role,
                 label: role
                   .replace(/_/g, " ")
-                  .replace(/\b\w/g, (c) => c.toUpperCase()),
+                  .replace(/\b\w/g, (l) => l.toUpperCase()),
               }
             : role
         );
-        setRoleOptions(roles);
+        setRoleOptions(fetchedRoles);
       } catch (error) {
         setRoleOptions([
+          { value: "call_center_agent", label: "Call Center Agent" },
           { value: "service_desk_agent", label: "Service Desk Agent" },
+          { value: "service_desk_tl", label: "Service Desk Team Leader" },
+          { value: "assignee_lvl_1_2", label: "Level 1/2 Support" },
+          { value: "assignee_lvl_3", label: "Level 3 Support" },
+          { value: "assignment_group_tl", label: "Assignment Group Team Lead" },
+          { value: "service_desk_manager", label: "Service Desk Manager" },
+          { value: "incident_manager", label: "Incident Manager" },
+          { value: "problem_manager", label: "Problem Manager" },
+          { value: "change_manager", label: "Change Manager" },
+          { value: "department_manager", label: "Department Manager" },
+          { value: "general_manager", label: "General Manager" },
+          { value: "sub_domain_admin", label: "Sub-Domain Admin" },
           { value: "domain_admin", label: "Domain Admin" },
+          { value: "system_admin", label: "System Admin" },
         ]);
       } finally {
         setRolesLoading(false);
@@ -57,11 +70,10 @@ const CreateUserForm = ({ onClose }) => {
     if (subdomain && token) fetchRoles();
   }, [subdomain, token]);
 
-  useEffect(() => {
-    return () => {
-      if (avatarPreview) URL.revokeObjectURL(avatarPreview);
-    };
-  }, [avatarPreview]);
+  useEffect(
+    () => () => avatarPreview && URL.revokeObjectURL(avatarPreview),
+    [avatarPreview]
+  );
 
   const handleChange = (e) => {
     const { name, value, files } = e.target;
@@ -74,29 +86,49 @@ const CreateUserForm = ({ onClose }) => {
     }
   };
 
+  const validateForm = () => {
+    const errors = [];
+    if (!formData.name.trim()) errors.push("Name is required");
+    if (!formData.email.trim()) errors.push("Email is required");
+    else if (!/\S+@\S+\.\S+/.test(formData.email)) errors.push("Invalid email");
+    if (!formData.username.trim()) errors.push("Username is required");
+    else if (formData.username.includes("@"))
+      errors.push("Username should not be an email");
+    if (!formData.password || formData.password.length < 8)
+      errors.push("Password must be at least 8 characters");
+    if (formData.password !== formData.password_confirmation)
+      errors.push("Passwords must match");
+    if (formData.avatar) {
+      if (formData.avatar.size > 5 * 1024 * 1024)
+        errors.push("Avatar too large");
+      else if (!["image/jpeg", "image/png"].includes(formData.avatar.type))
+        errors.push("Invalid avatar type");
+    }
+    return errors;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setStatus({ loading: true, error: null, success: false });
-
+    const errors = validateForm();
+    if (errors.length > 0) {
+      setStatus({ loading: false, error: errors.join(", "), success: false });
+      return;
+    }
     try {
       const url = `https://itsm-api.onrender.com/api/v1/organizations/${subdomain}/users`;
-      const body = new FormData();
-      Object.entries(formData).forEach(([k, v]) => {
-        if (v && k !== "avatar") body.append(`user[${k}]`, v);
+      const data = new FormData();
+      Object.entries(formData).forEach(([key, val]) => {
+        if (val) data.append(`user[${key}]`, val);
       });
-      if (formData.avatar) {
-        body.append("user[avatar]", formData.avatar);
-      }
-      body.append("organization_subdomain", subdomain);
-
-      await axios.post(url, body, {
+      data.append("organization_subdomain", subdomain);
+      await axios.post(url, data, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "multipart/form-data",
         },
       });
-
-      setStatus({ loading: false, success: true, error: null });
+      setStatus({ loading: false, error: null, success: true });
       setTimeout(() => {
         setFormData({
           name: "",
@@ -110,184 +142,144 @@ const CreateUserForm = ({ onClose }) => {
           avatar: null,
         });
         setAvatarPreview(null);
-        onClose ? onClose() : navigate("/dashboard");
+        onClose?.();
       }, 1500);
-    } catch (error) {
-      const message =
-        error.response?.data?.error || "Error creating user. Please try again.";
-      setStatus({ loading: false, error: message, success: false });
+    } catch (err) {
+      setStatus({
+        loading: false,
+        error: err.response?.data?.error || "Failed to create user",
+        success: false,
+      });
     }
   };
 
   return (
-    <div className="min-h-screen w-full bg-gray-100 py-12 px-4">
-      <div className="w-full bg-white shadow-lg rounded-lg p-6">
+    <div className="min-h-screen w-full overflow-y-auto bg-gray-100 py-10 px-4 sm:px-6 md:px-8">
+      <div className="w-full max-w-4xl mx-auto bg-white rounded-lg shadow-xl p-6 sm:p-8">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold">Create New User</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-800">
+            Create New User
+          </h2>
           {onClose && (
             <button
               onClick={onClose}
-              className="text-gray-500 hover:text-gray-700 text-xl font-bold"
+              className="text-gray-500 hover:text-gray-700 focus:outline-none p-1"
             >
               ✕
             </button>
           )}
         </div>
-
         {status.error && (
-          <div className="mb-4 bg-red-100 text-red-700 p-3 rounded">
+          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
             {status.error}
           </div>
         )}
         {status.success && (
-          <div className="mb-4 bg-green-100 text-green-700 p-3 rounded">
-            User created successfully!
+          <div className="mb-4 p-3 bg-green-100 text-green-700 rounded">
+            User created!
           </div>
         )}
-
-        <form
-          onSubmit={handleSubmit}
-          className="grid grid-cols-1 lg:grid-cols-2 gap-4"
-        >
-          <div>
-            <label className="block text-sm font-medium">Full Name *</label>
-            <input
-              type="text"
-              name="name"
-              required
-              value={formData.name}
-              onChange={handleChange}
-              className="mt-1 w-full border px-3 py-2 rounded"
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Input fields */}
+          <input
+            type="text"
+            name="name"
+            placeholder="Full Name"
+            value={formData.name}
+            onChange={handleChange}
+            className="w-full border p-2 rounded"
+            required
+          />
+          <input
+            type="email"
+            name="email"
+            placeholder="Email"
+            value={formData.email}
+            onChange={handleChange}
+            className="w-full border p-2 rounded"
+            required
+          />
+          <input
+            type="text"
+            name="username"
+            placeholder="Username"
+            value={formData.username}
+            onChange={handleChange}
+            className="w-full border p-2 rounded"
+            required
+          />
+          <input
+            type="tel"
+            name="phone_number"
+            placeholder="Phone Number"
+            value={formData.phone_number}
+            onChange={handleChange}
+            className="w-full border p-2 rounded"
+          />
+          <input
+            type="text"
+            name="position"
+            placeholder="Position"
+            value={formData.position}
+            onChange={handleChange}
+            className="w-full border p-2 rounded"
+          />
+          <select
+            name="role"
+            value={formData.role}
+            onChange={handleChange}
+            className="w-full border p-2 rounded"
+          >
+            {roleOptions.map((role) => (
+              <option key={role.value} value={role.value}>
+                {role.label}
+              </option>
+            ))}
+          </select>
+          <input
+            type="password"
+            name="password"
+            placeholder="Password"
+            value={formData.password}
+            onChange={handleChange}
+            className="w-full border p-2 rounded"
+            required
+          />
+          <input
+            type="password"
+            name="password_confirmation"
+            placeholder="Confirm Password"
+            value={formData.password_confirmation}
+            onChange={handleChange}
+            className="w-full border p-2 rounded"
+            required
+          />
+          <input
+            type="file"
+            name="avatar"
+            accept="image/jpeg,image/png"
+            onChange={handleChange}
+            className="w-full"
+          />
+          {avatarPreview && (
+            <img
+              src={avatarPreview}
+              alt="avatar preview"
+              className="w-24 h-24 object-cover rounded-full"
             />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium">Email *</label>
-            <input
-              type="email"
-              name="email"
-              required
-              value={formData.email}
-              onChange={handleChange}
-              className="mt-1 w-full border px-3 py-2 rounded"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium">Username *</label>
-            <input
-              type="text"
-              name="username"
-              required
-              value={formData.username}
-              onChange={handleChange}
-              className="mt-1 w-full border px-3 py-2 rounded"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium">Phone Number</label>
-            <input
-              type="tel"
-              name="phone_number"
-              value={formData.phone_number}
-              onChange={handleChange}
-              className="mt-1 w-full border px-3 py-2 rounded"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium">Position</label>
-            <input
-              type="text"
-              name="position"
-              value={formData.position}
-              onChange={handleChange}
-              className="mt-1 w-full border px-3 py-2 rounded"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium">Role *</label>
-            <select
-              name="role"
-              value={formData.role}
-              onChange={handleChange}
-              className="mt-1 w-full border px-3 py-2 rounded"
-            >
-              {roleOptions.map((role) => (
-                <option key={role.value} value={role.value}>
-                  {role.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium">Password *</label>
-            <input
-              type="password"
-              name="password"
-              value={formData.password}
-              required
-              onChange={handleChange}
-              className="mt-1 w-full border px-3 py-2 rounded"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium">
-              Confirm Password *
-            </label>
-            <input
-              type="password"
-              name="password_confirmation"
-              value={formData.password_confirmation}
-              required
-              onChange={handleChange}
-              className="mt-1 w-full border px-3 py-2 rounded"
-            />
-          </div>
-
-          <div className="col-span-1 lg:col-span-2">
-            <label className="block text-sm font-medium">Avatar</label>
-            <input
-              type="file"
-              name="avatar"
-              accept="image/*"
-              onChange={handleChange}
-              className="mt-1"
-            />
-            {avatarPreview && (
-              <div className="mt-2 flex items-center space-x-4">
-                <img
-                  src={avatarPreview}
-                  alt="Preview"
-                  className="w-24 h-24 object-cover rounded-full"
-                />
-                <button
-                  type="button"
-                  onClick={() => setAvatarPreview(null)}
-                  className="text-red-500 text-sm"
-                >
-                  Remove
-                </button>
-              </div>
-            )}
-          </div>
-
-          <div className="col-span-1 lg:col-span-2 flex justify-end space-x-4 pt-4">
+          )}
+          <div className="flex gap-4 mt-4">
             <button
               type="button"
-              onClick={onClose}
-              className="bg-gray-300 text-gray-800 px-4 py-2 rounded"
+              onClick={() => onClose?.()}
+              className="bg-gray-200 px-4 py-2 rounded"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={status.loading}
-              className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
+              className="bg-blue-600 text-white px-4 py-2 rounded"
             >
               {status.loading ? "Creating..." : "Create User"}
             </button>
