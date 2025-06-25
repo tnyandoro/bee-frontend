@@ -7,10 +7,7 @@ const CreateTeamForm = ({ onClose, onTeamCreated }) => {
   const { token, subdomain } = useAuth();
   const navigate = useNavigate();
 
-  const [formData, setFormData] = useState({
-    name: "",
-    user_ids: [],
-  });
+  const [formData, setFormData] = useState({ name: "", user_ids: [] });
   const [users, setUsers] = useState([]);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
@@ -22,13 +19,12 @@ const CreateTeamForm = ({ onClose, onTeamCreated }) => {
         localStorage.removeItem("authToken");
         navigate("/login");
         return "Session expired. Please log in again.";
-      } else if (error.response?.data?.errors) {
-        return error.response.data.errors.join(", ");
-      } else if (error.response?.data?.error) {
-        return error.response.data.error;
-      } else {
-        return error.message;
       }
+      return (
+        error.response?.data?.errors?.join(", ") ||
+        error.response?.data?.error ||
+        error.message
+      );
     },
     [navigate]
   );
@@ -57,53 +53,40 @@ const CreateTeamForm = ({ onClose, onTeamCreated }) => {
     return true;
   };
 
-  const withLoading = async (callback) => {
-    setLoading(true);
-    try {
-      await callback();
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
     const fetchUsers = async () => {
       if (!validateAuth()) return;
-      // const api = createApiInstance(token);
       const api = createApiInstance(token, subdomain);
 
       try {
         const response = await api.get(`/organizations/${subdomain}/users`);
-        const usersData = Array.isArray(response.data.data)
+        const usersData = Array.isArray(response.data?.data)
           ? response.data.data
           : [];
-
-        if (usersData.length === 0) {
-          setMessage("No users found for this organization.");
-          setUsers([]);
-        } else {
-          setUsers(usersData);
-          setMessage("");
-        }
+        setUsers(usersData);
+        setMessage(
+          usersData.length ? "" : "No users found for this organization."
+        );
       } catch (error) {
         setMessage(handleApiError(error));
         setIsError(true);
+      } finally {
+        setLoading(false);
       }
     };
 
-    withLoading(fetchUsers);
-  }, [token, subdomain, navigate, validateAuth, handleApiError]);
+    fetchUsers();
+  }, [token, subdomain, validateAuth, handleApiError]);
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   const handleUserSelect = (e) => {
-    const selectedOptions = Array.from(e.target.selectedOptions, (option) =>
-      parseInt(option.value, 10)
+    const selected = Array.from(e.target.selectedOptions, (opt) =>
+      parseInt(opt.value, 10)
     );
-    setFormData((prev) => ({ ...prev, user_ids: selectedOptions }));
+    setFormData((prev) => ({ ...prev, user_ids: selected }));
   };
 
   const handleSubmit = async (e) => {
@@ -113,7 +96,6 @@ const CreateTeamForm = ({ onClose, onTeamCreated }) => {
 
     if (!validateAuth() || !validateForm()) return;
 
-    // const api = createApiInstance(token);
     const api = createApiInstance(token, subdomain);
 
     try {
@@ -124,9 +106,8 @@ const CreateTeamForm = ({ onClose, onTeamCreated }) => {
         },
       });
 
-      setMessage("Team created successfully!");
+      setMessage("✅ Team created successfully!");
       setFormData({ name: "", user_ids: [] });
-      setIsError(false);
       onTeamCreated?.();
       onClose?.();
     } catch (error) {
@@ -181,7 +162,7 @@ const CreateTeamForm = ({ onClose, onTeamCreated }) => {
           <select
             multiple
             name="user_ids"
-            value={formData.user_ids.map(String)} // Ensure it’s string array
+            value={formData.user_ids.map(String)}
             onChange={handleUserSelect}
             className="w-full px-3 py-2 border border-gray-300 rounded-md h-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
             disabled={users.length === 0}
