@@ -233,7 +233,7 @@ const CreateUserForm = ({ onClose }) => {
   };
 
   return (
-    <div className="!w-full min-w-full h-screen overflow-y-auto bg-gray-100 pt-20 pb-8 px-4 sm:px-6 md:px-8">
+    <div className="container h-screen overflow-y-auto bg-gray-100 pt-20 pb-8 px-4 sm:px-6 md:px-8">
       <div className="!w-full min-w-full max-w-full bg-white rounded-lg shadow-xl p-6 sm:p-8">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl sm:text-3xl font-bold text-gray-800">
