@@ -16,6 +16,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
   const [isCreateTeamFormOpen, setIsCreateTeamFormOpen] = useState(false);
   const [showTeams, setShowTeams] = useState(false);
   const [showUsers, setShowUsers] = useState(false);
+  const [editingTeam, setEditingTeam] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [users, setUsers] = useState([]);
@@ -159,6 +160,11 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     }
   };
 
+  const handleEditTeam = (team) => {
+    setEditingTeam(team);
+    setIsCreateTeamFormOpen(true);
+  };
+
   return (
     <div className="mt-20 p-8 relative">
       <h1 className="text-3xl font-semibold mb-6">Admin Dashboard</h1>
@@ -230,6 +236,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
                     <tbody className="bg-white divide-y divide-gray-200">
                       <TeamList
                         organizationSubdomain={getEffectiveSubdomain()}
+                        onEditTeam={handleEditTeam}
                       />
                     </tbody>
                   </table>
@@ -244,7 +251,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
                 ) : (
                   <div className="overflow-auto">
                     <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-blue-200">
+                      <thead className="bg-blue-100">
                         <tr>
                           <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
                             Name
@@ -315,6 +322,8 @@ const AdminDashboard = ({ organizationSubdomain }) => {
               onClose={handleCloseTeamForm}
               organizationSubdomain={getEffectiveSubdomain()}
               token={token}
+              editingTeam={editingTeam}
+              setEditingTeam={setEditingTeam}
             />
           </div>
         </div>
