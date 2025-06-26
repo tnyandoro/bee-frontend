@@ -158,6 +158,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     if (showUsers) {
       fetchTeams().then(fetchUsers);
     }
+    setEditingTeam(null);
   };
 
   const handleEditTeam = (team) => {
