@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { X } from "lucide-react";
 import MetricChart from "./MetricChart";
 import CreateUserForm from "./CreateUserForm";
 import CreateTeamForm from "./CreateTeamForm";
@@ -203,10 +204,10 @@ const AdminDashboard = ({ organizationSubdomain }) => {
                 setShowTeams(false);
                 setShowUsers(false);
               }}
-              className="absolute top-3 right-3 text-gray-600 hover:text-gray-800 text-xl"
+              className="absolute top-3 right-3 text-gray-600 hover:text-gray-800"
               aria-label="Close popup"
             >
-              &times;
+              <X className="w-6 h-6" />
             </button>
             {showTeams && (
               <div>
@@ -234,7 +235,14 @@ const AdminDashboard = ({ organizationSubdomain }) => {
 
       {isCreateUserFormOpen && (
         <div className="fixed inset-0 flex justify-center items-center bg-black bg-opacity-50 z-50">
-          <div className="bg-white rounded-lg p-8 w-1/3">
+          <div className="bg-white rounded-lg p-8 w-1/3 relative">
+            <button
+              onClick={handleCloseUserForm}
+              className="absolute top-3 right-3 text-gray-600 hover:text-gray-800"
+              aria-label="Close user form"
+            >
+              <X className="w-6 h-6" />
+            </button>
             <CreateUserForm
               orgSubdomain={getEffectiveSubdomain()}
               token={token}
@@ -246,7 +254,14 @@ const AdminDashboard = ({ organizationSubdomain }) => {
 
       {isCreateTeamFormOpen && (
         <div className="fixed inset-0 flex justify-center items-center bg-black bg-opacity-50 z-50">
-          <div className="bg-white rounded-lg p-8 w-1/3">
+          <div className="bg-white rounded-lg p-8 w-1/3 relative">
+            <button
+              onClick={handleCloseTeamForm}
+              className="absolute top-3 right-3 text-gray-600 hover:text-gray-800"
+              aria-label="Close team form"
+            >
+              <X className="w-6 h-6" />
+            </button>
             <CreateTeamForm
               onClose={handleCloseTeamForm}
               organizationSubdomain={getEffectiveSubdomain()}
