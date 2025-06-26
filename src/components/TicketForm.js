@@ -22,6 +22,10 @@ const TicketForm = ({ organization, token }) => {
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [teamsLoading, setTeamsLoading] = useState(false);
+  const [teamUsersLoading, setTeamUsersLoading] = useState(false);
+
   const generateTicketNumber = (ticketType) => {
     const prefix =
       {
@@ -72,7 +76,7 @@ const TicketForm = ({ organization, token }) => {
       return;
     }
 
-    setLoading(true);
+    setProfileLoading(true);
     try {
       const response = await axios.get(
         `${baseUrl}/organizations/${organization.subdomain}/profile`,
@@ -109,16 +113,13 @@ const TicketForm = ({ organization, token }) => {
         }`
       );
     } finally {
-      setLoading(false);
+      setProfileLoading(false);
     }
   }, [token, baseUrl, organization?.subdomain]);
 
   const fetchTeams = useCallback(async () => {
-    console.log("Fetching users for team:", formData.team_id);
-    console.log("Token:", token);
-
     if (!token || !organization?.subdomain) return;
-    setLoading(true);
+    setTeamsLoading(true);
     try {
       const response = await axios.get(
         `${baseUrl}/organizations/${organization.subdomain}/teams`,
@@ -126,20 +127,20 @@ const TicketForm = ({ organization, token }) => {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-      setTeams(response.data.teams || []);
+      setTeams(response.data || []);
     } catch (err) {
       setError(
         `Failed to fetch teams: ${err.response?.data?.error || err.message}`
       );
     } finally {
-      setLoading(false);
+      setTeamsLoading(false);
     }
   }, [token, baseUrl, organization?.subdomain]);
 
   const fetchTeamUsers = useCallback(async () => {
     if (!token || !organization?.subdomain || !formData.team_id) return;
 
-    setLoading(true);
+    setTeamUsersLoading(true);
     try {
       const response = await axios.get(
         `${baseUrl}/organizations/${organization.subdomain}/teams/${formData.team_id}/users`,
@@ -147,7 +148,7 @@ const TicketForm = ({ organization, token }) => {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-      setTeamUsers(response.data.users || []);
+      setTeamUsers(response.data || []);
     } catch (err) {
       setError(
         `Failed to fetch team users: ${
@@ -155,7 +156,7 @@ const TicketForm = ({ organization, token }) => {
         }`
       );
     } finally {
-      setLoading(false);
+      setTeamUsersLoading(false);
     }
   }, [token, baseUrl, organization?.subdomain, formData.team_id]);
 
@@ -174,7 +175,6 @@ const TicketForm = ({ organization, token }) => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    console.log("Changing:", name, value);
 
     const updated = {
       ...formData,
@@ -339,9 +339,8 @@ const TicketForm = ({ organization, token }) => {
           teams={teams}
           teamUsers={teamUsers}
           handleChange={handleChange}
-          loading={loading}
-          isTeamSelectable={teams.length > 0}
-          isAssigneeSelectable={!!formData.team_id && teamUsers.length > 0}
+          loadingTeams={teamsLoading}
+          loadingUsers={teamUsersLoading}
         />
 
         <CallerDetailsSection
