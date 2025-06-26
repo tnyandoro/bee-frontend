@@ -40,6 +40,11 @@ const DescriptionSection = ({
         className="w-full border px-3 py-2 rounded-md"
         disabled={loading}
       />
+      {attachment && (
+        <div className="mt-2 text-sm text-gray-600">
+          Selected: {attachment.name}
+        </div>
+      )}
     </div>
   </>
 );
