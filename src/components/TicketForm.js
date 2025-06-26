@@ -114,6 +114,9 @@ const TicketForm = ({ organization, token }) => {
   }, [token, baseUrl, organization?.subdomain]);
 
   const fetchTeams = useCallback(async () => {
+    console.log("Fetching users for team:", formData.team_id);
+    console.log("Token:", token);
+
     if (!token || !organization?.subdomain) return;
     setLoading(true);
     try {
@@ -171,9 +174,11 @@ const TicketForm = ({ organization, token }) => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    console.log("Changing:", name, value);
+
     const updated = {
       ...formData,
-      [name]: value,
+      [name]: name.includes("_id") ? String(value) : value,
       ...(name === "team_id" ? { assignee_id: "" } : {}),
       ...(name === "ticket_type"
         ? { ticketNumber: generateTicketNumber(value) }
@@ -181,6 +186,7 @@ const TicketForm = ({ organization, token }) => {
     };
 
     setFormData(updated);
+
     if (["urgency", "impact"].includes(name)) {
       calculatePriority(updated);
     }
