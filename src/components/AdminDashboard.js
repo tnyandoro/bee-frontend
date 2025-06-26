@@ -197,7 +197,17 @@ const AdminDashboard = ({ organizationSubdomain }) => {
 
       {(showTeams || showUsers) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 overflow-y-auto p-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-6xl shadow-xl">
+          <div className="bg-white rounded-lg p-6 w-full max-w-6xl shadow-xl relative">
+            <button
+              onClick={() => {
+                setShowTeams(false);
+                setShowUsers(false);
+              }}
+              className="absolute top-3 right-3 text-gray-600 hover:text-gray-800 text-xl"
+              aria-label="Close popup"
+            >
+              &times;
+            </button>
             {showTeams && (
               <div>
                 <h2 className="text-2xl font-semibold mb-4">Teams</h2>
