@@ -4,12 +4,12 @@ import { useNavigate } from "react-router-dom";
 import apiBaseUrl from "../config";
 
 // Subcomponents
-import TicketMetaSection from "../components/tickets/TicketMetaSection";
-import TicketDetailsSection from "../components/tickets/TicketDetailsSection";
-import TeamAssignmentSection from "../components/tickets/TeamAssignmentSection";
-import CallerDetailsSection from "../components/tickets/CallerDetailsSection";
-import DescriptionSection from "../components/tickets/DescriptionSection";
-import FormActions from "../components/tickets/FormActions";
+import TicketMetaSection from "../components/TicketMetaSection";
+import TicketDetailsSection from "../components/TickectDetailsSection";
+import TeamAssignmentSection from "../components/TeamAssignmentSection";
+import CallerDetailsSection from "../components/CallerDetailsSection";
+import DescriptionSection from "../components/DescriptionSection";
+import FormActions from "../components/FormActions";
 import toast from "react-hot-toast";
 
 const TicketForm = ({ organization, token }) => {
