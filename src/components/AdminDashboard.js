@@ -244,7 +244,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
                 ) : (
                   <div className="overflow-auto">
                     <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-blue-100">
+                      <thead className="bg-blue-200">
                         <tr>
                           <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
                             Name
