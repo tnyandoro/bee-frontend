@@ -11,6 +11,10 @@ const TeamAssignmentSection = ({
   const isAssigneeSelectable =
     !loading && formData.team_id && teamUsers.length > 0;
 
+  console.log("Teams:", teams);
+  console.log("Loading:", loading);
+  console.log("formData.team_id:", formData.team_id);
+
   return (
     <div className="mt-4 grid grid-cols-2 gap-4">
       <div>
