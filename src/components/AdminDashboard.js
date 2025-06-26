@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import MetricChart from "./MetricChart";
 import CreateUserForm from "./CreateUserForm";
 import CreateTeamForm from "./CreateTeamForm";
-import TeamList from "./TeamList"; // Import the TeamList component
+import TeamList from "./TeamList";
 import UserList from "./UserList";
 import createApiInstance from "../utils/api";
 import { useAuth } from "../contexts/authContext";
@@ -109,7 +109,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
       const api = createApiInstance(token, activeSubdomain);
       const response = await api.get(`/organizations/${activeSubdomain}/users`);
 
-      // Enhance users with team names
       const usersWithTeamNames = (response.data.data || []).map((user) => {
         const userTeam = teams.find((team) => team.id === user.team_id);
         return {
@@ -141,7 +140,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     const newState = !showUsers;
     setShowUsers(newState);
     if (newState) {
-      await fetchTeams(); // First fetch teams to ensure we have team names
+      await fetchTeams();
       await fetchUsers();
     }
   };
@@ -155,13 +154,12 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     setIsCreateTeamFormOpen(false);
     if (showTeams) fetchTeams();
     if (showUsers) {
-      // Refresh users too since team changes might affect user displays
       fetchTeams().then(fetchUsers);
     }
   };
 
   return (
-    <div className="mt-20 p-8">
+    <div className="mt-20 p-8 relative">
       <h1 className="text-3xl font-semibold mb-6">Admin Dashboard</h1>
 
       {error && (
@@ -197,30 +195,35 @@ const AdminDashboard = ({ organizationSubdomain }) => {
 
       <MetricChart />
 
-      {showTeams && (
-        <div className="mt-6 bg-white rounded-lg shadow p-6">
-          <h2 className="text-2xl font-semibold mb-4">Teams</h2>
-          <TeamList organizationSubdomain={getEffectiveSubdomain()} />
-        </div>
-      )}
-
-      {showUsers && (
-        <div className="mt-6 bg-white rounded-lg shadow p-6">
-          <h2 className="text-2xl font-semibold mb-4">Users</h2>
-          {loading ? (
-            <p>Loading users...</p>
-          ) : (
-            <UserList
-              users={users}
-              organizationSubdomain={getEffectiveSubdomain()}
-              token={token}
-            />
-          )}
+      {(showTeams || showUsers) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 overflow-y-auto p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-6xl shadow-xl">
+            {showTeams && (
+              <div>
+                <h2 className="text-2xl font-semibold mb-4">Teams</h2>
+                <TeamList organizationSubdomain={getEffectiveSubdomain()} />
+              </div>
+            )}
+            {showUsers && (
+              <div>
+                <h2 className="text-2xl font-semibold mb-4">Users</h2>
+                {loading ? (
+                  <p>Loading users...</p>
+                ) : (
+                  <UserList
+                    users={users}
+                    organizationSubdomain={getEffectiveSubdomain()}
+                    token={token}
+                  />
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
       {isCreateUserFormOpen && (
-        <div className="fixed inset-0 flex justify-center items-center bg-black bg-opacity-50">
+        <div className="fixed inset-0 flex justify-center items-center bg-black bg-opacity-50 z-50">
           <div className="bg-white rounded-lg p-8 w-1/3">
             <CreateUserForm
               orgSubdomain={getEffectiveSubdomain()}
@@ -232,7 +235,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
       )}
 
       {isCreateTeamFormOpen && (
-        <div className="fixed inset-0 flex justify-center items-center bg-black bg-opacity-50">
+        <div className="fixed inset-0 flex justify-center items-center bg-black bg-opacity-50 z-50">
           <div className="bg-white rounded-lg p-8 w-1/3">
             <CreateTeamForm
               onClose={handleCloseTeamForm}
