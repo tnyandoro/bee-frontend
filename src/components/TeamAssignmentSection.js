@@ -7,25 +7,21 @@ const TeamAssignmentSection = ({
   handleChange,
   loading,
 }) => {
-  const isTeamSelectable = !loading && teams.length > 0;
-  const isAssigneeSelectable =
-    !loading && formData.team_id && teamUsers.length > 0;
-
-  console.log("Teams:", teams);
-  console.log("Loading:", loading);
-  console.log("formData.team_id:", formData.team_id);
+  const isTeamSelectable = teams.length > 0;
+  const isAssigneeSelectable = formData.team_id && teamUsers.length > 0;
 
   return (
     <div className="mt-4 grid grid-cols-2 gap-4">
+      {/* Team Select */}
       <div>
         <label className="block text-sm font-medium">Team *</label>
         <select
           name="team_id"
           value={String(formData.team_id || "")}
           onChange={handleChange}
-          className="w-full border px-3 py-2 rounded-md"
+          className="w-full border px-3 py-2 rounded-md bg-white"
           required
-          disabled={!isTeamSelectable}
+          disabled={!isTeamSelectable || loading}
         >
           <option value="">Select a Team</option>
           {teams.map((team) => (
@@ -34,19 +30,20 @@ const TeamAssignmentSection = ({
             </option>
           ))}
         </select>
-        {!isTeamSelectable && (
+        {!isTeamSelectable && !loading && (
           <p className="text-sm text-red-500 mt-1">No teams available.</p>
         )}
       </div>
 
+      {/* Assignee Select */}
       <div>
         <label className="block text-sm font-medium">Assignee</label>
         <select
           name="assignee_id"
           value={String(formData.assignee_id || "")}
           onChange={handleChange}
-          className="w-full border px-3 py-2 rounded-md"
-          disabled={!isAssigneeSelectable}
+          className="w-full border px-3 py-2 rounded-md bg-white"
+          disabled={!isAssigneeSelectable || loading}
         >
           <option value="">Select an Assignee</option>
           {teamUsers.map((user) => (
@@ -55,7 +52,7 @@ const TeamAssignmentSection = ({
             </option>
           ))}
         </select>
-        {!isAssigneeSelectable && formData.team_id && (
+        {!isAssigneeSelectable && formData.team_id && !loading && (
           <p className="text-sm text-yellow-500 mt-1">
             No assignees available for the selected team.
           </p>

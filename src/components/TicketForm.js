@@ -340,6 +340,8 @@ const TicketForm = ({ organization, token }) => {
           teamUsers={teamUsers}
           handleChange={handleChange}
           loading={loading}
+          isTeamSelectable={teams.length > 0}
+          isAssigneeSelectable={!!formData.team_id && teamUsers.length > 0}
         />
 
         <CallerDetailsSection
