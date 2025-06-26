@@ -212,7 +212,28 @@ const AdminDashboard = ({ organizationSubdomain }) => {
             {showTeams && (
               <div>
                 <h2 className="text-2xl font-semibold mb-4">Teams</h2>
-                <TeamList organizationSubdomain={getEffectiveSubdomain()} />
+                <div className="overflow-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-blue-100">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
+                          Team Name
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
+                          Description
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      <TeamList
+                        organizationSubdomain={getEffectiveSubdomain()}
+                      />
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
             {showUsers && (
@@ -221,11 +242,39 @@ const AdminDashboard = ({ organizationSubdomain }) => {
                 {loading ? (
                   <p>Loading users...</p>
                 ) : (
-                  <UserList
-                    users={users}
-                    organizationSubdomain={getEffectiveSubdomain()}
-                    token={token}
-                  />
+                  <div className="overflow-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-blue-100">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
+                            Name
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
+                            Email
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
+                            Username
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
+                            Team
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
+                            Role
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        <UserList
+                          users={users}
+                          organizationSubdomain={getEffectiveSubdomain()}
+                          token={token}
+                        />
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             )}
