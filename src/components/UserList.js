@@ -154,7 +154,7 @@ const UserList = ({ organizationSubdomain }) => {
             </tr>
           </thead>
           <thead className="bg-blue-100">
-            <tr className="bg-gray-100 text-left text-sm font-medium text-gray-700">
+            <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
                 Name
               </th>
@@ -175,7 +175,7 @@ const UserList = ({ organizationSubdomain }) => {
           <tbody>
             {users.length > 0 ? (
               users.map((user) => (
-                <tr key={user.id} className="hover:bg-gray-50 text-sm">
+                <tr key={user.id} className="hover:bg-blue-100 text-sm">
                   <td className="py-2 px-4 border">{user.name}</td>
                   <td className="py-2 px-4 border">{user.email}</td>
                   <td className="py-2 px-4 border capitalize">{user.role}</td>
