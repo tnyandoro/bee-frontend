@@ -144,7 +144,7 @@ const UserList = ({ organizationSubdomain }) => {
                   <td className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider border">
                     {user.name}
                   </td>
-                  <td className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider ">
+                  <td className="px-6 py-3 text-left text-xs font-medium text-blue-800 tracking-wider ">
                     {user.email}
                   </td>
                   <td className="py-2 px-4 border capitalize">{user.role}</td>
