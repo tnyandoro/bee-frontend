@@ -138,22 +138,6 @@ const UserList = ({ organizationSubdomain }) => {
       <div className="overflow-x-auto">
         <table className="min-w-full bg-white border border-gray-200">
           <thead className="bg-blue-100">
-            <tr className="bg-gray-100">
-              <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
-                Name
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
-                Members
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
-                Created
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <thead className="bg-blue-100">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
                 Name
@@ -176,8 +160,12 @@ const UserList = ({ organizationSubdomain }) => {
             {users.length > 0 ? (
               users.map((user) => (
                 <tr key={user.id} className="hover:bg-blue-100 text-sm">
-                  <td className="py-2 px-4 border">{user.name}</td>
-                  <td className="py-2 px-4 border">{user.email}</td>
+                  <td className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider border">
+                    {user.name}
+                  </td>
+                  <td className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider ">
+                    {user.email}
+                  </td>
                   <td className="py-2 px-4 border capitalize">{user.role}</td>
                   <td className="py-2 px-4 border">
                     {user.team_name || "No team"}
