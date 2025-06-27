@@ -137,13 +137,39 @@ const UserList = ({ organizationSubdomain }) => {
 
       <div className="overflow-x-auto">
         <table className="min-w-full bg-white border border-gray-200">
-          <thead>
+          <thead className="bg-blue-100">
+            <tr className="bg-gray-100">
+              <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
+                Name
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
+                Members
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
+                Created
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <thead className="bg-blue-100">
             <tr className="bg-gray-100 text-left text-sm font-medium text-gray-700">
-              <th className="py-2 px-4 border">Name</th>
-              <th className="py-2 px-4 border">Email</th>
-              <th className="py-2 px-4 border">Role</th>
-              <th className="py-2 px-4 border">Team</th>
-              <th className="py-2 px-4 border">Actions</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
+                Name
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
+                Email
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-widerr">
+                Role
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
+                Team
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody>
