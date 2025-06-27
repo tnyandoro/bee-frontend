@@ -149,15 +149,6 @@ const TeamList = ({ organizationSubdomain }) => {
 
       <div className="overflow-x-auto">
         <table className="min-w-full bg-white border">
-          <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
-              Description
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
-              Actions
-            </th>
-          </tr>
-
           <thead className="bg-blue-100">
             <tr className="bg-gray-100">
               <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
