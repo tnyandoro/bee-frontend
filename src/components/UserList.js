@@ -116,7 +116,7 @@ const UserList = ({ organizationSubdomain }) => {
   if (loading) {
     return (
       <div className="flex justify-center items-center p-8">
-        <p className="text-blue-700 animate-pulse">Loading users...</p>
+        <p className="text-blue-700 animate-ring">Loading users...</p>
       </div>
     );
   }
