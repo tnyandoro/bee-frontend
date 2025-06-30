@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import ResolveTicket from "./ResolveTicket";
 import apiBaseUrl from "../config";
+import * as XLSX from "xlsx";
 
 const IncidentOverview = () => {
   const [tickets, setTickets] = useState([]);
@@ -93,6 +94,37 @@ const IncidentOverview = () => {
     await fetchTickets();
   };
 
+  const downloadExport = (format = "csv") => {
+    const filters = new URLSearchParams({
+      status: "open",
+      from: "2024-01-01",
+      to: "2025-01-01",
+    });
+
+    const downloadUrl = `${apiBaseUrl}/organizations/${subdomain}/tickets/export.${format}?${filters}`;
+
+    window.open(downloadUrl, "_blank");
+  };
+
+  const exportToExcel = () => {
+    const exportData = tickets.map((ticket) => ({
+      "Ticket Number": ticket.ticket_number,
+      Title: ticket.title,
+      Status: ticket.status,
+      "Created At": ticket.created_at,
+      "Updated At": ticket.updated_at,
+      Priority: ticket.priority,
+      Assignee: ticket.assignee?.name || "Unassigned",
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Tickets");
+
+    // Download as Excel (.xlsx)
+    XLSX.writeFile(workbook, `tickets-${new Date().toISOString()}.xlsx`);
+  };
+
   const handleResolveCancel = () => {
     setSelectedTicket(null);
   };
@@ -121,8 +153,17 @@ const IncidentOverview = () => {
           placeholder="Search by ticket number or title..."
           onChange={() => {}}
         />
-        <button className="ml-4 px-4 py-2 rounded-md bg-blue-500 text-white hover:bg-blue-600">
+        <button
+          onClick={exportToExcel}
+          className="ml-4 px-4 py-2 rounded-md bg-blue-500 text-white hover:bg-blue-600"
+        >
           Export
+        </button>
+        <button
+          onClick={() => downloadExport("csv")}
+          className="ml-4 px-4 py-2 rounded-md bg-green-600 text-white hover:bg-green-700"
+        >
+          Download CSV
         </button>
       </div>
 
