@@ -9,6 +9,10 @@ const IncidentOverview = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedTicket, setSelectedTicket] = useState(null);
+  const [statusFilter, setStatusFilter] = useState("");
+  const [teamFilter, setTeamFilter] = useState("");
+  const [assigneeFilter, setAssigneeFilter] = useState("");
+  const [priorityFilter, setPriorityFilter] = useState("");
   const [subdomain, setSubdomain] = useState(
     localStorage.getItem("subdomain") || ""
   );
@@ -94,26 +98,67 @@ const IncidentOverview = () => {
     await fetchTickets();
   };
 
-  const downloadExport = (format = "csv") => {
-    const filters = new URLSearchParams({
-      status: "open",
-      from: "2024-01-01",
-      to: "2025-01-01",
-    });
+  const handleResolveCancel = () => {
+    setSelectedTicket(null);
+  };
 
-    const downloadUrl = `${apiBaseUrl}/organizations/${subdomain}/tickets/export.${format}?${filters}`;
+  const downloadExport = async (format = "csv") => {
+    const filters = new URLSearchParams();
+    if (statusFilter) filters.append("status", statusFilter);
+    if (teamFilter) filters.append("team", teamFilter);
+    if (assigneeFilter) filters.append("assignee", assigneeFilter);
+    if (priorityFilter) filters.append("priority", priorityFilter);
 
-    window.open(downloadUrl, "_blank");
+    const url = `${apiBaseUrl}/organizations/${subdomain}/tickets/export.${format}?${filters}`;
+
+    try {
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+
+      if (!response.ok) throw new Error("Export failed");
+
+      const blob = await response.blob();
+      const filename = `tickets-${new Date().toISOString()}.${format}`;
+      const downloadUrl = URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = downloadUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      console.error("Export error:", error);
+      alert("Export failed. Try again.");
+    }
   };
 
   const exportToExcel = () => {
-    const exportData = tickets.map((ticket) => ({
+    const filteredData = tickets
+      .filter((t) => (statusFilter ? t.status === statusFilter : true))
+      .filter((t) =>
+        assigneeFilter
+          ? t.assignee?.name
+              ?.toLowerCase()
+              .includes(assigneeFilter.toLowerCase())
+          : true
+      )
+      .filter((t) =>
+        teamFilter
+          ? t.team?.name?.toLowerCase().includes(teamFilter.toLowerCase())
+          : true
+      )
+      .filter((t) => (priorityFilter ? t.priority === priorityFilter : true));
+
+    const exportData = filteredData.map((ticket) => ({
       "Ticket Number": ticket.ticket_number,
       Title: ticket.title,
       Status: ticket.status,
+      Priority: ticket.priority,
       "Created At": ticket.created_at,
       "Updated At": ticket.updated_at,
-      Priority: ticket.priority,
       Assignee: ticket.assignee?.name || "Unassigned",
     }));
 
@@ -121,12 +166,7 @@ const IncidentOverview = () => {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Tickets");
 
-    // Download as Excel (.xlsx)
     XLSX.writeFile(workbook, `tickets-${new Date().toISOString()}.xlsx`);
-  };
-
-  const handleResolveCancel = () => {
-    setSelectedTicket(null);
   };
 
   if (!subdomain || !authToken) {
@@ -146,25 +186,61 @@ const IncidentOverview = () => {
         <h2 className="text-4xl mb-2 text-white">Incident Overview</h2>
       </div>
 
-      <div className="flex justify-between mb-4">
+      <div className="flex flex-col md:flex-row flex-wrap gap-4 mb-6">
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="w-full md:w-1/5 px-4 py-2 border rounded-md shadow-sm"
+        >
+          <option value="">All Statuses</option>
+          <option value="open">Open</option>
+          <option value="pending">Pending</option>
+          <option value="resolved">Resolved</option>
+          <option value="closed">Closed</option>
+        </select>
+
         <input
           type="text"
-          className="w-full md:w-1/2 px-4 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-          placeholder="Search by ticket number or title..."
-          onChange={() => {}}
+          value={teamFilter}
+          onChange={(e) => setTeamFilter(e.target.value)}
+          placeholder="Filter by Team"
+          className="w-full md:w-1/5 px-4 py-2 border rounded-md shadow-sm"
         />
-        <button
-          onClick={exportToExcel}
-          className="ml-4 px-4 py-2 rounded-md bg-blue-500 text-white hover:bg-blue-600"
+
+        <input
+          type="text"
+          value={assigneeFilter}
+          onChange={(e) => setAssigneeFilter(e.target.value)}
+          placeholder="Filter by Assignee"
+          className="w-full md:w-1/5 px-4 py-2 border rounded-md shadow-sm"
+        />
+
+        <select
+          value={priorityFilter}
+          onChange={(e) => setPriorityFilter(e.target.value)}
+          className="w-full md:w-1/5 px-4 py-2 border rounded-md shadow-sm"
         >
-          Export
-        </button>
-        <button
-          onClick={() => downloadExport("csv")}
-          className="ml-4 px-4 py-2 rounded-md bg-green-600 text-white hover:bg-green-700"
-        >
-          Download CSV
-        </button>
+          <option value="">All Priorities</option>
+          <option value="low">Low</option>
+          <option value="normal">Normal</option>
+          <option value="high">High</option>
+          <option value="urgent">Urgent</option>
+        </select>
+
+        <div className="flex gap-2 w-full md:w-auto">
+          <button
+            onClick={exportToExcel}
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            Export XLSX
+          </button>
+          <button
+            onClick={() => downloadExport("csv")}
+            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+          >
+            Download CSV
+          </button>
+        </div>
       </div>
 
       <table className="min-w-full table-auto text-sm text-left bg-white rounded-lg shadow">
