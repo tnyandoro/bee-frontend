@@ -132,7 +132,13 @@ const CreateProblems = () => {
     try {
       setLoading(true);
       const config = { headers: { Authorization: `Bearer ${token}` } };
-      await axios.post(`${baseUrl}/tickets`, ticketData, config);
+      // await axios.post(`${baseUrl}/tickets`, ticketData, config);
+      await axios.post(
+        `${baseUrl}/problems`,
+        { problem: { ...ticketData.ticket } },
+        config
+      );
+
       setShowSuccessModal(true);
       resetForm();
       fetchProblems();
