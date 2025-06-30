@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import ResolveTicket from "./ResolveTicket";
 import apiBaseUrl from "../config";
 import * as XLSX from "xlsx";
+import { useMemo } from "react";
 
 const IncidentOverview = () => {
   const [tickets, setTickets] = useState([]);
@@ -13,12 +14,8 @@ const IncidentOverview = () => {
   const [teamFilter, setTeamFilter] = useState("");
   const [assigneeFilter, setAssigneeFilter] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("");
-  const [subdomain, setSubdomain] = useState(
-    localStorage.getItem("subdomain") || ""
-  );
-  const [authToken, setAuthToken] = useState(
-    localStorage.getItem("authToken") || ""
-  );
+  const subdomain = useMemo(() => localStorage.getItem("subdomain") || "", []);
+  const authToken = useMemo(() => localStorage.getItem("authToken") || "", []);
   const navigate = useNavigate();
 
   const validateToken = useCallback(async () => {
