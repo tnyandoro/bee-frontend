@@ -120,7 +120,7 @@ const CreateProblems = () => {
     }
 
     const ticketData = {
-      ticket: {
+      problem: {
         ...formData,
         priority: parseInt(formData.priority, 10),
         team_id: formData.team_id || null,
