@@ -19,7 +19,7 @@ const createApiInstance = (token, subdomain) => {
     process.env.REACT_APP_API_BASE_URL ||
     (isDev
       ? `http://${effectiveSubdomain}.lvh.me:3000/api/v1`
-      : `https://${effectiveSubdomain}.itsm-api.onrender.com/api/v1`); // <-- replace with actual production pattern
+      : `https://${effectiveSubdomain}.itsm-api.onrender.com/api/v1`);
 
   const authHeader = `Bearer ${token}`;
   console.log("Creating API instance:", { baseURL, Authorization: authHeader });
