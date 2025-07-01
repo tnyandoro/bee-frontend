@@ -295,7 +295,7 @@ const TicketForm = ({ organization, token }) => {
     return <p className="text-center text-blue-700">Loading...</p>;
 
   return (
-    <div className="max-w-4xl mx-auto bg-white shadow-lg p-6 rounded-lg">
+    <div className="w-full px-2 sm:px-4 md:px-6 lg:px-8 py-6 bg-white shadow-md rounded-lg">
       {error && <p className="text-red-500 mb-4">{error}</p>}
       {success && (
         <p className="text-green-500 mb-4">Ticket submitted successfully!</p>
@@ -303,7 +303,7 @@ const TicketForm = ({ organization, token }) => {
 
       <form onSubmit={handleSubmit} encType="multipart/form-data">
         <TicketMetaSection formData={formData} currentUser={currentUser} />
-        <div className="mt-4 grid grid-cols-2 gap-4">
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium">Reported Date</label>
             <input
