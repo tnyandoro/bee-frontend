@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { X } from "lucide-react";
-import MetricChart from "./MetricChart";
 import CreateUserForm from "./CreateUserForm";
 import CreateTeamForm from "./CreateTeamForm";
 import TeamList from "./TeamList";
@@ -21,6 +20,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
   const [error, setError] = useState("");
   const [users, setUsers] = useState([]);
   const [teams, setTeams] = useState([]);
+  const [dashboardStats, setDashboardStats] = useState(null);
 
   const getEffectiveSubdomain = useCallback(() => {
     const subdomain =
@@ -65,14 +65,30 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     [navigate, refreshToken, logout]
   );
 
+  const fetchDashboardStats = useCallback(async () => {
+    const activeSubdomain = getEffectiveSubdomain();
+    if (!activeSubdomain || !token) return;
+
+    try {
+      const api = createApiInstance(token, activeSubdomain);
+      const response = await api.get(
+        `/organizations/${activeSubdomain}/dashboard`
+      );
+      setDashboardStats(response.data);
+    } catch (err) {
+      const errorMessage = handleApiError(err);
+      setError(errorMessage);
+    }
+  }, [token, getEffectiveSubdomain, handleApiError]);
+
+  useEffect(() => {
+    fetchDashboardStats();
+  }, [fetchDashboardStats]);
+
   const fetchTeams = useCallback(async () => {
     const activeSubdomain = getEffectiveSubdomain();
-    if (!activeSubdomain) {
-      setError("No organization subdomain available");
-      return [];
-    }
-    if (!token) {
-      setError("Authentication token missing. Please log in again.");
+    if (!activeSubdomain || !token) {
+      setError("Authentication or subdomain missing.");
       navigate("/login");
       return [];
     }
@@ -95,12 +111,8 @@ const AdminDashboard = ({ organizationSubdomain }) => {
 
   const fetchUsers = useCallback(async () => {
     const activeSubdomain = getEffectiveSubdomain();
-    if (!activeSubdomain) {
-      setError("No organization subdomain available");
-      return [];
-    }
-    if (!token) {
-      setError("Authentication token missing. Please log in again.");
+    if (!activeSubdomain || !token) {
+      setError("Authentication or subdomain missing.");
       navigate("/login");
       return [];
     }
@@ -110,15 +122,10 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     try {
       const api = createApiInstance(token, activeSubdomain);
       const response = await api.get(`/organizations/${activeSubdomain}/users`);
-
       const usersWithTeamNames = (response.data.data || []).map((user) => {
         const userTeam = teams.find((team) => team.id === user.team_id);
-        return {
-          ...user,
-          team_name: userTeam ? userTeam.name : "Unassigned",
-        };
+        return { ...user, team_name: userTeam ? userTeam.name : "Unassigned" };
       });
-
       setUsers(usersWithTeamNames);
       return usersWithTeamNames;
     } catch (err) {
@@ -133,9 +140,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
   const handleShowTeams = async () => {
     const newState = !showTeams;
     setShowTeams(newState);
-    if (newState) {
-      await fetchTeams();
-    }
+    if (newState) await fetchTeams();
   };
 
   const handleShowUsers = async () => {
@@ -155,9 +160,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
   const handleCloseTeamForm = () => {
     setIsCreateTeamFormOpen(false);
     if (showTeams) fetchTeams();
-    if (showUsers) {
-      fetchTeams().then(fetchUsers);
-    }
+    if (showUsers) fetchTeams().then(fetchUsers);
     setEditingTeam(null);
   };
 
@@ -201,7 +204,57 @@ const AdminDashboard = ({ organizationSubdomain }) => {
         </button>
       </div>
 
-      <MetricChart />
+      {dashboardStats ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+          <div className="bg-white shadow rounded-lg p-6">
+            <h2 className="text-lg font-semibold text-gray-700">
+              Organization
+            </h2>
+            <p className="text-gray-600">{dashboardStats.organization.name}</p>
+            <p className="text-gray-500 text-sm">
+              {dashboardStats.organization.email}
+            </p>
+            <p className="text-gray-500 text-sm">
+              {dashboardStats.organization.website}
+            </p>
+          </div>
+
+          <div className="bg-blue-100 shadow rounded-lg p-6">
+            <h3 className="text-xl font-semibold text-blue-800">
+              Total Tickets
+            </h3>
+            <p className="text-2xl">{dashboardStats.stats.total_tickets}</p>
+          </div>
+
+          <div className="bg-yellow-100 shadow rounded-lg p-6">
+            <h3 className="text-xl font-semibold text-yellow-800">
+              Open Tickets
+            </h3>
+            <p className="text-2xl">{dashboardStats.stats.open_tickets}</p>
+          </div>
+
+          <div className="bg-green-100 shadow rounded-lg p-6">
+            <h3 className="text-xl font-semibold text-green-800">
+              Closed Tickets
+            </h3>
+            <p className="text-2xl">{dashboardStats.stats.closed_tickets}</p>
+          </div>
+
+          <div className="bg-red-100 shadow rounded-lg p-6">
+            <h3 className="text-xl font-semibold text-red-800">Problems</h3>
+            <p className="text-2xl">{dashboardStats.stats.total_problems}</p>
+          </div>
+
+          <div className="bg-indigo-100 shadow rounded-lg p-6">
+            <h3 className="text-xl font-semibold text-indigo-800">
+              Team Members
+            </h3>
+            <p className="text-2xl">{dashboardStats.stats.total_members}</p>
+          </div>
+        </div>
+      ) : (
+        <p className="text-gray-500 mb-6">Loading dashboard metrics...</p>
+      )}
 
       {(showTeams || showUsers) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 overflow-y-auto p-4">
@@ -212,7 +265,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
                 setShowUsers(false);
               }}
               className="absolute top-3 right-3 text-gray-600 hover:text-gray-800"
-              aria-label="Close popup"
             >
               <X className="w-6 h-6" />
             </button>
@@ -261,7 +313,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
             <button
               onClick={handleCloseUserForm}
               className="absolute top-3 right-3 text-gray-600 hover:text-gray-800"
-              aria-label="Close user form"
             >
               <X className="w-6 h-6" />
             </button>
@@ -280,7 +331,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
             <button
               onClick={handleCloseTeamForm}
               className="absolute top-3 right-3 text-gray-600 hover:text-gray-800"
-              aria-label="Close team form"
             >
               <X className="w-6 h-6" />
             </button>
