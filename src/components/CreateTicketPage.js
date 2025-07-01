@@ -20,8 +20,8 @@ const CreateTicketPage = () => {
   const organization = { subdomain };
 
   return (
-    <div className="bg-gray-200 container mx-auto p-1 relative mt-12">
-      <div className="p-6 bg-gray-100 shadow-lg rounded-lg mt-12">
+    <div className="bg-gray-200 container mx-auto p-1 relative">
+      <div className="p-2 bg-gray-100 shadow-lg rounded-lg">
         <div className="p-2 text-white rounded-t-lg bg-blue-700 shadow-xl mb-6">
           <h2 className="text-2xl mb-1">Log a Ticket</h2>
           <p className="text-sm">
