@@ -170,8 +170,10 @@ const AdminDashboard = ({ organizationSubdomain }) => {
   };
 
   return (
-    <div className="mt-20 p-8 relative">
-      <h1 className="text-3xl font-semibold mb-6">Admin Dashboard</h1>
+    <div className="mt-2 p-8 relative">
+      <div>
+        <h1 className="text-3xl font-semibold mb-6">Admin Dashboard</h1>
+      </div>
 
       {error && (
         <div className="bg-red-100 text-red-700 p-3 rounded mb-4">{error}</div>
