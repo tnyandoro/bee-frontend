@@ -157,7 +157,7 @@ const Dashboard = () => {
 
   return (
     <div className="p-4">
-      <h1 className="text-2xl font-bold mb-2">
+      <h1 className="bg-gray-200 text-xl font-bold mb-2">
         {capitalizedOrgName} Dashboard
       </h1>
 
