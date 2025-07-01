@@ -206,7 +206,7 @@ const Dashboard = () => {
         />
       </div>
 
-      <MyChartComponent data={filteredTickets} />
+      <MyChartComponent tickets={filteredTickets} />
 
       <div className="overflow-x-auto mt-6">
         <table className="w-full table-auto border-collapse">

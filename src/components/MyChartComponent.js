@@ -32,10 +32,11 @@ const MyChartComponent = ({
 }) => {
   const pieChartRef = useRef(null);
   const barChartRef = useRef(null);
+  const categoryChartRef = useRef(null);
   const pieChartInstance = useRef(null);
   const barChartInstance = useRef(null);
+  const categoryChartInstance = useRef(null);
 
-  // Helper function to group tickets by day/month
   const groupTicketsByDate = (tickets, field, mode) => {
     const grouped = {};
 
@@ -50,7 +51,7 @@ const MyChartComponent = ({
               2,
               "0"
             )}`
-          : date.toISOString().split("T")[0]; // YYYY-MM-DD
+          : date.toISOString().split("T")[0];
 
       grouped[key] = (grouped[key] || 0) + 1;
     });
@@ -72,12 +73,13 @@ const MyChartComponent = ({
 
     const pieCtx = pieChartRef.current.getContext("2d");
     const barCtx = barChartRef.current.getContext("2d");
+    const categoryCtx = categoryChartRef.current.getContext("2d");
 
-    // Destroy existing charts
     pieChartInstance.current?.destroy();
     barChartInstance.current?.destroy();
+    categoryChartInstance.current?.destroy();
 
-    // Pie chart: Priority distribution
+    // Pie Chart: Priority distribution
     const priorityCounts = tickets.reduce((acc, ticket) => {
       const label =
         ticket.priority !== undefined ? `P${4 - ticket.priority}` : "Unknown";
@@ -91,19 +93,13 @@ const MyChartComponent = ({
         {
           data: Object.values(priorityCounts),
           backgroundColor: [
-            "rgba(54, 162, 235, 0.6)",
-            "rgba(255, 99, 132, 0.6)",
-            "rgba(255, 206, 86, 0.6)",
-            "rgba(75, 192, 192, 0.6)",
-            "rgba(153, 102, 255, 0.6)",
-          ].slice(0, Object.keys(priorityCounts).length),
-          borderColor: [
-            "rgba(54, 162, 235, 1)",
-            "rgba(255, 99, 132, 1)",
-            "rgba(255, 206, 86, 1)",
-            "rgba(75, 192, 192, 1)",
-            "rgba(153, 102, 255, 1)",
-          ].slice(0, Object.keys(priorityCounts).length),
+            "#60a5fa",
+            "#f87171",
+            "#facc15",
+            "#34d399",
+            "#a78bfa",
+          ],
+          borderColor: ["#3b82f6", "#ef4444", "#eab308", "#10b981", "#8b5cf6"],
           borderWidth: 1,
         },
       ],
@@ -126,19 +122,16 @@ const MyChartComponent = ({
       },
     });
 
-    // Bar chart: Time-based grouping
+    // Bar Chart: Time series
     const { labels, data } = groupTicketsByDate(tickets, dateField, groupBy);
-
     const barData = {
       labels,
       datasets: [
         {
-          label: `Tickets by ${
-            groupBy === "month" ? "Month" : "Day"
-          } (${dateField})`,
+          label: `Tickets by ${groupBy === "month" ? "Month" : "Day"}`,
           data,
-          backgroundColor: "rgba(75, 192, 192, 0.6)",
-          borderColor: "rgba(75, 192, 192, 1)",
+          backgroundColor: "#34d399",
+          borderColor: "#059669",
           borderWidth: 1,
         },
       ],
@@ -153,22 +146,59 @@ const MyChartComponent = ({
           legend: { position: "top" },
           title: {
             display: true,
-            text: `Ticket Volume Grouped by ${
-              groupBy === "month" ? "Month" : "Day"
-            } (${dateField})`,
-          },
-          tooltip: {
-            callbacks: {
-              label: (context) => `${context.label}: ${context.raw} tickets`,
-            },
+            text: `Ticket Volume Grouped by ${groupBy} (${dateField})`,
           },
         },
         scales: {
           y: {
             beginAtZero: true,
-            ticks: {
-              stepSize: 1,
-            },
+            ticks: { stepSize: 1 },
+          },
+        },
+      },
+    });
+
+    // NEW Chart: Ticket category breakdown
+    const open = tickets.filter((t) => t.status === "open").length;
+    const critical = tickets.filter((t) => t.priority === 0).length;
+    const high = tickets.filter((t) => t.priority === 1).length;
+    const breaching = tickets.filter(
+      (t) => t.sla_breached && t.status !== "resolved"
+    ).length;
+    const missedSLA = tickets.filter((t) => t.sla_breached).length;
+
+    const categoryData = {
+      labels: ["Open", "Critical", "High", "About to Breach", "Missed SLA"],
+      datasets: [
+        {
+          label: "Tickets by Category",
+          data: [open, critical, high, breaching, missedSLA],
+          backgroundColor: [
+            "#60a5fa",
+            "#f87171",
+            "#fbbf24",
+            "#fb923c",
+            "#eab308",
+          ],
+          borderColor: ["#3b82f6", "#ef4444", "#f59e0b", "#f97316", "#ca8a04"],
+          borderWidth: 1,
+        },
+      ],
+    };
+
+    categoryChartInstance.current = new Chart(categoryCtx, {
+      type: "bar",
+      data: categoryData,
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: "top" },
+          title: { display: true, text: "Tickets by Category" },
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { stepSize: 1 },
           },
         },
       },
@@ -177,16 +207,20 @@ const MyChartComponent = ({
     return () => {
       pieChartInstance.current?.destroy();
       barChartInstance.current?.destroy();
+      categoryChartInstance.current?.destroy();
     };
   }, [tickets, groupBy, dateField]);
 
   return (
-    <div className="flex flex-col md:flex-row justify-between">
-      <div className="w-full md:w-1/2 p-2">
-        <canvas ref={pieChartRef} id="myPieChart"></canvas>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="bg-white p-4 rounded shadow">
+        <canvas ref={pieChartRef}></canvas>
       </div>
-      <div className="w-full md:w-1/2 p-2">
-        <canvas ref={barChartRef} id="myBarChart"></canvas>
+      <div className="bg-white p-4 rounded shadow">
+        <canvas ref={barChartRef}></canvas>
+      </div>
+      <div className="col-span-1 md:col-span-2 bg-white p-4 rounded shadow">
+        <canvas ref={categoryChartRef}></canvas>
       </div>
     </div>
   );
