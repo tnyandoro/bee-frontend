@@ -345,6 +345,76 @@ const CreateProblems = () => {
             </div>
             <div>
               <label className="block text-gray-700 font-medium">
+                Caller Name *
+              </label>
+              <input
+                type="text"
+                name="caller_name"
+                value={formData.caller_name}
+                onChange={handleChange}
+                className="input-box border p-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+                disabled={loading}
+              />
+            </div>
+            <div>
+              <label className="block text-gray-700 font-medium">
+                Caller Surname *
+              </label>
+              <input
+                type="text"
+                name="caller_surname"
+                value={formData.caller_surname}
+                onChange={handleChange}
+                className="input-box border p-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+                disabled={loading}
+              />
+            </div>
+            <div>
+              <label className="block text-gray-700 font-medium">
+                Caller Email *
+              </label>
+              <input
+                type="email"
+                name="caller_email"
+                value={formData.caller_email}
+                onChange={handleChange}
+                className="input-box border p-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+                disabled={loading}
+              />
+            </div>
+            <div>
+              <label className="block text-gray-700 font-medium">
+                Caller Phone *
+              </label>
+              <input
+                type="text"
+                name="caller_phone"
+                value={formData.caller_phone}
+                onChange={handleChange}
+                className="input-box border p-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+                disabled={loading}
+              />
+            </div>
+            <div>
+              <label className="block text-gray-700 font-medium">
+                Customer *
+              </label>
+              <input
+                type="text"
+                name="customer"
+                value={formData.customer}
+                onChange={handleChange}
+                className="input-box border p-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+                disabled={loading}
+              />
+            </div>
+            <div>
+              <label className="block text-gray-700 font-medium">
                 Impact *
               </label>
               <select
