@@ -172,9 +172,10 @@ const AdminDashboard = ({ organizationSubdomain }) => {
   return (
     <div className="mt-2 p-2 relative">
       <div className="bg-gray-200">
-        <div className="bg-gray-700 shadow-xl rounded-lg mb-4">
-          <h1 className="text-3xl font-semibold mb-6">
-            Welcome to {dashboardStats.organization.name} Admin Dashboard
+        <div className="bg-gray-700 shadow-xl rounded-lg mb-4 p-4">
+          <h1 className="text-3xl font-semibold text-white">
+            Welcome to {dashboardStats?.organization?.name || "Organization"}{" "}
+            Admin Dashboard
           </h1>
         </div>
       </div>
@@ -221,7 +222,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
               {dashboardStats.organization.email}
             </p>
             <p className="text-gray-500 text-sm">
-              {dashboardStats.organization.website}
+              {dashboardStats.organization.web_address || "No website provided"}
             </p>
           </div>
 
