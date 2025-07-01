@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { useAuth } from "../contexts/authContext";
 import {
@@ -17,16 +17,15 @@ const ProblemsOverview = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // const baseUrl = `http://${subdomain || "subdomain"}.lvh.me:3000/api/v1`;
   const isLocalhost =
     window.location.hostname.includes("lvh.me") ||
     window.location.hostname === "localhost";
 
   const baseUrl = isLocalhost
     ? `http://${subdomain || "subdomain"}.lvh.me:3000/api/v1`
-    : `https://${subdomain}.itsm-api.onrender.com/api/v1`;
+    : `https://itsm-api.onrender.com/api/v1`; // ✅ Path-based URL for production
 
-  const fetchProblems = async () => {
+  const fetchProblems = useCallback(async () => {
     if (!token || !subdomain) {
       setError("Please log in to view problems.");
       return;
@@ -56,13 +55,11 @@ const ProblemsOverview = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token, subdomain, currentPage, baseUrl]);
 
   useEffect(() => {
-    if (token && subdomain) {
-      fetchProblems();
-    }
-  }, [token, subdomain, currentPage]);
+    fetchProblems();
+  }, [fetchProblems]);
 
   const ticketsPerPage = 10;
   const indexOfLastTicket = currentPage * ticketsPerPage;
