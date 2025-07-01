@@ -17,7 +17,14 @@ const ProblemsOverview = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const baseUrl = `http://${subdomain || "subdomain"}.lvh.me:3000/api/v1`;
+  // const baseUrl = `http://${subdomain || "subdomain"}.lvh.me:3000/api/v1`;
+  const isLocalhost =
+    window.location.hostname.includes("lvh.me") ||
+    window.location.hostname === "localhost";
+
+  const baseUrl = isLocalhost
+    ? `http://${subdomain || "subdomain"}.lvh.me:3000/api/v1`
+    : `https://${subdomain}.itsm-api.onrender.com/api/v1`;
 
   const fetchProblems = async () => {
     if (!token || !subdomain) {
