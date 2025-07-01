@@ -335,15 +335,19 @@ const Incident = ({ email, role }) => {
   };
 
   return (
-    <div className="relative flex flex-col w-full px-4 py-3 mt-20 min-h-screen sm:px-6 lg:px-8">
+    <div className="relative flex flex-col w-full p-2 min-h-screen sm:px-6 lg:px-8">
       {loading && (
         <div className="absolute top-0 left-0 flex items-center justify-center w-full h-full bg-white opacity-50 z-10">
           <div>Loading...</div>
         </div>
       )}
-      <h1 className="text-2xl font-bold text-gray-800 mb-4 text-center">
-        Incident List
-      </h1>
+      <div className="container bg-gray-100">
+        <div className="p-2 mb-6 text-center align-middle rounded-b-lg bg-blue-700 shadow-2xl">
+          <h1 className="text-2xl text-white font-bold text-gray-800 mb-2 text-center">
+            Incident List
+          </h1>
+        </div>
+      </div>
       <div className="w-full mb-6 flex flex-col sm:flex-row sm:space-x-4">
         <input
           type="text"

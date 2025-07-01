@@ -178,9 +178,9 @@ const IncidentOverview = () => {
   if (error) return <div className="text-red-500 text-center">{error}</div>;
 
   return (
-    <div className="container mt-20 p-4 bg-gray-100 min-h-screen">
-      <div className="p-4 mx-auto text-center align-middle rounded-b-lg bg-green-700 shadow-2xl mb-6">
-        <h2 className="text-4xl mb-2 text-white">Incident Overview</h2>
+    <div className="container mt-2 p-2 bg-gray-100 min-h-screen">
+      <div className="p-2 mx-auto text-center align-middle rounded-b-lg bg-blue-700 shadow-2xl mb-6">
+        <h2 className="text-4xl text-white">Incident Overview</h2>
       </div>
 
       <div className="flex flex-col md:flex-row flex-wrap gap-4 mb-6">
