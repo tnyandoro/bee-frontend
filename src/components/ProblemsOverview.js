@@ -143,7 +143,7 @@ const ProblemsOverview = () => {
   }
 
   return (
-    <div className="container mt-2 p-4 bg-gray-100 min-h-screen">
+    <div className="container mt-2 p-2 bg-gray-100 min-h-screen">
       <div className="p-2 mx-auto text-center align-middle rounded-b-lg bg-blue-600 shadow-2xl mb-6">
         <h2 className="text-4xl mb-2 text-white">Problems Overview</h2>
       </div>
