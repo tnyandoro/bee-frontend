@@ -23,7 +23,7 @@ const ProblemsOverview = () => {
 
   const baseUrl = isLocalhost
     ? `http://${subdomain || "subdomain"}.lvh.me:3000/api/v1`
-    : `https://itsm-api.onrender.com/api/v1`; // ✅ Path-based URL for production
+    : `https://itsm-api.onrender.com/api/v1`;
 
   const fetchProblems = useCallback(async () => {
     if (!token || !subdomain) {
@@ -143,8 +143,8 @@ const ProblemsOverview = () => {
   }
 
   return (
-    <div className="container mt-8 p-4 bg-gray-100 min-h-screen">
-      <div className="p-4 mx-auto text-center align-middle rounded-b-lg bg-blue-600 shadow-2xl mb-6">
+    <div className="container mt-2 p-4 bg-gray-100 min-h-screen">
+      <div className="p-2 mx-auto text-center align-middle rounded-b-lg bg-blue-600 shadow-2xl mb-6">
         <h2 className="text-4xl mb-2 text-white">Problems Overview</h2>
       </div>
 
