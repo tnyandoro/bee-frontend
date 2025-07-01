@@ -343,9 +343,7 @@ const Incident = ({ email, role }) => {
       )}
       <div className="container bg-gray-100">
         <div className="p-2 mb-6 text-center align-middle rounded-b-lg bg-blue-700 shadow-2xl">
-          <h1 className="text-2xl text-white font-bold text-gray-800 mb-2 text-center">
-            Incident List
-          </h1>
+          <h2 className="text-4xl text-white">Incident List</h2>
         </div>
       </div>
       <div className="w-full mb-6 flex flex-col sm:flex-row sm:space-x-4">
