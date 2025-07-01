@@ -230,8 +230,8 @@ const CreateProblems = () => {
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
   return (
-    <div className="bg-blue-700 container mx-auto p-1 relative mt-20">
-      <div className="p-6 bg-gray-100 shadow-lg rounded-lg mt-12">
+    <div className="bg-gray-200 container mx-auto p-1 relative">
+      <div className="px-2 bg-gray-100 shadow-lg rounded-lg">
         <div className="p-2 text-white rounded-t-lg bg-blue-700 shadow-xl mb-6">
           <h2 className="text-2xl mb-1">Log a Problem</h2>
           <p className="text-sm">

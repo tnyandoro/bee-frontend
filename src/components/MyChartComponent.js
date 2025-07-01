@@ -212,14 +212,21 @@ const MyChartComponent = ({
   }, [tickets, groupBy, dateField]);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div className="bg-white p-4 rounded shadow">
-        <canvas ref={pieChartRef}></canvas>
+    <div className="w-full flex flex-col items-center gap-6 mt-6 px-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full max-w-5xl">
+        {/* Pie Chart */}
+        <div className="bg-white p-4 rounded shadow w-full aspect-square flex items-center justify-center">
+          <canvas ref={pieChartRef}></canvas>
+        </div>
+
+        {/* Bar Chart */}
+        <div className="bg-white p-4 rounded shadow w-full aspect-square flex items-center justify-center">
+          <canvas ref={barChartRef}></canvas>
+        </div>
       </div>
-      <div className="bg-white p-4 rounded shadow">
-        <canvas ref={barChartRef}></canvas>
-      </div>
-      <div className="col-span-1 md:col-span-2 bg-white p-4 rounded shadow">
+
+      {/* Category Chart */}
+      <div className="bg-white p-4 rounded shadow w-full max-w-5xl aspect-[2/1] flex items-center justify-center">
         <canvas ref={categoryChartRef}></canvas>
       </div>
     </div>

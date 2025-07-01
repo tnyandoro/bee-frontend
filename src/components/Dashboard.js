@@ -151,15 +151,15 @@ const Dashboard = () => {
     localStorage.setItem("ticketFilter", type);
   };
 
-  const capitalizedOrgName =
-    organization?.name?.charAt(0).toUpperCase() +
-      organization?.name?.slice(1) || "";
+  const capitalizedOrgName = organization?.name?.toUpperCase() || "";
 
   return (
     <div className="p-4">
-      <h1 className="bg-gray-200 text-xl font-bold mb-2">
-        {capitalizedOrgName} Dashboard
-      </h1>
+      <div className="bg-gry-700 shadow-xl rounded-lg mb-4">
+        <h1 className="bg-gray-200 text-xl font-bold mb-2">
+          {capitalizedOrgName} Dashboard
+        </h1>
+      </div>
 
       {error && <div className="text-red-500 mb-2">{error}</div>}
 
