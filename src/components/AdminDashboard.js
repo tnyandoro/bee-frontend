@@ -172,8 +172,8 @@ const AdminDashboard = ({ organizationSubdomain }) => {
   return (
     <div className="mt-2 p-2 relative">
       <div className="bg-gray-200">
-        <div className="bg-gray-700 shadow-xl rounded-lg mb-4 p-4">
-          <h1 className="text-3xl font-semibold text-white">
+        <div className="bg-gray-200 shadow-xl rounded-lg mb-4 p-4">
+          <h1 className="text-3xl font-semibold">
             Welcome to {dashboardStats?.organization?.name || "Organization"}{" "}
             Admin Dashboard
           </h1>
