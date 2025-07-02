@@ -184,9 +184,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
             Dashboard
           </h1>
         </div>
-        {dashboardStats?.stats && (
-          <TicketsBarChart stats={dashboardStats.stats} />
-        )}
       </div>
 
       {error && (
@@ -267,6 +264,9 @@ const AdminDashboard = ({ organizationSubdomain }) => {
             </h3>
             <p className="text-2xl">{dashboardStats.stats.total_members}</p>
           </div>
+          {dashboardStats?.stats && (
+            <TicketsBarChart stats={dashboardStats.stats} />
+          )}
         </div>
       ) : (
         <p className="text-gray-500 mb-6">Loading dashboard metrics...</p>
