@@ -19,7 +19,12 @@ const TicketDetailsPopup = ({
       const response = await axios.put(
         `${apiBaseUrl}/organizations/${subdomain}/tickets/${selectedTicket.id}`,
         { ticket: { status: "closed" } },
-        { headers: { Authorization: `Bearer ${authToken}` } }
+        {
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+            "Content-Type": "application/json",
+          },
+        }
       );
       onUpdate(response.data.ticket);
       onClose();
