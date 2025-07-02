@@ -73,43 +73,40 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     }
   }, [token, getEffectiveSubdomain, handleApiError]);
 
- // Fetch dashboard stats
-useEffect(() => {
-  fetchDashboardStats();
-}, [fetchDashboardStats]);
+  useEffect(() => {
+    fetchDashboardStats();
+  }, [fetchDashboardStats]);
 
-// Fetch teams and users
-useEffect(() => {
-  const fetchTeams = async () => {
-    try {
-      const api = createApiInstance(token, getEffectiveSubdomain());
-      const response = await api.get(
-        `/organizations/${getEffectiveSubdomain()}/teams`
-      );
-      setTeams(response.data);
-    } catch (err) {
-      setError(handleApiError(err));
+  useEffect(() => {
+    const fetchTeams = async () => {
+      try {
+        const api = createApiInstance(token, getEffectiveSubdomain());
+        const response = await api.get(
+          `/organizations/${getEffectiveSubdomain()}/teams`
+        );
+        setTeams(response.data);
+      } catch (err) {
+        setError(handleApiError(err));
+      }
+    };
+
+    const fetchUsers = async () => {
+      try {
+        const api = createApiInstance(token, getEffectiveSubdomain());
+        const response = await api.get(
+          `/organizations/${getEffectiveSubdomain()}/users`
+        );
+        setUsers(response.data);
+      } catch (err) {
+        setError(handleApiError(err));
+      }
+    };
+
+    if (token && getEffectiveSubdomain()) {
+      fetchTeams();
+      fetchUsers();
     }
-  };
-
-  const fetchUsers = async () => {
-    try {
-      const api = createApiInstance(token, getEffectiveSubdomain());
-      const response = await api.get(
-        `/organizations/${getEffectiveSubdomain()}/users`
-      );
-      setUsers(response.data);
-    } catch (err) {
-      setError(handleApiError(err));
-    }
-  };
-
-  if (token && getEffectiveSubdomain()) {
-    fetchTeams();
-    fetchUsers();
-  }
-}, [token, getEffectiveSubdomain, handleApiError]);
-
+  }, [token, getEffectiveSubdomain, handleApiError]);
 
   const getPriorityStyle = (priority) => {
     switch (priority) {
@@ -280,45 +277,55 @@ useEffect(() => {
           )}
 
           {dashboardStats?.stats && (
-            <TicketsBarChart stats={dashboardStats.stats} />
-            {isCreateUserFormOpen && (
-  <div className="relative z-10 bg-white p-4 rounded shadow-xl">
-    <div className="flex justify-between items-center mb-2">
-      <h3 className="text-lg font-semibold">Create User</h3>
-      <button onClick={() => setIsCreateUserFormOpen(false)}>
-        <X className="w-5 h-5 text-gray-600" />
-      </button>
-    </div>
-    <CreateUserForm onClose={() => setIsCreateUserFormOpen(false)} />
-  </div>
-)}
+            <>
+              <TicketsBarChart stats={dashboardStats.stats} />
 
-{isCreateTeamFormOpen && (
-  <div className="relative z-10 bg-white p-4 rounded shadow-xl">
-    <div className="flex justify-between items-center mb-2">
-      <h3 className="text-lg font-semibold">Create Team</h3>
-      <button onClick={() => setIsCreateTeamFormOpen(false)}>
-        <X className="w-5 h-5 text-gray-600" />
-      </button>
-    </div>
-    <CreateTeamForm onClose={() => setIsCreateTeamFormOpen(false)} />
-  </div>
-)}
+              {isCreateUserFormOpen && (
+                <div className="relative z-10 bg-white p-4 rounded shadow-xl">
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-lg font-semibold">Create User</h3>
+                    <button onClick={() => setIsCreateUserFormOpen(false)}>
+                      <X className="w-5 h-5 text-gray-600" />
+                    </button>
+                  </div>
+                  <CreateUserForm
+                    onClose={() => setIsCreateUserFormOpen(false)}
+                  />
+                </div>
+              )}
 
-{showTeams && (
-  <div className="mt-4">
-    <h3 className="text-xl font-semibold text-gray-700 mb-2">Teams</h3>
-    <TeamList teams={teams} onEditTeam={setEditingTeam} />
-  </div>
-)}
+              {isCreateTeamFormOpen && (
+                <div className="relative z-10 bg-white p-4 rounded shadow-xl">
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-lg font-semibold">Create Team</h3>
+                    <button onClick={() => setIsCreateTeamFormOpen(false)}>
+                      <X className="w-5 h-5 text-gray-600" />
+                    </button>
+                  </div>
+                  <CreateTeamForm
+                    onClose={() => setIsCreateTeamFormOpen(false)}
+                  />
+                </div>
+              )}
 
-{showUsers && (
-  <div className="mt-4">
-    <h3 className="text-xl font-semibold text-gray-700 mb-2">Users</h3>
-    <UserList users={users} />
-  </div>
-)}
+              {showTeams && (
+                <div className="mt-4">
+                  <h3 className="text-xl font-semibold text-gray-700 mb-2">
+                    Teams
+                  </h3>
+                  <TeamList teams={teams} onEditTeam={setEditingTeam} />
+                </div>
+              )}
 
+              {showUsers && (
+                <div className="mt-4">
+                  <h3 className="text-xl font-semibold text-gray-700 mb-2">
+                    Users
+                  </h3>
+                  <UserList users={users} />
+                </div>
+              )}
+            </>
           )}
         </>
       ) : (
