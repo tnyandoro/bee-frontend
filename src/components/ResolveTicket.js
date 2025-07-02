@@ -59,7 +59,16 @@ const ResolveTicket = ({
     setIsLoading(true);
     setError(null);
     setSuccess(null);
-
+  
+    // 🛡️ Validate required values before making request
+    if (!subdomain || !authToken || !ticket?.ticket_number) {
+      const msg = "Missing subdomain, auth token, or ticket number.";
+      console.error(msg, { subdomain, authToken, ticket });
+      setError(msg);
+      setIsLoading(false);
+      return;
+    }
+  
     const payload = {
       ticket: {
         status: "resolved",
@@ -67,10 +76,11 @@ const ResolveTicket = ({
         ...formData,
       },
     };
-
+  
     console.log("Submitting resolve payload:", payload);
-
+  
     try {
+      // 🔵 First attempt: POST to /resolve
       let response = await fetch(
         `${apiBaseUrl}/organizations/${subdomain}/tickets/${ticket.ticket_number}/resolve`,
         {
@@ -82,9 +92,10 @@ const ResolveTicket = ({
           body: JSON.stringify(payload),
         }
       );
-
+  
+      // 🔁 If /resolve is not found, fallback to PUT
       if (!response.ok && response.status === 404) {
-        console.log("Falling back to PUT request");
+        console.warn("Resolve endpoint not found, falling back to PUT update...");
         response = await fetch(
           `${apiBaseUrl}/organizations/${subdomain}/tickets/${ticket.ticket_number}`,
           {
@@ -97,6 +108,27 @@ const ResolveTicket = ({
           }
         );
       }
+  
+      const data = await response.json();
+  
+      // 🔴 Any other failure
+      if (!response.ok) {
+        console.error("API error response:", data);
+        throw new Error(data.error || "Failed to resolve ticket.");
+      }
+  
+      // ✅ Success
+      setSuccess("Ticket resolved successfully.");
+      setTimeout(() => {
+        onSuccess(data.ticket); // Return updated ticket
+      }, 1000);
+    } catch (err) {
+      console.error("Resolve ticket error:", err.message);
+      setError(`Resolve failed: ${err.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };  
 
       const data = await response.json();
 
