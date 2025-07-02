@@ -134,7 +134,7 @@ useEffect(() => {
       <div className="bg-gray-200">
         <div className="bg-gray-200 shadow-xl rounded-lg mb-4 p-4">
           <h1 className="text-3xl font-semibold">
-            Welcome to {capitalizedOrgName} Admin Dashboard
+            Welcome to the {capitalizedOrgName} Admin Dashboard
           </h1>
         </div>
       </div>
