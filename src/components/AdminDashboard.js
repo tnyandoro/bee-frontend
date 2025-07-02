@@ -7,7 +7,7 @@ import TeamList from "./TeamList";
 import UserList from "./UserList";
 import createApiInstance from "../utils/api";
 import { useAuth } from "../contexts/authContext";
-import TicketsBarChart from "./TicketsBarChart"; // adjust path if needed
+import TicketsBarChart from "./TicketsBarChart";
 
 const AdminDashboard = ({ organizationSubdomain }) => {
   const { token, subdomain: authSubdomain, refreshToken, logout } = useAuth();
@@ -170,7 +170,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     setIsCreateTeamFormOpen(true);
   };
 
-  // const capitalizedOrgName = organization?.name?.toUpperCase() || "";
   const capitalizedOrgName =
     dashboardStats?.organization?.name?.toUpperCase() || "";
 
@@ -218,56 +217,105 @@ const AdminDashboard = ({ organizationSubdomain }) => {
       </div>
 
       {dashboardStats ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-          <div className="bg-white shadow rounded-lg p-6">
-            <h2 className="text-lg font-semibold text-gray-700">
-              Organization
-            </h2>
-            <p className="text-gray-600">{dashboardStats.organization.name}</p>
-            <p className="text-gray-500 text-sm">
-              {dashboardStats.organization.email}
-            </p>
-            <p className="text-gray-500 text-sm">
-              {dashboardStats.organization.web_address || "No website provided"}
-            </p>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+            <div className="bg-white shadow rounded-lg p-6">
+              <h2 className="text-lg font-semibold text-gray-700">
+                Organization
+              </h2>
+              <p className="text-gray-600">
+                {dashboardStats.organization.name}
+              </p>
+              <p className="text-gray-500 text-sm">
+                {dashboardStats.organization.email}
+              </p>
+              <p className="text-gray-500 text-sm">
+                {dashboardStats.organization.web_address ||
+                  "No website provided"}
+              </p>
+            </div>
+
+            <div className="bg-blue-100 shadow rounded-lg p-6">
+              <h3 className="text-xl font-semibold text-blue-800">
+                Total Tickets
+              </h3>
+              <p className="text-2xl">{dashboardStats.stats.total_tickets}</p>
+            </div>
+
+            <div className="bg-yellow-100 shadow rounded-lg p-6">
+              <h3 className="text-xl font-semibold text-yellow-800">
+                Open Tickets
+              </h3>
+              <p className="text-2xl">{dashboardStats.stats.open_tickets}</p>
+            </div>
+
+            <div className="bg-green-100 shadow rounded-lg p-6">
+              <h3 className="text-xl font-semibold text-green-800">
+                Closed Tickets
+              </h3>
+              <p className="text-2xl">{dashboardStats.stats.closed_tickets}</p>
+            </div>
+
+            <div className="bg-red-100 shadow rounded-lg p-6">
+              <h3 className="text-xl font-semibold text-red-800">Problems</h3>
+              <p className="text-2xl">
+                {dashboardStats.stats.total_problems ?? 0}
+              </p>
+            </div>
+
+            <div className="bg-indigo-100 shadow rounded-lg p-6">
+              <h3 className="text-xl font-semibold text-indigo-800">
+                Team Members
+              </h3>
+              <p className="text-2xl">{dashboardStats.stats.total_members}</p>
+            </div>
           </div>
 
-          <div className="bg-blue-100 shadow rounded-lg p-6">
-            <h3 className="text-xl font-semibold text-blue-800">
-              Total Tickets
-            </h3>
-            <p className="text-2xl">{dashboardStats.stats.total_tickets}</p>
-          </div>
+          {dashboardStats?.recent_problems?.length > 0 && (
+            <div className="mt-8">
+              <h2 className="text-2xl font-semibold mb-4 text-gray-800">
+                Recent Problems
+              </h2>
+              <div className="overflow-x-auto bg-white shadow rounded-lg">
+                <table className="min-w-full table-auto text-sm text-left">
+                  <thead className="bg-gray-100 text-gray-700 uppercase">
+                    <tr>
+                      <th className="px-4 py-3">ID</th>
+                      <th className="px-4 py-3">Title</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Priority</th>
+                      <th className="px-4 py-3">Created</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dashboardStats.recent_problems.map((problem) => (
+                      <tr
+                        key={problem.id}
+                        className="border-b hover:bg-gray-50"
+                      >
+                        <td className="px-4 py-2">
+                          {problem.ticket_number || `#${problem.id}`}
+                        </td>
+                        <td className="px-4 py-2">{problem.title || "-"}</td>
+                        <td className="px-4 py-2">{problem.status || "-"}</td>
+                        <td className="px-4 py-2">{`P${
+                          4 - Number(problem.priority)
+                        }`}</td>
+                        <td className="px-4 py-2">
+                          {new Date(problem.created_at).toLocaleDateString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
-          <div className="bg-yellow-100 shadow rounded-lg p-6">
-            <h3 className="text-xl font-semibold text-yellow-800">
-              Open Tickets
-            </h3>
-            <p className="text-2xl">{dashboardStats.stats.open_tickets}</p>
-          </div>
-
-          <div className="bg-green-100 shadow rounded-lg p-6">
-            <h3 className="text-xl font-semibold text-green-800">
-              Closed Tickets
-            </h3>
-            <p className="text-2xl">{dashboardStats.stats.closed_tickets}</p>
-          </div>
-
-          <div className="bg-red-100 shadow rounded-lg p-6">
-            <h3 className="text-xl font-semibold text-red-800">Problems</h3>
-            <p className="text-2xl">{dashboardStats.stats.total_problems}</p>
-          </div>
-
-          <div className="bg-indigo-100 shadow rounded-lg p-6">
-            <h3 className="text-xl font-semibold text-indigo-800">
-              Team Members
-            </h3>
-            <p className="text-2xl">{dashboardStats.stats.total_members}</p>
-          </div>
           {dashboardStats?.stats && (
             <TicketsBarChart stats={dashboardStats.stats} />
           )}
-        </div>
+        </>
       ) : (
         <p className="text-gray-500 mb-6">Loading dashboard metrics...</p>
       )}
