@@ -18,6 +18,8 @@ const Dashboard = () => {
     newTickets: 0,
     critical: 0,
     high: 0,
+    medium: 0,
+    low: 0,
     breaching: 0,
     missedSLA: 0,
     resolved: 0,
@@ -76,8 +78,10 @@ const Dashboard = () => {
 
       setTicketData({
         newTickets: visibleTickets.filter((t) => t.status === "open").length,
-        critical: visibleTickets.filter((t) => t.priority === 0).length,
-        high: visibleTickets.filter((t) => t.priority === 1).length,
+        critical: visibleTickets.filter((t) => t.priority === 0).length, // P1
+        high: visibleTickets.filter((t) => t.priority === 1).length, // P2
+        medium: visibleTickets.filter((t) => t.priority === 2).length, // P3
+        low: visibleTickets.filter((t) => t.priority === 3).length, // P4
         breaching: visibleTickets.filter(
           (t) => t.sla_breached && t.status !== "resolved"
         ).length,
@@ -167,6 +171,8 @@ const Dashboard = () => {
         <StatCard label="Open" value={ticketData.newTickets} color="blue" />
         <StatCard label="Critical" value={ticketData.critical} color="red" />
         <StatCard label="High" value={ticketData.high} color="orange" />
+        <StatCard label="Medium" value={ticketData.medium} color="yellow" />
+        <StatCard label="Low" value={ticketData.low} color="green" />
         <StatCard label="Breaching" value={ticketData.breaching} color="pink" />
         <StatCard
           label="Missed SLA"
