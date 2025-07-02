@@ -160,9 +160,16 @@ const Dashboard = () => {
   return (
     <div className="p-4">
       <div className="bg-gry-700 shadow-xl rounded-lg mb-4">
-        <h1 className="bg-gray-200 text-xl font-bold mb-2">
-          {capitalizedOrgName} Dashboard
-        </h1>
+        <div className="bg-gray-200 p-4 rounded-t">
+          <h1 className="text-xl font-bold mb-1">
+            {capitalizedOrgName} Dashboard
+          </h1>
+          {currentUser?.name && (
+            <p className="text-gray-700 text-sm">
+              Welcome, <span className="font-semibold">{currentUser.name}</span>
+            </p>
+          )}
+        </div>
       </div>
 
       {error && <div className="text-red-500 mb-2">{error}</div>}
