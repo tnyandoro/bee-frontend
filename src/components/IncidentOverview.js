@@ -86,10 +86,6 @@ const IncidentOverview = () => {
   }, [subdomain, authToken, fetchTickets, navigate]);
 
   const handleResolveClick = (ticket) => {
-    if (!ticket || !ticket.ticket_number) {
-      console.warn("Invalid ticket passed to resolve:", ticket);
-      return;
-    }
     setSelectedTicket(ticket);
   };
 
@@ -255,23 +251,7 @@ const IncidentOverview = () => {
         </thead>
         <tbody>
           {tickets
-            .filter((t) => (statusFilter ? t.status === statusFilter : true))
-            .filter((t) =>
-              assigneeFilter
-                ? t.assignee?.name
-                    ?.toLowerCase()
-                    .includes(assigneeFilter.toLowerCase())
-                : true
-            )
-            .filter((t) =>
-              teamFilter
-                ? t.team?.name?.toLowerCase().includes(teamFilter.toLowerCase())
-                : true
-            )
-            .filter((t) =>
-              priorityFilter ? t.priority === priorityFilter : true
-            )
-            .filter((t) => t && t.ticket_number)
+            .filter((ticket) => ticket && ticket.ticket_number)
             .map((ticket) => (
               <tr key={ticket.ticket_number} className="hover:bg-green-50">
                 <td className="border px-4 py-3 font-medium">
