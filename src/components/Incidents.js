@@ -31,13 +31,10 @@ const Incident = ({ email, role }) => {
   const [error, setError] = useState(null);
   const location = useLocation();
   const navigate = useNavigate();
-  const isLoggedOut = useRef(false); // Track logout state
-
-  console.log("Incident rendered with:", { email, role, token, subdomain });
+  const isLoggedOut = useRef(false);
 
   const logout = useCallback(() => {
-    if (isLoggedOut.current) return; // Prevent multiple logouts
-    console.log("Logging out due to invalid token or unauthorized access");
+    if (isLoggedOut.current) return;
     isLoggedOut.current = true;
     localStorage.removeItem("authToken");
     localStorage.removeItem("subdomain");
@@ -58,20 +55,13 @@ const Incident = ({ email, role }) => {
 
       for (let attempt = 0; attempt <= retries; attempt++) {
         try {
-          console.log(`Validating token (attempt ${attempt + 1})...`);
           await axios.get(`${apiBaseUrl}/verify`, {
             headers: { Authorization: `Bearer ${token}` },
-            timeout: 10000, // Increased timeout
+            timeout: 10000,
           });
-          console.log("Token validated successfully");
           return true;
         } catch (err) {
-          console.error(
-            `Token validation failed (attempt ${attempt + 1}):`,
-            err.response?.data || err.message
-          );
           if (attempt < retries) {
-            console.log(`Retrying after ${delay}ms...`);
             await new Promise((resolve) => setTimeout(resolve, delay));
           } else {
             setError(
@@ -87,7 +77,7 @@ const Incident = ({ email, role }) => {
   );
 
   const fetchTickets = useCallback(async () => {
-    if (isLoggedOut.current) return; // Skip if logged out
+    if (isLoggedOut.current) return;
     const isTokenValid = await validateToken();
     if (!isTokenValid) return;
 
@@ -95,20 +85,18 @@ const Incident = ({ email, role }) => {
     setError(null);
     try {
       const url = `${apiBaseUrl}/organizations/${subdomain}/tickets?page=${currentPage}&per_page=${ticketsPerPage}`;
-      console.log("Fetching tickets from:", url, "with token:", token);
       const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${token}` },
-        timeout: 15000, // Increased timeout
+        timeout: 15000,
       });
       const fetchedTickets = Array.isArray(response.data.tickets)
         ? response.data.tickets
         : [];
-      console.log("Fetched tickets:", fetchedTickets);
       setTickets(
         fetchedTickets.sort(
           (a, b) =>
-            new Date(b.reported_at || b.created_at || Date.now()) -
-            new Date(a.reported_at || a.created_at || Date.now())
+            new Date(b.reported_at || b.created_at) -
+            new Date(a.reported_at || a.created_at)
         )
       );
       setPagination(
@@ -119,14 +107,9 @@ const Incident = ({ email, role }) => {
       );
     } catch (err) {
       if (err.response?.status === 401) {
-        console.log("Unauthorized, logging out");
         setError("Session expired. Please log in again.");
         logout();
       } else {
-        console.error(
-          "Fetch tickets error:",
-          err.response?.data || err.message
-        );
         setError(
           `Failed to fetch incidents: ${
             err.response?.data?.error || err.message
@@ -136,54 +119,37 @@ const Incident = ({ email, role }) => {
       }
     } finally {
       setLoading(false);
-      console.log("Loading state set to false");
     }
   }, [token, subdomain, currentPage, ticketsPerPage, logout, validateToken]);
 
   useEffect(() => {
     if (location.state?.newTicket) {
-      console.log("New ticket received:", location.state.newTicket);
-      setTickets((prevTickets) => {
-        const newTicket = {
-          ...location.state.newTicket,
-          created_at: location.state.newTicket.reported_at || Date.now(),
-        };
-        return [
-          newTicket,
-          ...prevTickets.filter((t) => t.id !== newTicket.id),
-        ].sort(
+      const newTicket = {
+        ...location.state.newTicket,
+        created_at: location.state.newTicket.reported_at || Date.now(),
+      };
+      setTickets((prevTickets) =>
+        [newTicket, ...prevTickets.filter((t) => t.id !== newTicket.id)].sort(
           (a, b) =>
-            new Date(b.reported_at || b.created_at || Date.now()) -
-            new Date(a.reported_at || a.created_at || Date.now())
-        );
-      });
+            new Date(b.reported_at || b.created_at) -
+            new Date(a.reported_at || a.created_at)
+        )
+      );
       setCurrentPage(1);
       window.history.replaceState({}, document.title);
     } else if (location.state?.refresh) {
-      console.log("Refreshing tickets");
       fetchTickets();
       window.history.replaceState({}, document.title);
     }
   }, [location.state, fetchTickets]);
 
   useEffect(() => {
-    if (isLoggedOut.current) return; // Skip if logged out
-    if (token && subdomain) {
-      console.log("Token and subdomain present, fetching tickets");
-      fetchTickets();
-    } else {
-      console.log("Token or subdomain missing, skipping fetch");
-      setError("Please log in to view incidents.");
-    }
+    if (token && subdomain) fetchTickets();
+    else setError("Please log in to view incidents.");
   }, [token, subdomain, currentPage, ticketsPerPage, fetchTickets]);
 
-  const handleResolve = (ticket) => {
-    console.log("Resolving ticket:", ticket);
-    setResolveTicket(ticket);
-  };
-
+  const handleResolve = (ticket) => setResolveTicket(ticket);
   const handleResolveSuccess = (updatedTicket) => {
-    console.log("Resolve success:", updatedTicket);
     setTickets((prev) =>
       prev.map((t) =>
         (t.ticket_number || `INC-${t.id}`) ===
@@ -194,21 +160,9 @@ const Incident = ({ email, role }) => {
     );
     setResolveTicket(null);
   };
-
-  const handleResolveCancel = () => {
-    console.log("Resolve cancelled");
-    setResolveTicket(null);
-  };
-
-  const handleEdit = (ticket) => {
-    console.log("Editing ticket:", ticket);
-    setSelectedTicket(ticket);
-  };
-
-  const handleCloseModal = () => {
-    console.log("Closing edit modal");
-    setSelectedTicket(null);
-  };
+  const handleResolveCancel = () => setResolveTicket(null);
+  const handleEdit = (ticket) => setSelectedTicket(ticket);
+  const handleCloseModal = () => setSelectedTicket(null);
 
   const handleUpdateTicket = async (updatedTicket) => {
     try {
@@ -222,13 +176,11 @@ const Incident = ({ email, role }) => {
       );
       setSelectedTicket(null);
     } catch (err) {
-      console.error("Update ticket error:", err.response?.data || err.message);
       setError("Failed to update ticket.");
     }
   };
 
   const handleDetails = (ticket) => {
-    console.log("Viewing details for ticket:", ticket);
     setDetailsTicket({
       ticketNumber: ticket.ticket_number || `INC-${ticket.id}`,
       status: ticket.status,
@@ -244,13 +196,11 @@ const Incident = ({ email, role }) => {
       slaStatus: ticket.sla_status || "N/A",
       slaConsumed: ticket.sla_consumed || "N/A",
       resolvedDate: ticket.resolved_at || null,
+      id: ticket.id,
     });
   };
 
-  const handleCloseDetails = () => {
-    console.log("Closing details modal");
-    setDetailsTicket(null);
-  };
+  const handleCloseDetails = () => setDetailsTicket(null);
 
   const getStatusColor = (status) => {
     const s = status?.toLowerCase();
@@ -305,35 +255,31 @@ const Incident = ({ email, role }) => {
   const filteredTickets = tickets.filter((t) => {
     const term = searchTerm.toLowerCase();
     return [
-      t?.ticket_number,
-      `INC-${t?.id}`,
-      t?.status,
-      t?.customer,
-      t?.title,
-      t?.priority?.toString(),
-      t?.team?.name,
-      t?.assignee?.name,
-      t?.assignee,
-      t?.urgency,
-      t?.impact,
-      t?.source,
-      t?.category,
-      t?.caller_name,
-      t?.caller_surname,
-      t?.caller_email,
-      t?.caller_phone,
-    ].some((field) => field?.toLowerCase?.().includes?.(term));
+      t.ticket_number,
+      `INC-${t.id}`,
+      t.status,
+      t.customer,
+      t.title,
+      t.priority?.toString(),
+      t.team?.name,
+      t.assignee?.name,
+      t.assignee,
+      t.urgency,
+      t.impact,
+      t.source,
+      t.category,
+      t.caller_name,
+      t.caller_surname,
+      t.caller_email,
+      t.caller_phone,
+    ].some((field) => field?.toLowerCase?.().includes(term));
   });
 
   const totalPages =
     pagination.total_pages ||
     Math.ceil(filteredTickets.length / ticketsPerPage);
 
-  const handlePageChange = (page) => {
-    console.log("Changing to page:", page);
-    setCurrentPage(page);
-  };
-
+  const handlePageChange = (page) => setCurrentPage(page);
   return (
     <div className="relative flex flex-col w-full p-2 min-h-screen sm:px-6 lg:px-8">
       {loading && (
@@ -513,11 +459,11 @@ const Incident = ({ email, role }) => {
           onClose={handleCloseDetails}
           subdomain={subdomain}
           authToken={token}
-          onUpdate={(updated) => {
+          onUpdate={(updated) =>
             setTickets((prev) =>
               prev.map((t) => (t.id === updated.id ? updated : t))
-            );
-          }}
+            )
+          }
         />
       )}
     </div>
