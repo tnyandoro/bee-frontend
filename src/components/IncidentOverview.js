@@ -294,7 +294,7 @@ const IncidentOverview = () => {
       {selectedTicket && (
         <ResolveTicket
           ticket={selectedTicket}
-          subdomain={organization?.subdomain}
+          subdomain={subdomain}
           authToken={localStorage.getItem("authToken")}
           onSuccess={handleResolveSuccess}
           onCancel={handleResolveCancel}
