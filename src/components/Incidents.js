@@ -179,7 +179,7 @@ const Incident = ({ email, role }) => {
 
   const handleResolve = (ticket) => {
     console.log("Resolving ticket:", ticket);
-    setResolveTicket({ ...ticket, subdomain }); // Pass subdomain
+    setResolveTicket(ticket);
   };
 
   const handleResolveSuccess = (updatedTicket) => {
@@ -446,10 +446,13 @@ const Incident = ({ email, role }) => {
       {resolveTicket && (
         <ResolveTicket
           ticket={resolveTicket}
+          subdomain={subdomain}
+          authToken={token}
           onSuccess={handleResolveSuccess}
           onCancel={handleResolveCancel}
         />
       )}
+
       {selectedTicket && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg w-full max-w-md">
