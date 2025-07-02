@@ -79,10 +79,19 @@ const MyChartComponent = ({
     barChartInstance.current?.destroy();
     categoryChartInstance.current?.destroy();
 
-    // Pie Chart: Priority distribution
+    // ✅ Fixed: Priority labels (P1 to P4)
+    const priorityLabels = [
+      "Critical (P1)", // 0
+      "High (P2)", // 1
+      "Medium (P3)", // 2
+      "Low (P4)", // 3
+    ];
+
     const priorityCounts = tickets.reduce((acc, ticket) => {
       const label =
-        ticket.priority !== undefined ? `P${4 - ticket.priority}` : "Unknown";
+        ticket.priority !== undefined
+          ? priorityLabels[ticket.priority]
+          : "Unknown";
       acc[label] = (acc[label] || 0) + 1;
       return acc;
     }, {});
@@ -93,13 +102,13 @@ const MyChartComponent = ({
         {
           data: Object.values(priorityCounts),
           backgroundColor: [
-            "#60a5fa",
             "#f87171",
+            "#fbbf24",
             "#facc15",
             "#34d399",
             "#a78bfa",
           ],
-          borderColor: ["#3b82f6", "#ef4444", "#eab308", "#10b981", "#8b5cf6"],
+          borderColor: ["#ef4444", "#f59e0b", "#eab308", "#10b981", "#8b5cf6"],
           borderWidth: 1,
         },
       ],
@@ -158,7 +167,7 @@ const MyChartComponent = ({
       },
     });
 
-    // NEW Chart: Ticket category breakdown
+    // Category Chart: Ticket status + SLA
     const open = tickets.filter((t) => t.status === "open").length;
     const critical = tickets.filter((t) => t.priority === 0).length;
     const high = tickets.filter((t) => t.priority === 1).length;
