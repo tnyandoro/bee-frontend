@@ -86,6 +86,10 @@ const IncidentOverview = () => {
   }, [subdomain, authToken, fetchTickets, navigate]);
 
   const handleResolveClick = (ticket) => {
+    if (!ticket || !ticket.ticket_number) {
+      console.warn("Invalid ticket passed to resolve:", ticket);
+      return;
+    }
     setSelectedTicket(ticket);
   };
 
