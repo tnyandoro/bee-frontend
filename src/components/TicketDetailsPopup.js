@@ -23,6 +23,7 @@ const TicketDetailsPopup = ({
           headers: {
             Authorization: `Bearer ${authToken}`,
             "Content-Type": "application/json",
+            Accept: "application/json", // ✅ This line is key!
           },
         }
       );
