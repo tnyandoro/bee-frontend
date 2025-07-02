@@ -291,11 +291,11 @@ const IncidentOverview = () => {
         </tbody>
       </table>
 
-      {selectedTicket && (
+      {selectedTicket?.ticket_number && (
         <ResolveTicket
           ticket={selectedTicket}
           subdomain={subdomain}
-          authToken={localStorage.getItem("authToken")}
+          authToken={authToken}
           onSuccess={handleResolveSuccess}
           onCancel={handleResolveCancel}
         />
