@@ -511,6 +511,13 @@ const Incident = ({ email, role }) => {
         <TicketDetailsPopup
           selectedTicket={detailsTicket}
           onClose={handleCloseDetails}
+          subdomain={subdomain}
+          authToken={token}
+          onUpdate={(updated) => {
+            setTickets((prev) =>
+              prev.map((t) => (t.id === updated.id ? updated : t))
+            );
+          }}
         />
       )}
     </div>
