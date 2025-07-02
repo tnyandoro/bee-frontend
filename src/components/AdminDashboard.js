@@ -7,6 +7,7 @@ import TeamList from "./TeamList";
 import UserList from "./UserList";
 import createApiInstance from "../utils/api";
 import { useAuth } from "../contexts/authContext";
+import TicketsBarChart from "./TicketsBarChart"; // adjust path if needed
 
 const AdminDashboard = ({ organizationSubdomain }) => {
   const { token, subdomain: authSubdomain, refreshToken, logout } = useAuth();
@@ -169,7 +170,9 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     setIsCreateTeamFormOpen(true);
   };
 
-  const capitalizedOrgName = organization?.name?.toUpperCase() || "";
+  // const capitalizedOrgName = organization?.name?.toUpperCase() || "";
+  const capitalizedOrgName =
+    dashboardStats?.organization?.name?.toUpperCase() || "";
 
   return (
     <div className="mt-2 p-2 relative">
@@ -181,6 +184,9 @@ const AdminDashboard = ({ organizationSubdomain }) => {
             Dashboard
           </h1>
         </div>
+        {dashboardStats?.stats && (
+          <TicketsBarChart stats={dashboardStats.stats} />
+        )}
       </div>
 
       {error && (
