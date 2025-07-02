@@ -443,13 +443,15 @@ const Incident = ({ email, role }) => {
           Next
         </button>
       </div>
-      <ResolveTicket
-        ticket={resolveTicket}
-        subdomain={resolveTicket?.subdomain || subdomain} // ensure fallback
-        authToken={token}
-        onSuccess={handleResolveSuccess}
-        onCancel={handleResolveCancel}
-      />
+      {resolveTicket && (
+        <ResolveTicket
+          ticket={resolveTicket}
+          subdomain={resolveTicket?.subdomain || subdomain}
+          authToken={token}
+          onSuccess={handleResolveSuccess}
+          onCancel={handleResolveCancel}
+        />
+      )}
 
       {selectedTicket && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
