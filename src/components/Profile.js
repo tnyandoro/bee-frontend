@@ -1,7 +1,14 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
 import { useAuth } from "../contexts/authContext";
 import { FaUpload, FaLock, FaUser, FaArrowLeft } from "react-icons/fa";
+import axios from "axios";
+
+const api = axios.create({
+  baseURL: "https://itsm-api.onrender.com/api/v1",
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
 
 const Profile = () => {
   const { user } = useAuth();
@@ -26,20 +33,18 @@ const Profile = () => {
       }
 
       try {
-        const response = await axios.get(
-          `http://lvh.me:3000/api/v1/organizations/${subdomain}/profile`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-        console.log("Profile response:", response.data);
-        setProfile(response.data);
+        const res = await api.get(`/organizations/${subdomain}/profile`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        console.log("Profile response:", res.data);
+        setProfile(res.data);
       } catch (err) {
-        setError(
-          "Failed to fetch profile data: " +
-            (err.response?.data?.error || err.message)
-        );
-        console.error("Profile fetch error:", err.response || err);
+        const message = err.response?.data?.error || err.message;
+        console.error("Profile fetch error:", err);
+        setError("Failed to fetch profile data: " + message);
       } finally {
         setLoading(false);
       }
@@ -70,7 +75,7 @@ const Profile = () => {
 
   const handleChangePassword = () => {
     if (newPassword === confirmPassword) {
-      // TODO: Implement password change API call
+      // TODO: Connect to password update API
       alert("Password changed successfully!");
       setNewPassword("");
       setConfirmPassword("");
@@ -80,27 +85,18 @@ const Profile = () => {
     }
   };
 
-  console.log("Profile state:", profile); // Debug profile state
-
-  if (loading) {
-    return <div className="p-4">Loading profile...</div>;
-  }
-
-  if (error) {
-    return <div className="p-4 text-red-500">{error}</div>;
-  }
-
-  if (!profile) {
-    return <div className="p-4">No profile data available.</div>;
-  }
+  if (loading) return <div className="p-4">Loading profile...</div>;
+  if (error) return <div className="p-4 text-red-500">{error}</div>;
+  if (!profile) return <div className="p-4">No profile data available.</div>;
 
   const userData = profile.user || {};
-  const isAdmin = userData.role === "admin" || userData.role === "super_user";
+  const isAdmin = ["admin", "super_user"].includes(userData.role);
 
   return (
     <div className="bg-gray-300 p-5 mt-10 flex">
+      {/* Sidebar */}
       <div className="bg-blue-700 p-4 rounded-l-lg text-white w-1/4">
-        <div className="p-2 mx-auto rounded-b-lg bg-blue-700 shadow-5xl mb-6 mt-10">
+        <div className="p-2 mx-auto bg-blue-700 shadow-5xl mb-6 mt-10 text-center">
           <h2 className="text-xl mb-6">My Profile</h2>
         </div>
 
@@ -148,53 +144,45 @@ const Profile = () => {
         </label>
         <label
           className="flex items-center py-2 px-4 mb-2 bg-blue-700 hover:bg-blue-600 rounded cursor-pointer transition"
-          onClick={() => alert("Profile updated!")} // TODO: Implement update logic
+          onClick={() => alert("Profile updated!")}
         >
           <FaArrowLeft className="mr-2" /> Update Profile
         </label>
       </div>
 
+      {/* Main Content */}
       <div className="flex-1 p-4">
         {activeTab === "profile" ? (
           <div>
-            <div className="p-2 mt-6">
-              {error && <p className="text-red-500">{error}</p>}
-              {isAdmin && (
-                <p className="text-green-500">You have admin privileges.</p>
-              )}
-            </div>
+            {isAdmin && (
+              <p className="text-green-500 mb-2">You have admin privileges.</p>
+            )}
 
             <div className="grid grid-cols-2 gap-2">
               {[
-                { key: "ID", value: userData.id || "N/A" },
-                { key: "Full Name", value: userData.name || "N/A" },
+                { key: "ID", value: userData.id },
+                { key: "Full Name", value: userData.name },
                 { key: "Password", value: "*********" },
-                { key: "Email", value: userData.email || "N/A" },
-                { key: "Username", value: userData.username || "N/A" },
-                { key: "Phone", value: userData.phone_number || "N/A" },
-                { key: "Department", value: userData.department || "N/A" },
-                { key: "Position", value: userData.position || "N/A" },
-                {
-                  key: "Organization ID",
-                  value: profile.organization?.id || "N/A",
-                },
-                {
-                  key: "Organization Name",
-                  value: profile.organization?.name || "N/A",
-                },
-                { key: "Team ID", value: userData.team_id || "N/A" },
-                { key: "Role", value: userData.role || "N/A" },
-              ].map(({ key, value }, index) => (
-                <div key={index} className="flex flex-col items-start mb-2">
+                { key: "Email", value: userData.email },
+                { key: "Username", value: userData.username },
+                { key: "Phone", value: userData.phone_number },
+                { key: "Department", value: userData.department },
+                { key: "Position", value: userData.position },
+                { key: "Organization ID", value: profile.organization?.id },
+                { key: "Organization Name", value: profile.organization?.name },
+                { key: "Team ID", value: userData.team_id },
+                { key: "Role", value: userData.role },
+              ].map(({ key, value }, i) => (
+                <div key={i} className="flex flex-col items-start mb-2">
                   <div className="font-bold text-lg">{key}</div>
                   <div className="border border-blue-500 bg-white p-2 w-full text-lg text-left">
-                    {value}
+                    {value || "N/A"}
                   </div>
                 </div>
               ))}
             </div>
           </div>
-        ) : activeTab === "settings" ? (
+        ) : (
           <div>
             <h2 className="text-xl font-semibold mb-4">Change Password</h2>
             <input
@@ -218,7 +206,7 @@ const Profile = () => {
               Change Password
             </button>
           </div>
-        ) : null}
+        )}
       </div>
     </div>
   );
