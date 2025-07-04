@@ -27,7 +27,7 @@ const Settings = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchSettings = async () => {
+    const fetchProfileAsFallback = async () => {
       const token = localStorage.getItem("authToken");
       const subdomain = localStorage.getItem("subdomain");
 
@@ -39,23 +39,32 @@ const Settings = () => {
 
       try {
         const response = await axios.get(
-          `https://itsm-api.onrender.com/api/v1/organizations/${subdomain}/settings`,
+          `https://itsm-api.onrender.com/api/v1/organizations/${subdomain}/profile`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
             },
           }
         );
-        setSettings(response.data);
+        setSettings({
+          organization: response.data.organization,
+          user: response.data.user,
+          roles: [],
+          ticket_config: {},
+          notifications: {},
+          branding: {},
+          integrations: {},
+          audit_logs: [],
+        });
       } catch (err) {
-        setError("Failed to load settings.");
-        console.error("Settings fetch error:", err);
+        setError("Failed to load settings from profile endpoint.");
+        console.error("Profile fetch error:", err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchSettings();
+    fetchProfileAsFallback();
   }, []);
 
   const renderTabContent = () => {
