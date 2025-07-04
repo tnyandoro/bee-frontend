@@ -22,71 +22,106 @@ const TABS = [
 
 const Settings = () => {
   const [activeTab, setActiveTab] = useState("organization");
-  const [settings, setSettings] = useState(null);
+  const [settings, setSettings] = useState({});
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const fetchSettings = async () => {
+    const token = localStorage.getItem("authToken");
+    const subdomain = localStorage.getItem("subdomain");
+
+    if (!token || !subdomain) {
+      setError("Missing token or subdomain.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const response = await axios.get(
+        `https://itsm-api.onrender.com/api/v1/organizations/${subdomain}/settings`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      setSettings(response.data);
+    } catch (err) {
+      setError("Failed to load settings.");
+      console.error("Settings fetch error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateSetting = async (key, value) => {
+    const token = localStorage.getItem("authToken");
+    const subdomain = localStorage.getItem("subdomain");
+
+    setSaving(true);
+    try {
+      const response = await axios.put(
+        `https://itsm-api.onrender.com/api/v1/organizations/${subdomain}/settings`,
+        { key, value },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      setSettings((prev) => ({ ...prev, [key]: response.data.value }));
+      alert("Settings updated.");
+    } catch (err) {
+      console.error("Settings update error:", err);
+      alert("Failed to update setting.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchProfileAsFallback = async () => {
-      const token = localStorage.getItem("authToken");
-      const subdomain = localStorage.getItem("subdomain");
-
-      if (!token || !subdomain) {
-        setError("Missing token or subdomain.");
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const response = await axios.get(
-          `https://itsm-api.onrender.com/api/v1/organizations/${subdomain}/profile`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-        setSettings({
-          organization: response.data.organization,
-          user: response.data.user,
-          roles: [],
-          ticket_config: {},
-          notifications: {},
-          branding: {},
-          integrations: {},
-          audit_logs: [],
-        });
-      } catch (err) {
-        setError("Failed to load settings from profile endpoint.");
-        console.error("Profile fetch error:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProfileAsFallback();
+    fetchSettings();
   }, []);
 
   const renderTabContent = () => {
     if (!settings) return <p>No settings available.</p>;
 
     switch (activeTab) {
-      case "organization":
-        return <pre>{JSON.stringify(settings.organization, null, 2)}</pre>;
-      case "roles":
-        return <pre>{JSON.stringify(settings.roles, null, 2)}</pre>;
       case "ticket":
-        return <pre>{JSON.stringify(settings.ticket_config, null, 2)}</pre>;
-      case "notifications":
-        return <pre>{JSON.stringify(settings.notifications, null, 2)}</pre>;
-      case "branding":
-        return <pre>{JSON.stringify(settings.branding, null, 2)}</pre>;
-      case "integrations":
-        return <pre>{JSON.stringify(settings.integrations, null, 2)}</pre>;
-      case "logs":
-        return <pre>{JSON.stringify(settings.audit_logs, null, 2)}</pre>;
+        return (
+          <div>
+            <h2 className="font-semibold mb-2">SLA Config</h2>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const autoCloseDays = e.target.autoClose.value;
+                updateSetting("ticket_config", {
+                  auto_close_days: autoCloseDays,
+                });
+              }}
+            >
+              <label className="block mb-2">
+                Auto Close Days:
+                <input
+                  type="number"
+                  name="autoClose"
+                  defaultValue={settings.ticket_config?.auto_close_days || 0}
+                  className="border rounded p-1 ml-2"
+                />
+              </label>
+              <button
+                type="submit"
+                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                disabled={saving}
+              >
+                {saving ? "Saving..." : "Save"}
+              </button>
+            </form>
+          </div>
+        );
       default:
-        return <p>Select a tab to view settings.</p>;
+        return <pre>{JSON.stringify(settings[activeTab] || {}, null, 2)}</pre>;
     }
   };
 
