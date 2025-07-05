@@ -120,6 +120,72 @@ const Settings = () => {
             </form>
           </div>
         );
+      case "branding":
+        return (
+          <div>
+            <h2 className="font-semibold mb-2">Upload Logo</h2>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const file = e.target.logo.files[0];
+                if (!file) return;
+
+                const token = localStorage.getItem("authToken");
+                const subdomain = localStorage.getItem("subdomain");
+
+                const formData = new FormData();
+                formData.append("file", file);
+
+                try {
+                  setSaving(true);
+                  const response = await axios.post(
+                    `https://itsm-api.onrender.com/api/v1/organizations/${subdomain}/upload_logo`,
+                    formData,
+                    {
+                      headers: {
+                        Authorization: `Bearer ${token}`,
+                        "Content-Type": "multipart/form-data",
+                      },
+                    }
+                  );
+                  const logoUrl = response.data.url;
+                  await updateSetting("branding", { logo_url: logoUrl });
+                } catch (err) {
+                  console.error("Logo upload failed:", err);
+                  alert("Failed to upload logo.");
+                } finally {
+                  setSaving(false);
+                }
+              }}
+            >
+              <input
+                type="file"
+                name="logo"
+                accept="image/*"
+                className="mb-2"
+              />
+              <br />
+              <button
+                type="submit"
+                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                disabled={saving}
+              >
+                {saving ? "Uploading..." : "Upload Logo"}
+              </button>
+            </form>
+
+            {settings.branding?.logo_url && (
+              <div className="mt-4">
+                <p className="text-sm mb-2">Current Logo:</p>
+                <img
+                  src={settings.branding.logo_url}
+                  alt="Organization Logo"
+                  className="h-24 rounded border"
+                />
+              </div>
+            )}
+          </div>
+        );
       default:
         return <pre>{JSON.stringify(settings[activeTab] || {}, null, 2)}</pre>;
     }
