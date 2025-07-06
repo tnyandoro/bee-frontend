@@ -169,7 +169,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
 
       {dashboardStats ? (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6 transition duration-500 ease-in-out hover:rotate-2 hover:scale-105">
             <div className="bg-white shadow rounded-lg p-6">
               <h2 className="text-lg font-semibold text-gray-700">
                 Organization
@@ -185,31 +185,31 @@ const AdminDashboard = ({ organizationSubdomain }) => {
                   "No website provided"}
               </p>
             </div>
-            <div className="bg-blue-100 shadow rounded-lg p-6">
+            <div className="bg-blue-100 shadow rounded-lg p-6 transition duration-500 ease-in-out hover:rotate-2 hover:scale-105">
               <h3 className="text-xl font-semibold text-blue-800">
                 Total Tickets
               </h3>
               <p className="text-2xl">{dashboardStats.stats.total_tickets}</p>
             </div>
-            <div className="bg-yellow-100 shadow rounded-lg p-6">
+            <div className="bg-yellow-100 shadow rounded-lg p-6 transition duration-500 ease-in-out hover:rotate-2 hover:scale-105">
               <h3 className="text-xl font-semibold text-yellow-800">
                 Open Tickets
               </h3>
               <p className="text-2xl">{dashboardStats.stats.open_tickets}</p>
             </div>
-            <div className="bg-green-100 shadow rounded-lg p-6">
+            <div className="bg-green-100 shadow rounded-lg p-6 transition duration-500 ease-in-out hover:rotate-2 hover:scale-105">
               <h3 className="text-xl font-semibold text-green-800">
                 Closed Tickets
               </h3>
               <p className="text-2xl">{dashboardStats.stats.closed_tickets}</p>
             </div>
-            <div className="bg-red-100 shadow rounded-lg p-6">
+            <div className="bg-red-100 shadow rounded-lg p-6 transition duration-500 ease-in-out hover:rotate-2 hover:scale-105">
               <h3 className="text-xl font-semibold text-red-800">Problems</h3>
               <p className="text-2xl">
                 {dashboardStats.stats.total_problems ?? 0}
               </p>
             </div>
-            <div className="bg-indigo-100 shadow rounded-lg p-6">
+            <div className="bg-indigo-100 shadow rounded-lg p-6 transition duration-500 ease-in-out hover:rotate-2 hover:scale-105">
               <h3 className="text-xl font-semibold text-indigo-800">
                 Team Members
               </h3>
