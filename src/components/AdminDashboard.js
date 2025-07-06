@@ -170,7 +170,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
       {dashboardStats ? (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-            {/* Stat Cards */}
             <div className="bg-white shadow rounded-lg p-6">
               <h2 className="text-lg font-semibold text-gray-700">
                 Organization
@@ -263,7 +262,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
                               problem.priority
                             )}`}
                           >
-                            {`P${4 - Number(problem.priority ?? 3)}`}
+                            {`P${Number(problem.priority ?? 3) + 1}`}
                           </td>
                           <td className="px-4 py-2">
                             {new Date(problem.created_at).toLocaleDateString()}
@@ -276,56 +275,48 @@ const AdminDashboard = ({ organizationSubdomain }) => {
             </div>
           )}
 
-          {dashboardStats?.stats && (
-            <>
-              <TicketsBarChart stats={dashboardStats.stats} />
+          <TicketsBarChart stats={dashboardStats.stats} />
 
-              {isCreateUserFormOpen && (
-                <div className="relative z-10 bg-white p-4 rounded shadow-xl">
-                  <div className="flex justify-between items-center mb-2">
-                    <h3 className="text-lg font-semibold">Create User</h3>
-                    <button onClick={() => setIsCreateUserFormOpen(false)}>
-                      <X className="w-5 h-5 text-gray-600" />
-                    </button>
-                  </div>
-                  <CreateUserForm
-                    onClose={() => setIsCreateUserFormOpen(false)}
-                  />
-                </div>
-              )}
+          {isCreateUserFormOpen && (
+            <div className="relative z-10 bg-white p-4 rounded shadow-xl">
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-lg font-semibold">Create User</h3>
+                <button onClick={() => setIsCreateUserFormOpen(false)}>
+                  <X className="w-5 h-5 text-gray-600" />
+                </button>
+              </div>
+              <CreateUserForm onClose={() => setIsCreateUserFormOpen(false)} />
+            </div>
+          )}
 
-              {isCreateTeamFormOpen && (
-                <div className="relative z-10 bg-white p-4 rounded shadow-xl">
-                  <div className="flex justify-between items-center mb-2">
-                    <h3 className="text-lg font-semibold">Create Team</h3>
-                    <button onClick={() => setIsCreateTeamFormOpen(false)}>
-                      <X className="w-5 h-5 text-gray-600" />
-                    </button>
-                  </div>
-                  <CreateTeamForm
-                    onClose={() => setIsCreateTeamFormOpen(false)}
-                  />
-                </div>
-              )}
+          {isCreateTeamFormOpen && (
+            <div className="relative z-10 bg-white p-4 rounded shadow-xl">
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-lg font-semibold">Create Team</h3>
+                <button onClick={() => setIsCreateTeamFormOpen(false)}>
+                  <X className="w-5 h-5 text-gray-600" />
+                </button>
+              </div>
+              <CreateTeamForm onClose={() => setIsCreateTeamFormOpen(false)} />
+            </div>
+          )}
 
-              {showTeams && (
-                <div className="mt-4">
-                  <h3 className="text-xl font-semibold text-gray-700 mb-2">
-                    Teams
-                  </h3>
-                  <TeamList teams={teams} onEditTeam={setEditingTeam} />
-                </div>
-              )}
+          {showTeams && (
+            <div className="mt-4">
+              <h3 className="text-xl font-semibold text-gray-700 mb-2">
+                Teams
+              </h3>
+              <TeamList teams={teams} onEditTeam={setEditingTeam} />
+            </div>
+          )}
 
-              {showUsers && (
-                <div className="mt-4">
-                  <h3 className="text-xl font-semibold text-gray-700 mb-2">
-                    Users
-                  </h3>
-                  <UserList users={users} />
-                </div>
-              )}
-            </>
+          {showUsers && (
+            <div className="mt-4">
+              <h3 className="text-xl font-semibold text-gray-700 mb-2">
+                Users
+              </h3>
+              <UserList users={users} />
+            </div>
           )}
         </>
       ) : (
