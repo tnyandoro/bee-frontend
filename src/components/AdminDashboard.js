@@ -169,8 +169,8 @@ const AdminDashboard = ({ organizationSubdomain }) => {
 
       {dashboardStats ? (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6 transition duration-500 ease-in-out hover:rotate-2 hover:scale-105">
-            <div className="bg-white shadow rounded-lg p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+            <div className="bg-white shadow rounded-lg p-6 transition duration-500 ease-in-out hover:rotate-2 hover:scale-105">
               <h2 className="text-lg font-semibold text-gray-700">
                 Organization
               </h2>
