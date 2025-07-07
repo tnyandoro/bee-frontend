@@ -197,6 +197,14 @@ const AdminDashboard = ({ organizationSubdomain }) => {
               </h3>
               <p className="text-2xl">{dashboardStats.stats.open_tickets}</p>
             </div>
+            <div className="bg-green-200 shadow rounded-lg p-6 transition duration-500 ease-in-out hover:rotate-2 hover:scale-105">
+              <h3 className="text-xl font-semibold text-green-900">
+                Resolved Tickets
+              </h3>
+              <p className="text-2xl">
+                {dashboardStats.stats.resolved_tickets}
+              </p>
+            </div>
             <div className="bg-green-100 shadow rounded-lg p-6 transition duration-500 ease-in-out hover:rotate-2 hover:scale-105">
               <h3 className="text-xl font-semibold text-green-800">
                 Closed Tickets
