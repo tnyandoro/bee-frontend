@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../contexts/authContext";
 import { FaUpload, FaLock, FaUser, FaArrowLeft } from "react-icons/fa";
+import CloudinaryUploadWidget from "./CloudinaryUploadWidget";
 import axios from "axios";
 
 const api = axios.create({
@@ -19,7 +20,6 @@ const Profile = () => {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [profilePicture, setProfilePicture] = useState(null);
-  const [selectedFile, setSelectedFile] = useState(null);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -41,6 +41,7 @@ const Profile = () => {
 
         console.log("Profile response:", res.data);
         setProfile(res.data);
+        setProfilePicture(res.data.user?.profile_picture_url || null);
       } catch (err) {
         const message = err.response?.data?.error || err.message;
         console.error("Profile fetch error:", err);
@@ -51,25 +52,31 @@ const Profile = () => {
     };
 
     fetchProfile();
-
-    const storedImage = localStorage.getItem("profilePicture");
-    if (storedImage) {
-      setProfilePicture(storedImage);
-    }
-
     console.log("Current user from context:", user);
   }, [user]);
 
-  const handleImageUpload = () => {
-    if (selectedFile) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const imageUrl = reader.result;
-        setProfilePicture(imageUrl);
-        localStorage.setItem("profilePicture", imageUrl);
-      };
-      reader.readAsDataURL(selectedFile);
-      setSelectedFile(null);
+  const handleUploadToBackend = async (imageUrl) => {
+    const token = localStorage.getItem("authToken");
+
+    try {
+      await axios.post(
+        "https://itsm-api.onrender.com/api/v1/uploads/upload_profile_picture",
+        { file: imageUrl },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      setProfilePicture(imageUrl);
+      console.log("Profile picture uploaded and saved to backend");
+    } catch (err) {
+      console.error(
+        "Error saving profile picture:",
+        err.response?.data || err.message
+      );
     }
   };
 
@@ -108,28 +115,13 @@ const Profile = () => {
               className="w-32 h-32 rounded-full border-4 border-blue-500 mb-2"
             />
           ) : (
-            <div className="w-32 h-32 rounded-full border-4 border-blue-500 bg-white shadow flex items-center justify-center mb-2">
-              Upload Picture
+            <div className="w-32 h-32 rounded-full border-4 border-blue-500 bg-white shadow flex items-center justify-center mb-2 text-center text-blue-700">
+              No Picture
             </div>
           )}
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => {
-              setSelectedFile(e.target.files[0]);
-              handleImageUpload();
-            }}
-            className="hidden"
-            id="file-upload"
-          />
+          <CloudinaryUploadWidget onUpload={handleUploadToBackend} />
         </div>
 
-        <label
-          htmlFor="file-upload"
-          className="flex items-center py-2 px-4 mb-2 bg-blue-700 hover:bg-blue-600 rounded cursor-pointer transition"
-        >
-          <FaUpload className="mr-2" /> Upload Picture
-        </label>
         <label
           className="flex items-center py-2 px-4 mb-2 bg-blue-700 hover:bg-blue-600 rounded cursor-pointer transition"
           onClick={() => setActiveTab("profile")}
