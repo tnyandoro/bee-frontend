@@ -24,6 +24,8 @@ const Dashboard = () => {
     missedSLA: 0,
     resolved: 0,
     closed: 0,
+    assigned: 0,
+    escalated: 0,
   });
 
   const [tickets, setTickets] = useState([]);
@@ -78,16 +80,18 @@ const Dashboard = () => {
 
       setTicketData({
         newTickets: visibleTickets.filter((t) => t.status === "open").length,
-        critical: visibleTickets.filter((t) => t.priority === 0).length, // P1
-        high: visibleTickets.filter((t) => t.priority === 1).length, // P2
-        medium: visibleTickets.filter((t) => t.priority === 2).length, // P3
-        low: visibleTickets.filter((t) => t.priority === 3).length, // P4
+        critical: visibleTickets.filter((t) => t.priority === 0).length,
+        high: visibleTickets.filter((t) => t.priority === 1).length,
+        medium: visibleTickets.filter((t) => t.priority === 2).length,
+        low: visibleTickets.filter((t) => t.priority === 3).length,
         breaching: visibleTickets.filter(
           (t) => t.sla_breached && t.status !== "resolved"
         ).length,
         missedSLA: visibleTickets.filter((t) => t.sla_breached).length,
         resolved: visibleTickets.filter((t) => t.status === "resolved").length,
         closed: visibleTickets.filter((t) => t.status === "closed").length,
+        assigned: visibleTickets.filter((t) => !!t.assignee_id).length,
+        escalated: visibleTickets.filter((t) => !!t.escalated).length,
       });
     } catch (err) {
       console.error("Dashboard API Error:", err);
@@ -159,23 +163,27 @@ const Dashboard = () => {
 
   return (
     <div className="p-4">
-      <div className="bg-gry-700 shadow-xl rounded-lg mb-4">
-        <div className="bg-gray-200 p-4 rounded-t">
-          <h1 className="text-xl font-bold mb-1">
-            {capitalizedOrgName} Dashboard
-          </h1>
-          {currentUser?.name && (
-            <p className="text-gray-700 text-sm">
-              Welcome, <span className="font-semibold">{currentUser.name}</span>
-            </p>
-          )}
-        </div>
+      <div className="bg-gray-200 shadow-xl rounded-lg mb-4 p-4">
+        <h1 className="text-xl font-bold mb-1">
+          {capitalizedOrgName} Dashboard
+        </h1>
+        {currentUser?.name && (
+          <p className="text-gray-700 text-sm">
+            Welcome, <span className="font-semibold">{currentUser.name}</span>
+          </p>
+        )}
       </div>
 
       {error && <div className="text-red-500 mb-2">{error}</div>}
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
         <StatCard label="Open" value={ticketData.newTickets} color="blue" />
+        <StatCard label="Assigned" value={ticketData.assigned} color="indigo" />
+        <StatCard
+          label="Escalated"
+          value={ticketData.escalated}
+          color="purple"
+        />
         <StatCard label="Critical" value={ticketData.critical} color="red" />
         <StatCard label="High" value={ticketData.high} color="orange" />
         <StatCard label="Medium" value={ticketData.medium} color="yellow" />
@@ -184,9 +192,14 @@ const Dashboard = () => {
         <StatCard
           label="Missed SLA"
           value={ticketData.missedSLA}
-          color="yellow"
+          color="gray"
         />
-        <StatCard label="Resolved" value={ticketData.resolved} color="green" />
+        <StatCard
+          label="Resolved"
+          value={ticketData.resolved}
+          color="emerald"
+        />
+        <StatCard label="Closed" value={ticketData.closed} color="teal" />
       </div>
 
       <div className="mb-4">
