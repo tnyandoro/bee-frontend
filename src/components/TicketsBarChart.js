@@ -5,7 +5,14 @@ const TicketsBarChart = ({ stats }) => {
   const options = {
     chart: { id: "tickets-bar", toolbar: { show: false } },
     xaxis: {
-      categories: ["Total", "Open", "Closed", "Problems", "Team Members"],
+      categories: [
+        "Total",
+        "Open",
+        "Closed",
+        "Resolved", // ✅ Added
+        "Problems",
+        "Team Members",
+      ],
     },
     colors: ["#3b82f6"],
     dataLabels: {
@@ -20,6 +27,7 @@ const TicketsBarChart = ({ stats }) => {
         stats.total_tickets,
         stats.open_tickets,
         stats.closed_tickets,
+        stats.resolved_tickets, // ✅ Added
         stats.total_problems,
         stats.total_members,
       ],
