@@ -1,20 +1,24 @@
-import React from "react";
+import React, { useState } from "react";
 
 const CloudinaryUploadWidget = ({ onUpload }) => {
   const cloudName = process.env.REACT_APP_CLOUD_NAME;
   const uploadPreset = process.env.REACT_APP_UPLOAD_PRESET;
+  const [uploading, setUploading] = useState(false);
 
   const openWidget = () => {
+    setUploading(true);
     window.cloudinary.openUploadWidget(
       {
-        cloudName: cloudName,
-        uploadPreset: uploadPreset,
+        cloudName,
+        uploadPreset,
         sources: ["local", "camera", "url"],
         multiple: false,
         cropping: false,
-        folder: "problems",
+        folder: "profile_pictures",
       },
       function (error, result) {
+        setUploading(false);
+
         if (!error && result && result.event === "success") {
           console.log("Upload Success:", result.info);
           onUpload(result.info.secure_url);
@@ -27,10 +31,35 @@ const CloudinaryUploadWidget = ({ onUpload }) => {
 
   return (
     <button
-      className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+      className={`px-4 py-2 rounded text-white ${
+        uploading ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"
+      }`}
       onClick={openWidget}
+      disabled={uploading}
     >
-      Upload Attachment
+      {uploading ? (
+        <div className="flex items-center space-x-2">
+          <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+              fill="none"
+            ></circle>
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+            ></path>
+          </svg>
+          <span>Uploading...</span>
+        </div>
+      ) : (
+        "Upload Picture"
+      )}
     </button>
   );
 };

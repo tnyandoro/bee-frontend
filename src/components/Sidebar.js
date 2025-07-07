@@ -15,7 +15,7 @@ import { useAuth } from "../contexts/authContext";
 
 const Sidebar = ({ isLoggedIn }) => {
   const [selected, setSelected] = useState(null);
-  const { user } = useAuth();
+  const { currentUser: user } = useAuth();
 
   const links = [
     {
