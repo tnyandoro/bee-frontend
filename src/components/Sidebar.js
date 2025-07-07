@@ -11,9 +11,11 @@ import {
   UserPlusIcon,
   Squares2X2Icon,
 } from "@heroicons/react/24/outline";
+import { useAuth } from "../contexts/authContext";
 
 const Sidebar = ({ isLoggedIn }) => {
   const [selected, setSelected] = useState(null);
+  const { user } = useAuth();
 
   const links = [
     {
@@ -86,18 +88,40 @@ const Sidebar = ({ isLoggedIn }) => {
 
   if (!isLoggedIn) return null;
 
+  const profilePicture = user?.profile_picture_url;
+
   return (
     <div className="fixed mt-28 mb-8 pb-16 left-0 h-full bg-white shadow-lg w-64 overflow-y-auto z-40">
-      <ul className="space-y-2">
+      {/* Profile Picture */}
+      <div className="text-center py-6 border-b border-gray-200">
+        {profilePicture ? (
+          <img
+            src={profilePicture}
+            alt="Profile"
+            className="w-16 h-16 mx-auto rounded-full border-2 border-blue-500 object-cover"
+          />
+        ) : (
+          <div className="w-16 h-16 mx-auto rounded-full bg-gray-300 flex items-center justify-center text-white text-sm">
+            No Image
+          </div>
+        )}
+        <p className="mt-2 font-semibold text-gray-800 text-sm">
+          {user?.name || "User"}
+        </p>
+        <p className="text-xs text-gray-500">{user?.email}</p>
+      </div>
+
+      {/* Links */}
+      <ul className="space-y-2 mt-4">
         {links.map((link) => (
           <li key={link.id}>
             <NavLink
               to={link.path}
               className={({ isActive }) =>
-                `flex items-center py-4 px-6 text-gray-700 ${
+                `flex items-center py-3 px-6 text-sm font-medium ${
                   isActive || selected === link.id
                     ? "bg-blue-700 text-white rounded-l-full"
-                    : "hover:bg-blue-700 hover:text-white rounded-l-full"
+                    : "text-gray-700 hover:bg-blue-700 hover:text-white rounded-l-full"
                 }`
               }
               onClick={() => setSelected(link.id)}
