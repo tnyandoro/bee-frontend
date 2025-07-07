@@ -8,8 +8,10 @@ const TicketsBarChart = ({ stats }) => {
       categories: [
         "Total",
         "Open",
+        "Assigned",
+        "Escalated",
+        "Resolved",
         "Closed",
-        "Resolved", // ✅ Added
         "Problems",
         "Team Members",
       ],
@@ -18,18 +20,35 @@ const TicketsBarChart = ({ stats }) => {
     dataLabels: {
       enabled: false,
     },
+    plotOptions: {
+      bar: {
+        borderRadius: 6,
+        horizontal: false,
+        columnWidth: "45%",
+      },
+    },
+    tooltip: {
+      y: {
+        formatter: (val) => `${val} ticket${val !== 1 ? "s" : ""}`,
+      },
+    },
+    theme: {
+      palette: "palette1",
+    },
   };
 
   const series = [
     {
       name: "Count",
       data: [
-        stats.total_tickets,
-        stats.open_tickets,
-        stats.closed_tickets,
-        stats.resolved_tickets, // ✅ Added
-        stats.total_problems,
-        stats.total_members,
+        stats.total_tickets ?? 0,
+        stats.open_tickets ?? 0,
+        stats.assigned_tickets ?? 0,
+        stats.escalated_tickets ?? 0,
+        stats.resolved_tickets ?? 0,
+        stats.closed_tickets ?? 0,
+        stats.total_problems ?? 0,
+        stats.total_members ?? 0,
       ],
     },
   ];
