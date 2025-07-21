@@ -11,21 +11,23 @@ const ProfilePictureUploader = ({ currentImageUrl, onUploadSuccess }) => {
 
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("upload_preset", "YOUR_UPLOAD_PRESET"); // Replace with Cloudinary preset
-    formData.append("folder", "profile_pictures"); // Optional
+    formData.append(
+      "upload_preset",
+      process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET
+    );
+    formData.append("folder", "profile_pictures");
 
     try {
       setUploading(true);
       const res = await axios.post(
-        "https://api.cloudinary.com/v1_1/YOUR_CLOUD_NAME/image/upload",
+        `https://api.cloudinary.com/v1_1/${process.env.REACT_APP_CLOUDINARY_CLOUD_NAME}/image/upload`,
         formData
       );
       const imageUrl = res.data.secure_url;
-
-      // Callback to parent to update profile with the new image URL
-      onUploadSuccess(imageUrl);
+      onUploadSuccess(imageUrl); // callback to update parent
     } catch (err) {
-      setError("Failed to upload image");
+      console.error("Cloudinary upload error:", err);
+      setError("Failed to upload image. Please try again.");
     } finally {
       setUploading(false);
     }
