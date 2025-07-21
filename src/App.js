@@ -1,11 +1,15 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   BrowserRouter as Router,
   Route,
   Routes,
   Navigate,
+  useLocation,
 } from "react-router-dom";
+
+import FullPageLoader from "./components/FullPageLoader";
 import { useAuth } from "./contexts/authContext";
+
 import Home from "./components/home";
 import Header from "./components/Header";
 import Login from "./components/Login";
@@ -26,15 +30,29 @@ import Profile from "./components/Profile";
 import CreateUserForm from "./components/CreateUserForm";
 import AdminDashboard from "./components/AdminDashboard";
 
-function App() {
+// Custom wrapper to handle route-based loading
+const AppWrapper = () => {
+  const location = useLocation();
+  const [loading, setLoading] = useState(false);
   const { currentUser, isAuthenticated, logout, subdomain } = useAuth();
+
+  useEffect(() => {
+    setLoading(true);
+    const timeout = setTimeout(() => {
+      setLoading(false);
+    }, 600); // adjust duration based on perceived load
+
+    return () => clearTimeout(timeout);
+  }, [location.pathname]);
 
   const handleLogout = () => {
     logout();
   };
 
   return (
-    <Router>
+    <>
+      {loading && <FullPageLoader />}
+
       <div className="App min-h-screen flex flex-col">
         {isAuthenticated && (
           <>
@@ -282,8 +300,15 @@ function App() {
           </Routes>
         </div>
       </div>
-    </Router>
+    </>
   );
-}
+};
+
+// Final export with Router at the top
+const App = () => (
+  <Router>
+    <AppWrapper />
+  </Router>
+);
 
 export default App;

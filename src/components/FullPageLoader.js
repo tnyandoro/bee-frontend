@@ -2,6 +2,7 @@
 import React from "react";
 import { Player } from "@lottiefiles/react-lottie-player";
 import animationData from "../assets/loader.json";
+import loader from "../assets/loader.json";
 
 const FullPageLoader = () => {
   return (

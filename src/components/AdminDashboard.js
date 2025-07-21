@@ -8,6 +8,7 @@ import UserList from "./UserList";
 import createApiInstance from "../utils/api";
 import { useAuth } from "../contexts/authContext";
 import TicketsBarChart from "./TicketsBarChart";
+import { Card } from "./ui/card";
 
 const AdminDashboard = ({ organizationSubdomain }) => {
   const { token, subdomain: authSubdomain, refreshToken, logout } = useAuth();
