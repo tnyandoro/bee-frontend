@@ -20,7 +20,7 @@ const ProfilePictureUploader = ({ onUploadSuccess, uploading }) => {
 
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("upload_preset", "itsmgss"); // 🔁 Replace
+    formData.append("upload_preset", "itsmgss");
     formData.append("folder", "profile_pictures");
 
     try {
