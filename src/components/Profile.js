@@ -20,6 +20,7 @@ const Profile = () => {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [profilePicture, setProfilePicture] = useState(null);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -59,8 +60,8 @@ const Profile = () => {
     const token = localStorage.getItem("authToken");
     const subdomain = localStorage.getItem("subdomain");
 
+    setUploading(true); // start loader
     try {
-      // Upload to Rails backend
       await axios.post(
         "https://itsm-api.onrender.com/api/v1/uploads/upload_profile_picture",
         { file: imageUrl },
@@ -72,7 +73,6 @@ const Profile = () => {
         }
       );
 
-      // Re-fetch profile to get updated image URL from ActiveStorage
       const res = await api.get(`/organizations/${subdomain}/profile`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -87,6 +87,8 @@ const Profile = () => {
         "Error saving profile picture:",
         err.response?.data || err.message
       );
+    } finally {
+      setUploading(false); // stop loader
     }
   };
 
