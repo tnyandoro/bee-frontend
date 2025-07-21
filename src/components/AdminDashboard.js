@@ -121,7 +121,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     dashboardStats?.organization?.name?.toUpperCase() || "";
 
   return (
-    <div className="mt-2 p-4 ml-64">
+    <div className="mt-2 p-4 ml-4">
       {" "}
       {/* Ensure sidebar spacing */}
       <div className="bg-gray-200 shadow-xl rounded-lg mb-4 p-4">
