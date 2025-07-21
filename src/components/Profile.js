@@ -20,12 +20,12 @@ const ProfilePictureUploader = ({ onUploadSuccess, uploading }) => {
 
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("upload_preset", "your_upload_preset"); // 🔁 Replace
+    formData.append("upload_preset", "itsmgss"); // 🔁 Replace
     formData.append("folder", "profile_pictures");
 
     try {
       const res = await axios.post(
-        "https://api.cloudinary.com/v1_1/your_cloud_name/image/upload", // 🔁 Replace
+        "https://api.cloudinary.com/v1_1/tendai/image/upload", // 🔁 Replace
         formData
       );
       onUploadSuccess(res.data.secure_url);
