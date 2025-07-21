@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../contexts/authContext";
 import { FaUpload, FaLock, FaUser, FaArrowLeft } from "react-icons/fa";
-import CloudinaryUploadWidget from "./CloudinaryUploadWidget";
 import axios from "axios";
 
 const api = axios.create({
