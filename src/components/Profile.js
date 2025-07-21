@@ -57,8 +57,10 @@ const Profile = () => {
 
   const handleUploadToBackend = async (imageUrl) => {
     const token = localStorage.getItem("authToken");
+    const subdomain = localStorage.getItem("subdomain");
 
     try {
+      // Upload to Rails backend
       await axios.post(
         "https://itsm-api.onrender.com/api/v1/uploads/upload_profile_picture",
         { file: imageUrl },
@@ -70,8 +72,16 @@ const Profile = () => {
         }
       );
 
-      setProfilePicture(imageUrl);
-      console.log("Profile picture uploaded and saved to backend");
+      // Re-fetch profile to get updated image URL from ActiveStorage
+      const res = await api.get(`/organizations/${subdomain}/profile`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      setProfile(res.data);
+      setProfilePicture(res.data.user?.profile_picture_url || null);
+      alert("Profile picture updated successfully!");
     } catch (err) {
       console.error(
         "Error saving profile picture:",
