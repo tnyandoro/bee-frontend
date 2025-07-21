@@ -1,12 +1,14 @@
 import React, { useState } from "react";
 
-const CloudinaryUploadWidget = ({ onUpload }) => {
+const CloudinaryUploadWidget = ({ onUpload, setFeedback }) => {
   const cloudName = process.env.REACT_APP_CLOUD_NAME;
   const uploadPreset = process.env.REACT_APP_UPLOAD_PRESET;
   const [uploading, setUploading] = useState(false);
 
   const openWidget = () => {
     setUploading(true);
+    if (setFeedback) setFeedback("Uploading started...");
+
     window.cloudinary.openUploadWidget(
       {
         cloudName,
@@ -21,9 +23,13 @@ const CloudinaryUploadWidget = ({ onUpload }) => {
 
         if (!error && result && result.event === "success") {
           console.log("Upload Success:", result.info);
+          if (setFeedback) setFeedback("Upload successful!");
           onUpload(result.info.secure_url);
         } else if (error) {
           console.error("Upload Widget Error:", error);
+          if (setFeedback) setFeedback("Upload failed. Please try again.");
+        } else {
+          if (setFeedback) setFeedback("Upload cancelled or failed.");
         }
       }
     );
