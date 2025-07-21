@@ -10,6 +10,47 @@ const api = axios.create({
   },
 });
 
+// Upload button component
+const ProfilePictureUploader = ({ onUploadSuccess, uploading }) => {
+  const [error, setError] = useState("");
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", "your_upload_preset"); // 🔁 Replace
+    formData.append("folder", "profile_pictures");
+
+    try {
+      const res = await axios.post(
+        "https://api.cloudinary.com/v1_1/your_cloud_name/image/upload", // 🔁 Replace
+        formData
+      );
+      onUploadSuccess(res.data.secure_url);
+    } catch (err) {
+      console.error("Cloudinary upload error:", err);
+      setError("Failed to upload image.");
+    }
+  };
+
+  return (
+    <div className="flex flex-col items-center space-y-2">
+      <label className="bg-blue-600 text-white px-4 py-2 rounded cursor-pointer hover:bg-blue-700">
+        {uploading ? "Uploading..." : "Attach Photo"}
+        <input
+          type="file"
+          accept="image/*"
+          onChange={handleFileChange}
+          className="hidden"
+        />
+      </label>
+      {error && <span className="text-red-500 text-sm">{error}</span>}
+    </div>
+  );
+};
+
 const Profile = () => {
   const { user } = useAuth();
   const [profile, setProfile] = useState(null);
@@ -39,12 +80,10 @@ const Profile = () => {
           },
         });
 
-        console.log("Profile response:", res.data);
         setProfile(res.data);
         setProfilePicture(res.data.user?.profile_picture_url || null);
       } catch (err) {
         const message = err.response?.data?.error || err.message;
-        console.error("Profile fetch error:", err);
         setError("Failed to fetch profile data: " + message);
       } finally {
         setLoading(false);
@@ -52,14 +91,13 @@ const Profile = () => {
     };
 
     fetchProfile();
-    console.log("Current user from context:", user);
   }, [user]);
 
   const handleUploadToBackend = async (imageUrl) => {
     const token = localStorage.getItem("authToken");
     const subdomain = localStorage.getItem("subdomain");
 
-    setUploading(true); // start loader
+    setUploading(true);
     try {
       await axios.post(
         "https://itsm-api.onrender.com/api/v1/uploads/upload_profile_picture",
@@ -87,13 +125,12 @@ const Profile = () => {
         err.response?.data || err.message
       );
     } finally {
-      setUploading(false); // stop loader
+      setUploading(false);
     }
   };
 
   const handleChangePassword = () => {
     if (newPassword === confirmPassword) {
-      // TODO: Connect to password update API
       alert("Password changed successfully!");
       setNewPassword("");
       setConfirmPassword("");
@@ -130,7 +167,10 @@ const Profile = () => {
               No Picture
             </div>
           )}
-          <CloudinaryUploadWidget onUpload={handleUploadToBackend} />
+          <ProfilePictureUploader
+            onUploadSuccess={handleUploadToBackend}
+            uploading={uploading}
+          />
         </div>
 
         <label
@@ -160,7 +200,6 @@ const Profile = () => {
             {isAdmin && (
               <p className="text-green-500 mb-2">You have admin privileges.</p>
             )}
-
             <div className="grid grid-cols-2 gap-2">
               {[
                 { key: "ID", value: userData.id },
