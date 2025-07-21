@@ -40,7 +40,7 @@ const AppWrapper = () => {
     setLoading(true);
     const timeout = setTimeout(() => {
       setLoading(false);
-    }, 600); // adjust duration based on perceived load
+    }, 600); // adjust duration based on load feel
 
     return () => clearTimeout(timeout);
   }, [location.pathname]);
@@ -73,12 +73,13 @@ const AppWrapper = () => {
             />
             <Sidebar
               isLoggedIn={isAuthenticated}
-              className="fixed top-16 left-0 h-[calc(100vh-4rem)] w-64"
+              className="fixed top-16 left-0 h-[calc(100vh-4rem)] w-64 z-20 bg-gray-800 text-white"
             />
           </>
         )}
 
-        <div className={isAuthenticated ? "ml-64 pt-16 flex-1" : "flex-1"}>
+        {/* Adjusted layout so content doesn't go under sidebar */}
+        <div className={isAuthenticated ? "ml-64 pt-16 px-4 flex-1" : "flex-1"}>
           <Routes>
             <Route
               path="/"
@@ -304,7 +305,6 @@ const AppWrapper = () => {
   );
 };
 
-// Final export with Router at the top
 const App = () => (
   <Router>
     <AppWrapper />
