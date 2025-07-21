@@ -6,9 +6,8 @@ import PrivateRoute from "./PrivateRoute";
 
 const CreateUserForm = ({ onClose }) => {
   const { currentUser, token, subdomain } = useAuth();
-  const [roleOptions, setRoleOptions] = useState([]);
-  const [rolesLoading, setRolesLoading] = useState(true);
   const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -20,13 +19,35 @@ const CreateUserForm = ({ onClose }) => {
     password_confirmation: "",
     avatar: null,
   });
+
+  const [roleOptions, setRoleOptions] = useState([]);
+  const [rolesLoading, setRolesLoading] = useState(true);
   const [avatarPreview, setAvatarPreview] = useState(null);
+
   const [status, setStatus] = useState({
     loading: false,
     error: null,
     success: false,
   });
 
+  // Lock scroll when modal opens
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "auto";
+    };
+  }, []);
+
+  // Cleanup preview URL
+  useEffect(() => {
+    return () => {
+      if (avatarPreview) {
+        URL.revokeObjectURL(avatarPreview);
+      }
+    };
+  }, [avatarPreview]);
+
+  // Fetch roles
   useEffect(() => {
     const fetchRoles = async () => {
       try {
@@ -78,14 +99,6 @@ const CreateUserForm = ({ onClose }) => {
     }
   }, [subdomain, token]);
 
-  useEffect(() => {
-    return () => {
-      if (avatarPreview) {
-        URL.revokeObjectURL(avatarPreview);
-      }
-    };
-  }, [avatarPreview]);
-
   const handleChange = (e) => {
     const { name, value, files } = e.target;
     if (name === "avatar" && files[0]) {
@@ -111,9 +124,11 @@ const CreateUserForm = ({ onClose }) => {
     try {
       const url = `https://itsm-api.onrender.com/api/v1/organizations/${subdomain}/users`;
       const formDataToSend = new FormData();
+
       Object.entries(formData).forEach(([key, value]) => {
         if (value) formDataToSend.append(`user[${key}]`, value);
       });
+
       formDataToSend.append("organization_subdomain", subdomain);
 
       await axios.post(url, formDataToSend, {
@@ -124,6 +139,7 @@ const CreateUserForm = ({ onClose }) => {
       });
 
       setStatus({ loading: false, success: true, error: null });
+
       setTimeout(() => {
         setFormData({
           name: "",
@@ -149,7 +165,7 @@ const CreateUserForm = ({ onClose }) => {
 
   return (
     <PrivateRoute allowedRoles={["system_admin", "domain_admin"]}>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 overflow-y-auto p-4">
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-60 p-4 transition-opacity duration-300 overflow-y-auto">
         <div className="w-full max-w-6xl sm:rounded-lg bg-white p-6 shadow-xl">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
@@ -222,11 +238,15 @@ const CreateUserForm = ({ onClose }) => {
                 onChange={handleChange}
                 className="w-full border border-gray-300 rounded px-3 py-2"
               >
-                {roleOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
+                {rolesLoading ? (
+                  <option>Loading...</option>
+                ) : (
+                  roleOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))
+                )}
               </select>
               <input
                 type="password"
@@ -247,6 +267,7 @@ const CreateUserForm = ({ onClose }) => {
                 className="w-full border border-gray-300 rounded px-3 py-2"
               />
             </div>
+
             <div className="mt-4">
               <input
                 type="file"
@@ -263,6 +284,7 @@ const CreateUserForm = ({ onClose }) => {
                 />
               )}
             </div>
+
             <div className="flex justify-end space-x-2">
               <button
                 type="button"
