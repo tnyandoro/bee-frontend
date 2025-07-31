@@ -8,8 +8,10 @@ const CreateUserForm = ({ onClose }) => {
   const { currentUser, token, subdomain } = useAuth();
   const navigate = useNavigate();
 
+  // Updated: Added last_name field
   const [formData, setFormData] = useState({
     name: "",
+    last_name: "", // ← Added
     email: "",
     username: "",
     phone_number: "",
@@ -23,7 +25,6 @@ const CreateUserForm = ({ onClose }) => {
   const [roleOptions, setRoleOptions] = useState([]);
   const [rolesLoading, setRolesLoading] = useState(true);
   const [avatarPreview, setAvatarPreview] = useState(null);
-
   const [status, setStatus] = useState({
     loading: false,
     error: null,
@@ -57,7 +58,6 @@ const CreateUserForm = ({ onClose }) => {
             Authorization: `Bearer ${token}`,
           },
         });
-
         const fetchedRoles = response.data.map((role) =>
           typeof role === "string"
             ? {
@@ -68,7 +68,6 @@ const CreateUserForm = ({ onClose }) => {
               }
             : role
         );
-
         setRoleOptions(fetchedRoles);
       } catch (error) {
         console.error("Failed to fetch roles:", error);
@@ -93,7 +92,6 @@ const CreateUserForm = ({ onClose }) => {
         setRolesLoading(false);
       }
     };
-
     if (subdomain && token) {
       fetchRoles();
     }
@@ -120,15 +118,14 @@ const CreateUserForm = ({ onClose }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setStatus({ loading: true, error: null, success: false });
-
     try {
       const url = `https://itsm-api.onrender.com/api/v1/organizations/${subdomain}/users`;
       const formDataToSend = new FormData();
-
       Object.entries(formData).forEach(([key, value]) => {
-        if (value) formDataToSend.append(`user[${key}]`, value);
+        if (value !== null && value !== "") {
+          formDataToSend.append(`user[${key}]`, value);
+        }
       });
-
       formDataToSend.append("organization_subdomain", subdomain);
 
       await axios.post(url, formDataToSend, {
@@ -140,9 +137,11 @@ const CreateUserForm = ({ onClose }) => {
 
       setStatus({ loading: false, success: true, error: null });
 
+      // Reset form after success
       setTimeout(() => {
         setFormData({
           name: "",
+          last_name: "",
           email: "",
           username: "",
           phone_number: "",
@@ -163,11 +162,14 @@ const CreateUserForm = ({ onClose }) => {
     }
   };
 
+  // Compute full name for preview
+  const fullNamePreview =
+    `${formData.name} ${formData.last_name}`.trim() || "Full Name Preview";
+
   return (
     <PrivateRoute allowedRoles={["system_admin", "domain_admin"]}>
       <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-60 p-4 transition-opacity duration-300 overflow-y-auto">
         <div className="w-full max-w-6xl sm:rounded-lg bg-white p-6 shadow-xl scale-[.90]">
-          {" "}
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
               Create New User
@@ -179,26 +181,51 @@ const CreateUserForm = ({ onClose }) => {
               ✕
             </button>
           </div>
+
           {status.error && (
             <div className="mb-4 p-3 bg-red-50 text-red-700 border border-red-200 rounded">
               {status.error}
             </div>
           )}
+
           {status.success && (
             <div className="mb-4 p-3 bg-green-50 text-green-700 border border-green-200 rounded">
               User created successfully!
             </div>
           )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              {/* First Name */}
               <input
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
-                placeholder="Full Name"
+                placeholder="First Name"
                 required
                 className="w-full border border-gray-300 rounded px-3 py-2"
               />
+
+              {/* Last Name */}
+              <input
+                name="last_name"
+                value={formData.last_name}
+                onChange={handleChange}
+                placeholder="Last Name"
+                required
+                className="w-full border border-gray-300 rounded px-3 py-2"
+              />
+
+              {/* Full Name Preview (Read-only) */}
+              <input
+                type="text"
+                value={fullNamePreview}
+                placeholder="Full Name Preview"
+                disabled
+                className="w-full border border-gray-300 rounded px-3 py-2 bg-gray-100 text-gray-500 cursor-not-allowed"
+              />
+
+              {/* Email */}
               <input
                 type="email"
                 name="email"
@@ -208,6 +235,8 @@ const CreateUserForm = ({ onClose }) => {
                 required
                 className="w-full border border-gray-300 rounded px-3 py-2"
               />
+
+              {/* Username */}
               <input
                 name="username"
                 value={formData.username}
@@ -216,6 +245,8 @@ const CreateUserForm = ({ onClose }) => {
                 required
                 className="w-full border border-gray-300 rounded px-3 py-2"
               />
+
+              {/* Phone Number */}
               <input
                 name="phone_number"
                 value={formData.phone_number}
@@ -223,6 +254,8 @@ const CreateUserForm = ({ onClose }) => {
                 placeholder="Phone Number"
                 className="w-full border border-gray-300 rounded px-3 py-2"
               />
+
+              {/* Position */}
               <input
                 name="position"
                 value={formData.position}
@@ -230,14 +263,17 @@ const CreateUserForm = ({ onClose }) => {
                 placeholder="Position"
                 className="w-full border border-gray-300 rounded px-3 py-2"
               />
+
+              {/* Role */}
               <select
                 name="role"
                 value={formData.role}
                 onChange={handleChange}
                 className="w-full border border-gray-300 rounded px-3 py-2"
+                required
               >
                 {rolesLoading ? (
-                  <option>Loading...</option>
+                  <option>Loading roles...</option>
                 ) : (
                   roleOptions.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -246,6 +282,8 @@ const CreateUserForm = ({ onClose }) => {
                   ))
                 )}
               </select>
+
+              {/* Password */}
               <input
                 type="password"
                 name="password"
@@ -255,6 +293,8 @@ const CreateUserForm = ({ onClose }) => {
                 required
                 className="w-full border border-gray-300 rounded px-3 py-2"
               />
+
+              {/* Confirm Password */}
               <input
                 type="password"
                 name="password_confirmation"
@@ -266,6 +306,7 @@ const CreateUserForm = ({ onClose }) => {
               />
             </div>
 
+            {/* Avatar Upload */}
             <div className="mt-4">
               <input
                 type="file"
@@ -277,24 +318,25 @@ const CreateUserForm = ({ onClose }) => {
               {avatarPreview && (
                 <img
                   src={avatarPreview}
-                  alt="Preview"
-                  className="mt-2 h-24 w-24 rounded-full object-cover"
+                  alt="Avatar Preview"
+                  className="mt-2 h-24 w-24 rounded-full object-cover border"
                 />
               )}
             </div>
 
-            <div className="flex justify-end space-x-2">
+            {/* Submit Buttons */}
+            <div className="flex justify-end space-x-2 pt-4">
               <button
                 type="button"
                 onClick={handleCancel}
-                className="bg-gray-200 px-4 py-2 rounded hover:bg-gray-300"
+                className="bg-gray-200 px-4 py-2 rounded hover:bg-gray-300 transition"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={status.loading}
-                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-blue-400 transition"
               >
                 {status.loading ? "Creating..." : "Create User"}
               </button>
