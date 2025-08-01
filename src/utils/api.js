@@ -1,4 +1,3 @@
-// src/utils/api.js
 import axios from "axios";
 
 const createApiInstance = (token, subdomain) => {
@@ -9,18 +8,18 @@ const createApiInstance = (token, subdomain) => {
 
   const isDev = process.env.NODE_ENV === "development";
 
-  // Validate subdomain
-  if (!subdomain) {
+  const effectiveSubdomain = subdomain || (isDev ? "demo" : null);
+  if (!effectiveSubdomain) {
     console.error("No subdomain provided for API instance");
     throw new Error("Organization subdomain is required");
   }
 
-  // Use fixed domain, pass subdomain in routes
+  // Determine the base URL
   const baseURL =
     process.env.REACT_APP_API_BASE_URL ||
     (isDev
-      ? `http://localhost:3000/api/v1` // Dev: localhost
-      : `https://itsm-api.onrender.com/api/v1`); // Prod: fixed domain
+      ? `http://${effectiveSubdomain}.lvh.me:3000/api/v1`
+      : `https://${effectiveSubdomain}.itsm-api.onrender.com/api/v1`);
 
   const authHeader = `Bearer ${token}`;
   console.log("Creating API instance:", { baseURL, Authorization: authHeader });
@@ -29,14 +28,12 @@ const createApiInstance = (token, subdomain) => {
     baseURL,
     headers: {
       "Content-Type": "application/json",
-      Accept: "application/json",
       Authorization: authHeader,
     },
     timeout: 15000,
-    withCredentials: false, // Not needed for Bearer tokens
+    withCredentials: true,
   });
 
-  // Response interceptor for error handling
   instance.interceptors.response.use(
     (response) => response,
     (error) => {
@@ -47,14 +44,10 @@ const createApiInstance = (token, subdomain) => {
       } else if (error.response?.status === 404) {
         console.error(
           "Resource not found:",
-          errorMessage || "Endpoint or organization not found"
+          errorMessage || "Organization or endpoint not found"
         );
       } else {
-        console.error("API error:", {
-          message: errorMessage,
-          status: error.response?.status,
-          url: error.config?.url,
-        });
+        console.error("API error:", errorMessage || "Unknown error");
       }
 
       return Promise.reject(error);
