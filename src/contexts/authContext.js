@@ -1,4 +1,3 @@
-// src/contexts/AuthProvider.js
 import React, {
   createContext,
   useContext,
@@ -7,86 +6,94 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
+import axios from "axios";
 
 const AuthContext = createContext();
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) throw new Error("useAuth must be used within an AuthProvider");
-  return context;
+
+  // Defensive subdomain fallback
+  const fallbackSubdomain =
+    context.subdomain ||
+    context.organization?.subdomain ||
+    localStorage.getItem("subdomain") ||
+    (process.env.NODE_ENV === "development" ? "demo" : null);
+
+  return {
+    ...context,
+    subdomain: fallbackSubdomain,
+  };
 };
 
-// API Base URL
 const getApiBaseUrl = () => {
-  return (
-    process.env.REACT_APP_API_BASE_URL || "https://itsm-api.onrender.com/api/v1"
-  );
+  return process.env.REACT_APP_API_BASE_URL || "http://localhost:3000/api/v1";
 };
 
 export const AuthProvider = ({ children }) => {
   const [state, setState] = useState({
     currentUser: null,
     organization: null,
-    permissions: {},
     subdomain: null,
     token: null,
     loading: true,
     error: null,
   });
 
-  const logout = useCallback(() => {
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("subdomain");
-    localStorage.removeItem("email");
-    localStorage.removeItem("role");
-    localStorage.removeItem("userId");
+  const getAuthTokens = useCallback(() => {
+    try {
+      const token = localStorage.getItem("authToken");
+      const subdomain = localStorage.getItem("subdomain");
+      const email = localStorage.getItem("email");
+      const role = localStorage.getItem("role");
+      const userId = localStorage.getItem("userId");
 
-    setState((prev) => ({
-      ...prev,
+      return { token, subdomain, email, role, userId };
+    } catch (e) {
+      console.warn("LocalStorage access error:", e);
+      return {};
+    }
+  }, []);
+
+  const logout = useCallback(() => {
+    localStorage.clear();
+    setState({
       currentUser: null,
       organization: null,
-      permissions: {},
       subdomain: null,
       token: null,
       loading: false,
       error: null,
-    }));
+    });
   }, []);
 
-  const fetchProfileAndPermissions = useCallback(
+  const verifyAuth = useCallback(
     async (token, subdomain) => {
-      if (!token || !subdomain) return false;
-
-      const apiBase = getApiBaseUrl();
-      const headers = {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      };
+      if (!token || !subdomain) {
+        const error = !token
+          ? "Authentication token is required"
+          : "Organization subdomain is required";
+        setState((prev) => ({ ...prev, error, loading: false }));
+        return false;
+      }
 
       try {
-        // Fetch profile
-        const profileRes = await fetch(
+        setState((prev) => ({ ...prev, loading: true, error: null }));
+        const apiBase = getApiBaseUrl();
+
+        const response = await axios.get(
           `${apiBase}/organizations/${subdomain}/profile`,
-          { headers }
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          }
         );
 
-        if (!profileRes.ok) throw new Error("Profile fetch failed");
+        const { user, organization } = response.data;
 
-        const profileData = await profileRes.json();
-        const { user, organization } = profileData;
-
-        // Fetch permissions
-        const permissionsRes = await fetch(`${apiBase}/permissions`, {
-          headers,
-        });
-        if (!permissionsRes.ok) throw new Error("Permissions fetch failed");
-        const permissionsData = await permissionsRes.json();
-
-        // Use data.data if wrapped
-        const permissions = permissionsData.data || permissionsData;
-
-        // Sanitize user
         const sanitizedUser = {
           id: user.id,
           email: user.email,
@@ -95,10 +102,8 @@ export const AuthProvider = ({ children }) => {
           username: user.username,
           team_id: user.team_id,
           department_id: user.department_id,
-          is_admin: permissions.can_access_admin_dashboard || false,
         };
 
-        // Persist to localStorage
         localStorage.setItem("authToken", token);
         localStorage.setItem("subdomain", subdomain);
         localStorage.setItem("email", sanitizedUser.email);
@@ -108,7 +113,6 @@ export const AuthProvider = ({ children }) => {
         setState({
           currentUser: sanitizedUser,
           organization,
-          permissions,
           subdomain,
           token,
           loading: false,
@@ -117,10 +121,19 @@ export const AuthProvider = ({ children }) => {
 
         return true;
       } catch (error) {
-        console.error("Auth verification failed:", error);
-        const message =
-          error.response?.data?.error || "Session invalid or expired";
-        setState((prev) => ({ ...prev, error: message, loading: false }));
+        const errorMessage =
+          error.response?.status === 401
+            ? "Session expired. Please log in again."
+            : error.response?.status === 404
+            ? "Organization not found for this subdomain"
+            : error.response?.data?.error || "Authentication failed";
+
+        setState((prev) => ({
+          ...prev,
+          error: errorMessage,
+          loading: false,
+        }));
+
         logout();
         return false;
       }
@@ -128,75 +141,65 @@ export const AuthProvider = ({ children }) => {
     [logout]
   );
 
-  // Initialize auth on mount
   useEffect(() => {
-    const { token, subdomain } = {
-      token: localStorage.getItem("authToken"),
-      subdomain: localStorage.getItem("subdomain"),
-    };
-
+    const { token, subdomain } = getAuthTokens();
     const effectiveSubdomain =
       subdomain || (process.env.NODE_ENV === "development" ? "demo" : null);
 
     if (token && effectiveSubdomain) {
-      fetchProfileAndPermissions(token, effectiveSubdomain);
+      verifyAuth(token, effectiveSubdomain);
     } else {
       setState((prev) => ({
         ...prev,
         loading: false,
-        error: !token
-          ? "No authentication token"
+        error: effectiveSubdomain
+          ? "Authentication token missing"
           : "No organization subdomain available",
       }));
     }
-  }, [fetchProfileAndPermissions]);
+  }, [getAuthTokens, verifyAuth]);
 
   const login = useCallback(
     async (email, password, domain) => {
-      setState((prev) => ({ ...prev, loading: true, error: null }));
-
-      const subdomain =
-        domain || (process.env.NODE_ENV === "development" ? "demo" : null);
-      if (!subdomain) throw new Error("Subdomain is required");
-
-      const apiBase = getApiBaseUrl();
-
       try {
-        const response = await fetch(`${apiBase}/login`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify({ email, password, subdomain }),
+        setState((prev) => ({ ...prev, loading: true, error: null }));
+
+        const subdomain =
+          domain || (process.env.NODE_ENV === "development" ? "demo" : null);
+
+        if (!subdomain) throw new Error("Subdomain is required");
+
+        const apiBase = getApiBaseUrl();
+
+        const response = await axios.post(`${apiBase}/login`, {
+          email,
+          password,
+          subdomain,
         });
 
-        const data = await response.json();
+        const { auth_token, user } = response.data;
 
-        if (!response.ok) {
-          throw new Error(data.error || "Login failed");
-        }
+        localStorage.setItem("authToken", auth_token);
+        localStorage.setItem("subdomain", subdomain);
+        localStorage.setItem("email", user.email);
+        localStorage.setItem("role", user.role);
+        localStorage.setItem("userId", user.id);
 
-        const { auth_token: authToken } = data;
-
-        // Now fetch profile and permissions
-        const success = await fetchProfileAndPermissions(authToken, subdomain);
-        if (!success) {
-          throw new Error("Failed to verify session after login");
-        }
+        const isVerified = await verifyAuth(auth_token, subdomain);
+        if (!isVerified) throw new Error("Verification after login failed");
 
         return true;
       } catch (error) {
         const errorMessage =
           error.response?.status === 404
-            ? "Organization not found"
-            : error.message || "Login failed";
+            ? "Organization not found for this subdomain"
+            : error.response?.data?.error || "Login failed";
 
         setState((prev) => ({ ...prev, error: errorMessage, loading: false }));
-        throw error;
+        throw new Error(errorMessage);
       }
     },
-    [fetchProfileAndPermissions]
+    [verifyAuth]
   );
 
   const contextValue = useMemo(
@@ -204,10 +207,12 @@ export const AuthProvider = ({ children }) => {
       ...state,
       login,
       logout,
-      isAdmin: state.permissions.can_access_admin_dashboard === true,
-      isSuperUser: ["system_admin", "domain_admin"].includes(
-        state.currentUser?.role
-      ),
+      isAdmin:
+        state.currentUser?.role === "system_admin" ||
+        state.currentUser?.role === "domain_admin",
+      isSuperUser:
+        state.currentUser?.role === "system_admin" ||
+        state.currentUser?.role === "domain_admin",
       isAuthenticated: !!state.currentUser && !!state.token,
     }),
     [state, login, logout]
