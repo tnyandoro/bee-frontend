@@ -1,3 +1,4 @@
+// src/components/AdminDashboard.js
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { X } from "lucide-react";
@@ -5,9 +6,9 @@ import CreateUserForm from "./CreateUserForm";
 import CreateTeamForm from "./CreateTeamForm";
 import TeamList from "./TeamList";
 import UserList from "./UserList";
+import TicketsBarChart from "./TicketsBarChart";
 import createApiInstance from "../utils/api";
 import { useAuth } from "../contexts/authContext";
-import TicketsBarChart from "./TicketsBarChart";
 
 // Local stat card component
 const StatCard = ({ title, value, color, textColor }) => (
@@ -18,9 +19,18 @@ const StatCard = ({ title, value, color, textColor }) => (
 );
 
 const AdminDashboard = ({ organizationSubdomain }) => {
-  const { token, subdomain: authSubdomain, refreshToken, logout } = useAuth();
+  const {
+    token,
+    subdomain: authSubdomain,
+    refreshToken,
+    logout,
+    permissions,
+    loading: authLoading,
+  } = useAuth();
+
   const navigate = useNavigate();
 
+  // Modal states
   const [isCreateUserFormOpen, setIsCreateUserFormOpen] = useState(false);
   const [isCreateTeamFormOpen, setIsCreateTeamFormOpen] = useState(false);
   const [showTeams, setShowTeams] = useState(false);
@@ -31,6 +41,20 @@ const AdminDashboard = ({ organizationSubdomain }) => {
   const [users, setUsers] = useState([]);
   const [teams, setTeams] = useState([]);
   const [dashboardStats, setDashboardStats] = useState(null);
+
+  // --- PERMISSION CHECKS ---
+  const canManageUsers = permissions?.can_manage_users === true;
+  const canCreateTeams = permissions?.can_create_teams === true;
+  const canAccessAdminDashboard =
+    permissions?.can_access_admin_dashboard === true;
+
+  // Prevent access if not allowed
+  useEffect(() => {
+    if (!authLoading && !canAccessAdminDashboard) {
+      console.warn("User does not have access to admin dashboard");
+      navigate("/forbidden", { replace: true });
+    }
+  }, [authLoading, canAccessAdminDashboard, navigate]);
 
   const getEffectiveSubdomain = useCallback(() => {
     return organizationSubdomain && organizationSubdomain !== "undefined"
@@ -112,52 +136,82 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     };
 
     if (token && getEffectiveSubdomain()) {
-      fetchTeams();
-      fetchUsers();
+      if (canManageUsers) fetchUsers(); // Only fetch if allowed
+      if (canCreateTeams) fetchTeams(); // Only fetch if allowed
     }
-  }, [token, getEffectiveSubdomain, handleApiError]);
+  }, [
+    token,
+    getEffectiveSubdomain,
+    handleApiError,
+    canManageUsers,
+    canCreateTeams,
+  ]);
 
   const capitalizedOrgName =
     dashboardStats?.organization?.name?.toUpperCase() || "";
 
+  if (authLoading || !canAccessAdminDashboard) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="mt-2 p-4 ml-4">
-      {" "}
-      {/* Ensure sidebar spacing */}
+      {/* Header */}
       <div className="bg-gray-200 shadow-xl rounded-lg mb-4 p-4">
         <h1 className="text-3xl font-semibold">
           Welcome to the {capitalizedOrgName} Admin Dashboard
         </h1>
       </div>
+
+      {/* Error */}
       {error && (
         <div className="bg-red-100 text-red-700 p-3 rounded mb-4">{error}</div>
       )}
+
+      {/* Action Buttons */}
       <div className="flex flex-wrap gap-4 mb-6">
-        <button
-          onClick={() => setIsCreateUserFormOpen(true)}
-          className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded shadow"
-        >
-          Add User
-        </button>
-        <button
-          onClick={() => setIsCreateTeamFormOpen(true)}
-          className="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded shadow"
-        >
-          Add Team
-        </button>
-        <button
-          onClick={() => setShowTeams((prev) => !prev)}
-          className="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded shadow"
-        >
-          {showTeams ? "Hide Teams" : "Show Teams"}
-        </button>
-        <button
-          onClick={() => setShowUsers((prev) => !prev)}
-          className="bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 px-4 rounded shadow"
-        >
-          {showUsers ? "Hide Users" : "Show Users"}
-        </button>
+        {canManageUsers && (
+          <button
+            onClick={() => setIsCreateUserFormOpen(true)}
+            className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded shadow"
+          >
+            Add User
+          </button>
+        )}
+
+        {canCreateTeams && (
+          <button
+            onClick={() => setIsCreateTeamFormOpen(true)}
+            className="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded shadow"
+          >
+            Add Team
+          </button>
+        )}
+
+        {canCreateTeams && (
+          <button
+            onClick={() => setShowTeams((prev) => !prev)}
+            className="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded shadow"
+          >
+            {showTeams ? "Hide Teams" : "Show Teams"}
+          </button>
+        )}
+
+        {canManageUsers && (
+          <button
+            onClick={() => setShowUsers((prev) => !prev)}
+            className="bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 px-4 rounded shadow"
+          >
+            {showUsers ? "Hide Users" : "Show Users"}
+          </button>
+        )}
       </div>
+
+      {/* Dashboard Stats */}
       {dashboardStats ? (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-6">
@@ -213,7 +267,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
 
           <TicketsBarChart stats={dashboardStats.stats} />
 
-          {/* Create User Modal */}
+          {/* Modals */}
           {isCreateUserFormOpen && (
             <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-[9999]">
               <div className="bg-white p-6 rounded-xl w-full max-w-md shadow-xl relative">
@@ -231,7 +285,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
             </div>
           )}
 
-          {/* Create Team Modal */}
           {isCreateTeamFormOpen && (
             <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-[9999]">
               <div className="bg-white p-6 rounded-xl w-full max-w-md shadow-xl relative">
@@ -249,7 +302,8 @@ const AdminDashboard = ({ organizationSubdomain }) => {
             </div>
           )}
 
-          {showTeams && (
+          {/* Lists */}
+          {showTeams && canCreateTeams && (
             <div className="mt-6">
               <h3 className="text-xl font-semibold text-gray-700 mb-2">
                 Teams
@@ -258,7 +312,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
             </div>
           )}
 
-          {showUsers && (
+          {showUsers && canManageUsers && (
             <div className="mt-6">
               <h3 className="text-xl font-semibold text-gray-700 mb-2">
                 Users

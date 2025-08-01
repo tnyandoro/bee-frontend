@@ -1,13 +1,6 @@
 import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/authContext";
-import { canViewAllTickets } from "../utils/roleMapper";
-import { canCreateTicket } from "../utils/rolePermissions";
-import { canEditTicket } from "../utils/rolePermissions";
-
-const hasAccess =
-  allowedRoles.includes(currentUser.role) ||
-  canViewAllTickets(currentUser.role);
 
 const PrivateRoute = ({ children, allowedRoles = [] }) => {
   const { currentUser, loading, error, isAdmin } = useAuth();
