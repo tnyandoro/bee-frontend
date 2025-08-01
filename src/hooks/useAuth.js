@@ -8,10 +8,11 @@ const useAuth = () => {
   );
   const [user, setUser] = useState(null);
   const [permissions, setPermissions] = useState({});
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Full auth loading state
   const [error, setError] = useState(null);
 
-  const API_BASE = process.env.REACT_APP_API_BASE_URL; // e.g., https://api.yourapp.com
+  const API_BASE =
+    process.env.REACT_APP_API_BASE_URL || "https://itsm-api.onrender.com";
 
   const updateAuth = useCallback((newToken, newSubdomain) => {
     setToken(newToken);
@@ -25,7 +26,6 @@ const useAuth = () => {
     setError(null);
 
     try {
-      // Use same API base, pass subdomain in body
       const response = await fetch(`${API_BASE}/api/v1/login`, {
         method: "POST",
         headers: {
@@ -50,13 +50,13 @@ const useAuth = () => {
 
       updateAuth(authToken, orgSubdomain);
 
-      // Fetch profile and permissions
+      // Fetch profile and permissions in parallel
       const [profileData, permissionsData] = await Promise.all([
         fetchProfile(authToken, orgSubdomain),
         fetchPermissions(authToken, orgSubdomain),
       ]);
 
-      // Ensure user has admin rights if required
+      // Optional: Enforce admin access here
       if (!permissionsData.can_access_admin_dashboard) {
         throw new Error("User does not have admin privileges");
       }
@@ -74,6 +74,8 @@ const useAuth = () => {
 
   const fetchProfile = useCallback(
     async (authToken, profileSubdomain) => {
+      if (!authToken || !profileSubdomain) return null;
+
       try {
         const response = await fetch(
           `${API_BASE}/api/v1/organizations/${profileSubdomain}/profile`,
@@ -85,7 +87,12 @@ const useAuth = () => {
           }
         );
 
-        if (!response.ok) throw new Error("Profile fetch failed");
+        if (!response.ok) {
+          if (response.status === 401 || response.status === 403) {
+            throw new Error("Unauthorized");
+          }
+          throw new Error(`Profile fetch failed: ${response.status}`);
+        }
 
         const data = await response.json();
         const userData = {
@@ -107,6 +114,8 @@ const useAuth = () => {
 
   const fetchPermissions = useCallback(
     async (authToken, subdomain) => {
+      if (!authToken || !subdomain) return null;
+
       try {
         const response = await fetch(`${API_BASE}/api/v1/permissions`, {
           headers: {
@@ -115,11 +124,20 @@ const useAuth = () => {
           },
         });
 
-        if (!response.ok) throw new Error("Permissions fetch failed");
+        if (!response.ok) {
+          if (response.status === 401 || response.status === 403) {
+            throw new Error("Unauthorized");
+          }
+          throw new Error(`Permissions fetch failed: ${response.status}`);
+        }
 
         const data = await response.json();
-        setPermissions(data);
-        return data;
+
+        // Ensure data.data if your API wraps response
+        const permissionsData = data.data || data;
+
+        setPermissions(permissionsData);
+        return permissionsData;
       } catch (error) {
         console.error("Permissions fetch error:", error);
         setPermissions({});
@@ -150,16 +168,11 @@ const useAuth = () => {
     }
   };
 
-  // Reusable function to verify admin access
-  const verifyAdminRole = async () => {
-    if (!permissions?.can_access_admin_dashboard) {
-      console.log("Admin access denied: missing can_access_admin_dashboard");
-      return false;
-    }
-    return true;
+  const verifyAdminRole = () => {
+    return permissions.can_access_admin_dashboard === true;
   };
 
-  // Initialize auth on mount
+  // Initialize on mount
   useEffect(() => {
     const initializeAuth = async () => {
       if (token && subdomain) {
@@ -183,12 +196,12 @@ const useAuth = () => {
 
   return {
     user,
-    permissions, // ✅ Expose permissions
+    permissions,
     token,
     subdomain,
     loading,
     error,
-    isAdmin: permissions.can_access_admin_dashboard || false, // ✅ Based on permissions
+    isAdmin: permissions.can_access_admin_dashboard === true,
     login,
     logout,
     updateAuth,
