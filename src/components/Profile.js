@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../contexts/authContext";
-import { FaUpload, FaLock, FaUser, FaArrowLeft } from "react-icons/fa";
+import { FaUser, FaLock, FaArrowLeft } from "react-icons/fa";
 import axios from "axios";
 
+// Base API instance
 const api = axios.create({
   baseURL: "https://itsm-api.onrender.com/api/v1",
   headers: {
@@ -10,7 +11,7 @@ const api = axios.create({
   },
 });
 
-// Upload button component
+// Profile Picture Uploader Component
 const ProfilePictureUploader = ({ onUploadSuccess, uploading }) => {
   const [error, setError] = useState("");
 
@@ -18,21 +19,20 @@ const ProfilePictureUploader = ({ onUploadSuccess, uploading }) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("upload_preset", "itsmgss");
-    formData.append("folder", "profile_pictures");
-
-    try {
-      const res = await axios.post(
-        "https://api.cloudinary.com/v1_1/tendai/image/upload", // 🔁 Replace
-        formData
-      );
-      onUploadSuccess(res.data.secure_url);
-    } catch (err) {
-      console.error("Cloudinary upload error:", err);
-      setError("Failed to upload image.");
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      setError("Please upload an image file.");
+      return;
     }
+
+    // Validate file size (<5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Image must be less than 5MB.");
+      return;
+    }
+
+    setError("");
+    onUploadSuccess(file); // Pass file to parent for upload
   };
 
   return (
@@ -52,7 +52,7 @@ const ProfilePictureUploader = ({ onUploadSuccess, uploading }) => {
 };
 
 const Profile = () => {
-  const { user } = useAuth();
+  const { currentUser, token, subdomain, updateUser } = useAuth();
   const [profile, setProfile] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -62,11 +62,9 @@ const Profile = () => {
   const [profilePicture, setProfilePicture] = useState(null);
   const [uploading, setUploading] = useState(false);
 
+  // Fetch profile data
   useEffect(() => {
     const fetchProfile = async () => {
-      const token = localStorage.getItem("authToken");
-      const subdomain = localStorage.getItem("subdomain");
-
       if (!token || !subdomain) {
         setError("Please log in to view your profile.");
         setLoading(false);
@@ -81,7 +79,7 @@ const Profile = () => {
         });
 
         setProfile(res.data);
-        setProfilePicture(res.data.user?.profile_picture_url || null);
+        setProfilePicture(res.data.avatar_url || null);
       } catch (err) {
         const message = err.response?.data?.error || err.message;
         setError("Failed to fetch profile data: " + message);
@@ -91,44 +89,45 @@ const Profile = () => {
     };
 
     fetchProfile();
-  }, [user]);
+  }, [token, subdomain]);
 
-  const handleUploadToBackend = async (imageUrl) => {
-    const token = localStorage.getItem("authToken");
-    const subdomain = localStorage.getItem("subdomain");
+  // Handle avatar upload
+  const handleUploadSuccess = async (file) => {
+    if (!file || !currentUser || !token || !subdomain) return;
 
     setUploading(true);
+    const formData = new FormData();
+    formData.append("user[avatar]", file);
+
     try {
-      await axios.post(
-        "https://itsm-api.onrender.com/api/v1/uploads/upload_profile_picture",
-        { file: imageUrl },
+      const response = await axios.patch(
+        `https://itsm-api.onrender.com/api/v1/organizations/${subdomain}/users/${currentUser.id}`,
+        formData,
         {
           headers: {
             Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
+            "Content-Type": "multipart/form-data",
           },
         }
       );
 
-      const res = await api.get(`/organizations/${subdomain}/profile`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      setProfile(res.data);
-      setProfilePicture(res.data.user?.profile_picture_url || null);
-      alert("Profile picture updated successfully!");
+      // Update local state
+      const newAvatarUrl = response.data.avatar_url;
+      if (newAvatarUrl) {
+        setProfilePicture(newAvatarUrl);
+        updateUser({ avatar_url: newAvatarUrl }); // Update global context
+        alert("Profile picture updated successfully!");
+      }
     } catch (err) {
-      console.error(
-        "Error saving profile picture:",
-        err.response?.data || err.message
-      );
+      console.error("Error uploading profile picture:", err);
+      const message = err.response?.data?.error || "Upload failed.";
+      alert(message);
     } finally {
       setUploading(false);
     }
   };
 
+  // Change password
   const handleChangePassword = () => {
     if (newPassword === confirmPassword) {
       alert("Password changed successfully!");
@@ -144,8 +143,8 @@ const Profile = () => {
   if (error) return <div className="p-4 text-red-500">{error}</div>;
   if (!profile) return <div className="p-4">No profile data available.</div>;
 
-  const userData = profile.user || {};
-  const isAdmin = ["admin", "super_user"].includes(userData.role);
+  const userData = profile || {};
+  const isAdmin = ["system_admin", "domain_admin"].includes(userData.role);
 
   return (
     <div className="bg-gray-300 p-5 mt-10 flex">
@@ -160,7 +159,7 @@ const Profile = () => {
             <img
               src={profilePicture}
               alt="Profile"
-              className="w-32 h-32 rounded-full border-4 border-blue-500 mb-2"
+              className="w-32 h-32 rounded-full border-4 border-blue-500 mb-2 object-cover"
             />
           ) : (
             <div className="w-32 h-32 rounded-full border-4 border-blue-500 bg-white shadow flex items-center justify-center mb-2 text-center text-blue-700">
@@ -168,7 +167,7 @@ const Profile = () => {
             </div>
           )}
           <ProfilePictureUploader
-            onUploadSuccess={handleUploadToBackend}
+            onUploadSuccess={handleUploadSuccess}
             uploading={uploading}
           />
         </div>
@@ -203,17 +202,19 @@ const Profile = () => {
             <div className="grid grid-cols-2 gap-2">
               {[
                 { key: "ID", value: userData.id },
-                { key: "Full Name", value: userData.name },
-                { key: "Password", value: "*********" },
+                { key: "Full Name", value: userData.full_name },
                 { key: "Email", value: userData.email },
                 { key: "Username", value: userData.username },
                 { key: "Phone", value: userData.phone_number },
-                { key: "Department", value: userData.department },
                 { key: "Position", value: userData.position },
-                { key: "Organization ID", value: profile.organization?.id },
-                { key: "Organization Name", value: profile.organization?.name },
+                { key: "Department ID", value: userData.department_id },
                 { key: "Team ID", value: userData.team_id },
                 { key: "Role", value: userData.role },
+                { key: "Organization ID", value: userData.organization_id },
+                {
+                  key: "Organization Subdomain",
+                  value: userData.organization_subdomain,
+                },
               ].map(({ key, value }, i) => (
                 <div key={i} className="flex flex-col items-start mb-2">
                   <div className="font-bold text-lg">{key}</div>
