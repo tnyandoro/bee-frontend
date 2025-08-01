@@ -1,3 +1,4 @@
+// src/utils/api.js
 import axios from "axios";
 
 const createApiInstance = (token, subdomain) => {
@@ -8,18 +9,18 @@ const createApiInstance = (token, subdomain) => {
 
   const isDev = process.env.NODE_ENV === "development";
 
-  const effectiveSubdomain = subdomain || (isDev ? "demo" : null);
-  if (!effectiveSubdomain) {
+  // Validate subdomain
+  if (!subdomain) {
     console.error("No subdomain provided for API instance");
     throw new Error("Organization subdomain is required");
   }
 
-  // Determine the base URL
+  // Use fixed domain, pass subdomain in routes
   const baseURL =
     process.env.REACT_APP_API_BASE_URL ||
     (isDev
-      ? `http://${effectiveSubdomain}.lvh.me:3000/api/v1`
-      : `https://${effectiveSubdomain}.itsm-api.onrender.com/api/v1`);
+      ? `http://localhost:3000/api/v1` // Dev: localhost
+      : `https://itsm-api.onrender.com/api/v1`); // Prod: fixed domain
 
   const authHeader = `Bearer ${token}`;
   console.log("Creating API instance:", { baseURL, Authorization: authHeader });
@@ -28,12 +29,14 @@ const createApiInstance = (token, subdomain) => {
     baseURL,
     headers: {
       "Content-Type": "application/json",
+      Accept: "application/json",
       Authorization: authHeader,
     },
     timeout: 15000,
-    withCredentials: true,
+    withCredentials: false, // Not needed for Bearer tokens
   });
 
+  // Response interceptor for error handling
   instance.interceptors.response.use(
     (response) => response,
     (error) => {
@@ -44,10 +47,14 @@ const createApiInstance = (token, subdomain) => {
       } else if (error.response?.status === 404) {
         console.error(
           "Resource not found:",
-          errorMessage || "Organization or endpoint not found"
+          errorMessage || "Endpoint or organization not found"
         );
       } else {
-        console.error("API error:", errorMessage || "Unknown error");
+        console.error("API error:", {
+          message: errorMessage,
+          status: error.response?.status,
+          url: error.config?.url,
+        });
       }
 
       return Promise.reject(error);
