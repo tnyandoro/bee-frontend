@@ -1,6 +1,9 @@
+// src/components/Dashboard.js
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import MyChartComponent from "./MyChartComponent";
+import SLAMetrics from "./SLAMetrics"; // We'll create this
+import RecentTickets from "./RecentTickets"; // We'll create this
 import { useAuth } from "../contexts/authContext";
 import { useNavigate } from "react-router-dom";
 
@@ -14,288 +17,266 @@ const Dashboard = () => {
     organization?.subdomain || localStorage.getItem("subdomain");
   const navigate = useNavigate();
 
-  const [ticketData, setTicketData] = useState({
-    newTickets: 0,
-    critical: 0,
-    high: 0,
-    medium: 0,
-    low: 0,
-    breaching: 0,
-    missedSLA: 0,
-    resolved: 0,
-    closed: 0,
-    assigned: 0,
-    escalated: 0,
-  });
-
-  const [tickets, setTickets] = useState([]);
-  const [selectedType, setSelectedType] = useState(
-    localStorage.getItem("ticketFilter") || "All"
-  );
-  const [searchQuery, setSearchQuery] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [dashboardData, setDashboardData] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const itemsPerPage = 10;
 
-  const fetchTickets = useCallback(async () => {
+  const fetchDashboard = useCallback(async () => {
+    if (!subdomain) {
+      setError("Organization subdomain missing.");
+      setLoading(false);
+      return;
+    }
+
     const token = localStorage.getItem("authToken");
-
-    if (!token || !subdomain || !currentUser?.id) {
-      setError("Authentication or user info missing.");
+    if (!token) {
+      setError("Authentication token missing.");
+      setLoading(false);
       return;
     }
 
     try {
-      const url = `${getApiBaseUrl()}/organizations/${subdomain}/tickets`;
+      const url = `${getApiBaseUrl()}/organizations/${subdomain}/dashboard`;
       const response = await axios.get(url, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        timeout: 30000,
+        timeout: 15000,
       });
 
-      const allTickets = Array.isArray(response.data.tickets)
-        ? response.data.tickets
-        : [];
-
-      const globalRoles = [
-        "admin",
-        "super_user",
-        "system_admin",
-        "domain_admin",
-        "general_manager",
-        "department_manager",
-      ];
-
-      const visibleTickets = globalRoles.includes(currentUser.role)
-        ? allTickets
-        : allTickets.filter(
-            (ticket) =>
-              ticket.assignee?.id === currentUser.id ||
-              currentUser.team_ids?.includes(ticket.team_id)
-          );
-
-      setTickets(visibleTickets);
-
-      setTicketData({
-        newTickets: visibleTickets.filter((t) => t.status === "open").length,
-        critical: visibleTickets.filter((t) => t.priority === 0).length,
-        high: visibleTickets.filter((t) => t.priority === 1).length,
-        medium: visibleTickets.filter((t) => t.priority === 2).length,
-        low: visibleTickets.filter((t) => t.priority === 3).length,
-        breaching: visibleTickets.filter(
-          (t) => t.sla_breached && t.status !== "resolved"
-        ).length,
-        missedSLA: visibleTickets.filter((t) => t.sla_breached).length,
-        resolved: visibleTickets.filter((t) => t.status === "resolved").length,
-        closed: visibleTickets.filter((t) => t.status === "closed").length,
-        assigned: visibleTickets.filter((t) => !!t.assignee_id).length,
-        escalated: visibleTickets.filter((t) => !!t.escalated).length,
-      });
+      setDashboardData(response.data.data); // if using render_success
+      // OR: setDashboardData(response.data); // if using direct render json
     } catch (err) {
-      console.error("Dashboard API Error:", err);
-      setError("Failed to load dashboard data.");
-      setTickets([]);
+      console.error("Dashboard fetch failed:", err);
+      const message =
+        err.response?.status === 404
+          ? "Organization not found."
+          : err.response?.status === 403
+          ? "Access denied."
+          : "Failed to load dashboard.";
+      setError(message);
+    } finally {
+      setLoading(false);
     }
   }, [subdomain, currentUser]);
 
   useEffect(() => {
-    if (subdomain && currentUser?.id) {
-      fetchTickets();
-    } else {
-      setError("Missing authentication data.");
-    }
-  }, [subdomain, currentUser, fetchTickets]);
+    fetchDashboard();
+  }, [fetchDashboard]);
 
-  const getPriorityLabel = (priority) => {
-    switch (priority) {
-      case 0:
-        return "Critical";
-      case 1:
-        return "High";
-      case 2:
-        return "Medium";
-      case 3:
-        return "Low";
-      default:
-        return "Unknown";
-    }
-  };
+  if (loading) return <div className="p-4">Loading dashboard...</div>;
+  if (error) return <div className="p-4 text-red-500">{error}</div>;
+  if (!dashboardData) return <div className="p-4">No data available.</div>;
 
-  const getPriorityBadgeClass = (priority) => {
-    switch (priority) {
-      case 0:
-        return "bg-red-100 text-red-700";
-      case 1:
-        return "bg-orange-100 text-orange-700";
-      case 2:
-        return "bg-yellow-100 text-yellow-700";
-      case 3:
-        return "bg-green-100 text-green-700";
-      default:
-        return "bg-gray-100 text-gray-700";
-    }
-  };
-
-  const filteredTickets = tickets.filter((ticket) => {
-    const matchesType =
-      selectedType === "All" || ticket.status === selectedType;
-    const matchesSearch = ticket.title
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
-    return matchesType && matchesSearch;
-  });
-
-  const totalPages = Math.ceil(filteredTickets.length / itemsPerPage);
-  const paginatedTickets = filteredTickets.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-
-  const handleTabClick = (type) => {
-    setSelectedType(type);
-    setCurrentPage(1);
-    localStorage.setItem("ticketFilter", type);
-  };
-
-  const capitalizedOrgName = organization?.name?.toUpperCase() || "";
+  const {
+    organization: org,
+    stats,
+    charts,
+    sla,
+    recent_tickets,
+  } = dashboardData;
 
   return (
-    <div className="p-4">
-      <div className="bg-gray-200 shadow-xl rounded-lg mb-4 p-4">
-        <h1 className="text-xl font-bold mb-1">
-          {capitalizedOrgName} Dashboard
+    <div className="p-4 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="bg-indigo-600 text-white shadow-lg rounded-lg mb-6 p-6">
+        <h1 className="text-2xl font-bold">
+          {org.name.toUpperCase()} DASHBOARD
         </h1>
         {currentUser?.name && (
-          <p className="text-gray-700 text-sm">
+          <p className="text-indigo-100">
             Welcome, <span className="font-semibold">{currentUser.name}</span>
           </p>
         )}
       </div>
 
-      {error && <div className="text-red-500 mb-2">{error}</div>}
-
+      {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-        <StatCard label="Open" value={ticketData.newTickets} color="blue" />
-        <StatCard label="Assigned" value={ticketData.assigned} color="indigo" />
+        <StatCard label="Open" value={stats.open_tickets} color="blue" />
+        <StatCard
+          label="Assigned"
+          value={stats.assigned_tickets}
+          color="indigo"
+        />
         <StatCard
           label="Escalated"
-          value={ticketData.escalated}
+          value={stats.escalated_tickets}
           color="purple"
         />
-        <StatCard label="Critical" value={ticketData.critical} color="red" />
-        <StatCard label="High" value={ticketData.high} color="orange" />
-        <StatCard label="Medium" value={ticketData.medium} color="yellow" />
-        <StatCard label="Low" value={ticketData.low} color="green" />
-        <StatCard label="Breaching" value={ticketData.breaching} color="pink" />
         <StatCard
-          label="Missed SLA"
-          value={ticketData.missedSLA}
-          color="gray"
+          label="Critical"
+          value={stats.high_priority_tickets}
+          color="red"
         />
         <StatCard
           label="Resolved"
-          value={ticketData.resolved}
+          value={stats.resolved_tickets}
           color="emerald"
         />
-        <StatCard label="Closed" value={ticketData.closed} color="teal" />
+        <StatCard label="Closed" value={stats.closed_tickets} color="teal" />
       </div>
 
-      <div className="mb-4">
-        <div className="flex flex-wrap gap-2 mb-3">
-          {["All", "open", "resolved", "closed"].map((type) => (
-            <button
-              key={type}
-              onClick={() => handleTabClick(type)}
-              className={`px-4 py-1 rounded border ${
-                selectedType === type
-                  ? "bg-indigo-600 text-white"
-                  : "bg-white text-gray-800"
-              }`}
-            >
-              {type.charAt(0).toUpperCase() + type.slice(1)} (
-              {type === "All"
-                ? tickets.length
-                : tickets.filter((t) => t.status === type).length}
-              )
-            </button>
-          ))}
-        </div>
+      {/* Charts */}
+      <MyChartComponent dashboardData={dashboardData} />
 
-        <input
-          type="text"
-          placeholder="Search by title..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="p-2 border rounded w-full sm:w-64"
-        />
+      {/* SLA Metrics */}
+      <SLAMetrics sla={sla} />
+
+      {/* Recent Tickets */}
+      <RecentTickets tickets={recent_tickets} />
+
+      {/* Meta Info */}
+      <div className="text-xs text-gray-500 text-right mt-4">
+        Updated: {new Date(dashboardData.meta.fetched_at).toLocaleString()}
       </div>
+    </div>
+  );
+};
 
-      <MyChartComponent tickets={filteredTickets} />
+// --- StatCard Component ---
+const StatCard = ({ label, value, color }) => (
+  <div
+    className={`p-4 bg-${color}-100 text-${color}-800 rounded-lg shadow-sm text-center`}
+  >
+    <div className="text-sm font-medium">{label}</div>
+    <div className="text-2xl font-bold">{value}</div>
+  </div>
+);
 
-      <div className="overflow-x-auto mt-6">
-        <table className="w-full table-auto border-collapse">
+// --- SLAMetrics Component ---
+export const SLAMetrics = ({ sla }) => (
+  <div className="bg-white p-5 rounded-lg shadow mb-6 border">
+    <h3 className="text-lg font-semibold mb-3 text-gray-800">
+      SLA Performance
+    </h3>
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <MetricCard label="Missed SLA" value={sla.breached} color="red" />
+      <MetricCard
+        label="Breaching Soon"
+        value={sla.breaching_soon}
+        color="yellow"
+      />
+      <MetricCard
+        label="On-Time Rate"
+        value={`${sla.on_time_rate_percent}%`}
+        color="green"
+      />
+      <MetricCard
+        label="Avg Resolution"
+        value={`${sla.avg_resolution_hours}h`}
+        color="blue"
+      />
+    </div>
+  </div>
+);
+
+// --- RecentTickets Component ---
+export const RecentTickets = ({ tickets }) => {
+  const getPriorityBadgeClass = (priority) => {
+    switch (priority) {
+      case "Critical":
+        return "bg-red-100 text-red-800";
+      case "High":
+        return "bg-orange-100 text-orange-800";
+      case "Medium":
+        return "bg-yellow-100 text-yellow-800";
+      case "Low":
+        return "bg-green-100 text-green-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  const getStatusBadgeClass = (status) => {
+    switch (status) {
+      case "open":
+        return "bg-yellow-100 text-yellow-800";
+      case "assigned":
+        return "bg-blue-100 text-blue-800";
+      case "escalated":
+        return "bg-purple-100 text-purple-800";
+      case "resolved":
+        return "bg-green-100 text-green-800";
+      case "closed":
+        return "bg-gray-100 text-gray-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  return (
+    <div className="bg-white p-5 rounded-lg shadow border overflow-hidden">
+      <h3 className="text-lg font-semibold mb-3 text-gray-800">
+        Recent Tickets
+      </h3>
+      <div className="overflow-x-auto">
+        <table className="w-full table-auto">
           <thead>
-            <tr className="bg-gray-100">
-              <th className="border px-4 py-2">Title</th>
-              <th className="border px-4 py-2">Status</th>
-              <th className="border px-4 py-2">Priority</th>
-              <th className="border px-4 py-2">Assignee</th>
+            <tr className="bg-gray-50 text-gray-600 text-sm">
+              <th className="px-4 py-2 text-left">Title</th>
+              <th className="px-4 py-2 text-left">Status</th>
+              <th className="px-4 py-2 text-left">Priority</th>
+              <th className="px-4 py-2 text-left">Assignee</th>
+              <th className="px-4 py-2 text-left">Reported</th>
+              <th className="px-4 py-2 text-left">SLA</th>
             </tr>
           </thead>
-          <tbody>
-            {paginatedTickets.map((ticket) => (
-              <tr key={ticket.id}>
-                <td className="border px-4 py-2">{ticket.title}</td>
-                <td className="border px-4 py-2">{ticket.status}</td>
-                <td className="border px-4 py-2">
+          <tbody className="text-sm">
+            {tickets.slice(0, 10).map((t) => (
+              <tr key={t.id} className="border-b hover:bg-gray-50">
+                <td className="px-4 py-2 font-medium text-indigo-600 truncate max-w-xs">
+                  {t.title}
+                </td>
+                <td className="px-4 py-2">
                   <span
-                    className={`px-2 py-1 rounded text-sm font-medium ${getPriorityBadgeClass(
-                      ticket.priority
+                    className={`px-2 py-1 rounded-full text-xs ${getStatusBadgeClass(
+                      t.status
                     )}`}
                   >
-                    {getPriorityLabel(ticket.priority)}
+                    {t.status}
                   </span>
                 </td>
-                <td className="border px-4 py-2">
-                  {ticket.assignee?.name || "N/A"}
+                <td className="px-4 py-2">
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs ${getPriorityBadgeClass(
+                      t.priority
+                    )}`}
+                  >
+                    {t.priority}
+                  </span>
+                </td>
+                <td className="px-4 py-2">{t.assignee || "Unassigned"}</td>
+                <td className="px-4 py-2 text-gray-500">
+                  {new Date(t.created_at).toLocaleDateString()}
+                </td>
+                <td className="px-4 py-2">
+                  {t.sla_breached ? (
+                    <span className="text-red-600 text-xs">❌ Breached</span>
+                  ) : t.breaching_sla ? (
+                    <span className="text-yellow-600 text-xs">
+                      ⚠️ Breaching
+                    </span>
+                  ) : (
+                    <span className="text-green-600 text-xs">✅ OK</span>
+                  )}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-
-      <div className="mt-4 flex justify-between">
-        <button
-          className="px-4 py-1 bg-gray-300 rounded disabled:opacity-50"
-          onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-          disabled={currentPage === 1}
-        >
-          Previous
-        </button>
-        <span className="text-sm">
-          Page {currentPage} of {totalPages}
-        </span>
-        <button
-          className="px-4 py-1 bg-gray-300 rounded disabled:opacity-50"
-          onClick={() =>
-            setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-          }
-          disabled={currentPage === totalPages}
-        >
-          Next
-        </button>
-      </div>
     </div>
   );
 };
 
-const StatCard = ({ label, value, color }) => (
-  <div className={`p-4 bg-${color}-100 text-${color}-800 rounded shadow`}>
-    <div className="text-sm">{label}</div>
-    <div className="text-xl font-bold">{value}</div>
+// --- Reusable MetricCard ---
+const MetricCard = ({ label, value, color }) => (
+  <div
+    className={`p-3 text-center rounded border border-${color}-200 bg-${color}-50`}
+  >
+    <div className="text-sm text-gray-600 font-medium">{label}</div>
+    <div className={`text-xl font-bold text-${color}-700`}>{value}</div>
   </div>
 );
 
