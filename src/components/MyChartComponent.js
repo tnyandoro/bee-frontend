@@ -1,4 +1,3 @@
-// src/components/MyChartComponent.jsx
 import React, { useEffect, useRef } from "react";
 import {
   Chart as ChartJS,
@@ -51,18 +50,9 @@ const MyChartComponent = ({ dashboardData }) => {
     };
   }, []);
 
-  // Only proceed if we have data
-  if (!dashboardData || !charts) {
-    return (
-      <div className="text-center text-gray-500 my-8">
-        Loading chart data...
-      </div>
-    );
-  }
-
   // === Pie Chart: Tickets by Priority ===
   useEffect(() => {
-    if (!charts.tickets_by_priority) return;
+    if (!dashboardData || !charts || !charts.tickets_by_priority) return;
 
     const ctx = pieChartRef.current?.getContext("2d");
     if (!ctx) return;
@@ -101,11 +91,11 @@ const MyChartComponent = ({ dashboardData }) => {
         },
       },
     });
-  }, [charts.tickets_by_priority]);
+  }, [dashboardData, charts]);
 
   // === Bar Chart: Tickets by Status ===
   useEffect(() => {
-    if (!charts.tickets_by_status) return;
+    if (!dashboardData || !charts || !charts.tickets_by_status) return;
 
     const ctx = barChartRef.current?.getContext("2d");
     if (!ctx) return;
@@ -159,11 +149,11 @@ const MyChartComponent = ({ dashboardData }) => {
         },
       },
     });
-  }, [charts.tickets_by_status]);
+  }, [dashboardData, charts]);
 
   // === Line Chart: Top Assignees ===
   useEffect(() => {
-    if (!charts.top_assignees?.length) return;
+    if (!dashboardData || !charts || !charts.top_assignees?.length) return;
 
     const ctx = lineChartRef.current?.getContext("2d");
     if (!ctx) return;
@@ -203,7 +193,15 @@ const MyChartComponent = ({ dashboardData }) => {
         },
       },
     });
-  }, [charts.top_assignees]);
+  }, [dashboardData, charts]);
+
+  if (!dashboardData || !charts) {
+    return (
+      <div className="text-center text-gray-500 my-8">
+        Loading chart data...
+      </div>
+    );
+  }
 
   return (
     <div className="w-full flex flex-col gap-8 mt-6 px-2">
