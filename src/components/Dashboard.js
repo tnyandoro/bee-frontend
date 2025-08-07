@@ -1,9 +1,6 @@
-// src/components/Dashboard.js
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import MyChartComponent from "./MyChartComponent";
-import SLAMetrics from "./SLAMetrics"; // We'll create this
-import RecentTickets from "./RecentTickets"; // We'll create this
 import { useAuth } from "../contexts/authContext";
 import { useNavigate } from "react-router-dom";
 
@@ -45,8 +42,7 @@ const Dashboard = () => {
         timeout: 15000,
       });
 
-      setDashboardData(response.data.data); // if using render_success
-      // OR: setDashboardData(response.data); // if using direct render json
+      setDashboardData(response.data.data || response.data); // Handle both response formats
     } catch (err) {
       console.error("Dashboard fetch failed:", err);
       const message =
@@ -59,7 +55,7 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  }, [subdomain, currentUser]);
+  }, [subdomain]);
 
   useEffect(() => {
     fetchDashboard();
@@ -121,10 +117,103 @@ const Dashboard = () => {
       <MyChartComponent dashboardData={dashboardData} />
 
       {/* SLA Metrics */}
-      <SLAMetrics sla={sla} />
+      <div className="bg-white p-5 rounded-lg shadow mb-6 border">
+        <h3 className="text-lg font-semibold mb-3 text-gray-800">
+          SLA Performance
+        </h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <MetricCard label="Missed SLA" value={sla.breached} color="red" />
+          <MetricCard
+            label="Breaching Soon"
+            value={sla.breaching_soon}
+            color="yellow"
+          />
+          <MetricCard
+            label="On-Time Rate"
+            value={`${sla.on_time_rate_percent}%`}
+            color="green"
+          />
+          <MetricCard
+            label="Avg Resolution"
+            value={`${sla.avg_resolution_hours}h`}
+            color="blue"
+          />
+        </div>
+      </div>
 
       {/* Recent Tickets */}
-      <RecentTickets tickets={recent_tickets} />
+      <div className="bg-white p-5 rounded-lg shadow border overflow-hidden">
+        <h3 className="text-lg font-semibold mb-3 text-gray-800">
+          Recent Tickets
+        </h3>
+        <div className="overflow-x-auto">
+          <table className="w-full table-auto">
+            <thead>
+              <tr className="bg-gray-50 text-gray-600 text-sm">
+                <th className="px-4 py-2 text-left">Title</th>
+                <th className="px-4 py-2 text-left">Status</th>
+                <th className="px-4 py-2 text-left">Priority</th>
+                <th className="px-4 py-2 text-left">Assignee</th>
+                <th className="px-4 py-2 text-left">Reported</th>
+                <th className="px-4 py-2 text-left">SLA</th>
+              </tr>
+            </thead>
+            <tbody className="text-sm">
+              {recent_tickets.slice(0, 10).map((t) => (
+                <tr key={t.id} className="border-b hover:bg-gray-50">
+                  <td className="px-4 py-2 font-medium text-indigo-600 truncate max-w-xs">
+                    {t.title}
+                  </td>
+                  <td className="px-4 py-2">
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs ${
+                        {
+                          open: "bg-yellow-100 text-yellow-800",
+                          assigned: "bg-blue-100 text-blue-800",
+                          escalated: "bg-purple-100 text-purple-800",
+                          resolved: "bg-green-100 text-green-800",
+                          closed: "bg-gray-100 text-gray-800",
+                        }[t.status] || "bg-gray-100 text-gray-800"
+                      }`}
+                    >
+                      {t.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2">
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs ${
+                        {
+                          Critical: "bg-red-100 text-red-800",
+                          High: "bg-orange-100 text-orange-800",
+                          Medium: "bg-yellow-100 text-yellow-800",
+                          Low: "bg-green-100 text-green-800",
+                        }[t.priority] || "bg-gray-100 text-gray-800"
+                      }`}
+                    >
+                      {t.priority}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2">{t.assignee || "Unassigned"}</td>
+                  <td className="px-4 py-2 text-gray-500">
+                    {new Date(t.created_at).toLocaleDateString()}
+                  </td>
+                  <td className="px-4 py-2">
+                    {t.sla_breached ? (
+                      <span className="text-red-600 text-xs">❌ Breached</span>
+                    ) : t.breaching_sla ? (
+                      <span className="text-yellow-600 text-xs">
+                        ⚠️ Breaching
+                      </span>
+                    ) : (
+                      <span className="text-green-600 text-xs">✅ OK</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {/* Meta Info */}
       <div className="text-xs text-gray-500 text-right mt-4">
@@ -143,132 +232,6 @@ const StatCard = ({ label, value, color }) => (
     <div className="text-2xl font-bold">{value}</div>
   </div>
 );
-
-// --- SLAMetrics Component ---
-export const SLAMetrics = ({ sla }) => (
-  <div className="bg-white p-5 rounded-lg shadow mb-6 border">
-    <h3 className="text-lg font-semibold mb-3 text-gray-800">
-      SLA Performance
-    </h3>
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <MetricCard label="Missed SLA" value={sla.breached} color="red" />
-      <MetricCard
-        label="Breaching Soon"
-        value={sla.breaching_soon}
-        color="yellow"
-      />
-      <MetricCard
-        label="On-Time Rate"
-        value={`${sla.on_time_rate_percent}%`}
-        color="green"
-      />
-      <MetricCard
-        label="Avg Resolution"
-        value={`${sla.avg_resolution_hours}h`}
-        color="blue"
-      />
-    </div>
-  </div>
-);
-
-// --- RecentTickets Component ---
-export const RecentTickets = ({ tickets }) => {
-  const getPriorityBadgeClass = (priority) => {
-    switch (priority) {
-      case "Critical":
-        return "bg-red-100 text-red-800";
-      case "High":
-        return "bg-orange-100 text-orange-800";
-      case "Medium":
-        return "bg-yellow-100 text-yellow-800";
-      case "Low":
-        return "bg-green-100 text-green-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  const getStatusBadgeClass = (status) => {
-    switch (status) {
-      case "open":
-        return "bg-yellow-100 text-yellow-800";
-      case "assigned":
-        return "bg-blue-100 text-blue-800";
-      case "escalated":
-        return "bg-purple-100 text-purple-800";
-      case "resolved":
-        return "bg-green-100 text-green-800";
-      case "closed":
-        return "bg-gray-100 text-gray-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  return (
-    <div className="bg-white p-5 rounded-lg shadow border overflow-hidden">
-      <h3 className="text-lg font-semibold mb-3 text-gray-800">
-        Recent Tickets
-      </h3>
-      <div className="overflow-x-auto">
-        <table className="w-full table-auto">
-          <thead>
-            <tr className="bg-gray-50 text-gray-600 text-sm">
-              <th className="px-4 py-2 text-left">Title</th>
-              <th className="px-4 py-2 text-left">Status</th>
-              <th className="px-4 py-2 text-left">Priority</th>
-              <th className="px-4 py-2 text-left">Assignee</th>
-              <th className="px-4 py-2 text-left">Reported</th>
-              <th className="px-4 py-2 text-left">SLA</th>
-            </tr>
-          </thead>
-          <tbody className="text-sm">
-            {tickets.slice(0, 10).map((t) => (
-              <tr key={t.id} className="border-b hover:bg-gray-50">
-                <td className="px-4 py-2 font-medium text-indigo-600 truncate max-w-xs">
-                  {t.title}
-                </td>
-                <td className="px-4 py-2">
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs ${getStatusBadgeClass(
-                      t.status
-                    )}`}
-                  >
-                    {t.status}
-                  </span>
-                </td>
-                <td className="px-4 py-2">
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs ${getPriorityBadgeClass(
-                      t.priority
-                    )}`}
-                  >
-                    {t.priority}
-                  </span>
-                </td>
-                <td className="px-4 py-2">{t.assignee || "Unassigned"}</td>
-                <td className="px-4 py-2 text-gray-500">
-                  {new Date(t.created_at).toLocaleDateString()}
-                </td>
-                <td className="px-4 py-2">
-                  {t.sla_breached ? (
-                    <span className="text-red-600 text-xs">❌ Breached</span>
-                  ) : t.breaching_sla ? (
-                    <span className="text-yellow-600 text-xs">
-                      ⚠️ Breaching
-                    </span>
-                  ) : (
-                    <span className="text-green-600 text-xs">✅ OK</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-};
 
 // --- Reusable MetricCard ---
 const MetricCard = ({ label, value, color }) => (

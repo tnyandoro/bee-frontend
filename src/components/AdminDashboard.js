@@ -25,7 +25,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
   const [isCreateTeamFormOpen, setIsCreateTeamFormOpen] = useState(false);
   const [showTeams, setShowTeams] = useState(false);
   const [showUsers, setShowUsers] = useState(false);
-  const [editingTeam, setEditingTeam] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [users, setUsers] = useState([]);
@@ -283,7 +282,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
               <h3 className="text-xl font-semibold text-gray-700 mb-2">
                 Teams
               </h3>
-              <TeamList teams={teams} onEditTeam={setEditingTeam} />
+              <TeamList teams={teams} />
             </div>
           )}
 
