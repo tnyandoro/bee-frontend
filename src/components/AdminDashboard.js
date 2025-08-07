@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { X } from "lucide-react";
+import { X, RefreshCw } from "lucide-react";
 import CreateUserForm from "./CreateUserForm";
 import CreateTeamForm from "./CreateTeamForm";
 import TeamList from "./TeamList";
@@ -70,52 +70,67 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     const activeSubdomain = getEffectiveSubdomain();
     if (!activeSubdomain || !token) return;
 
+    setError("");
+    setLoading(true);
+
     try {
       const api = createApiInstance(token, activeSubdomain);
-      const response = await api.get(
-        `/organizations/${activeSubdomain}/dashboard`
-      );
+      // Updated endpoint path - removed organization from URL
+      const response = await api.get("/dashboard");
       setDashboardStats(response.data);
     } catch (err) {
       const errorMessage = handleApiError(err);
       setError(errorMessage);
+    } finally {
+      setLoading(false);
     }
   }, [token, getEffectiveSubdomain, handleApiError]);
+
+  // Function to retry loading dashboard
+  const retryDashboard = () => {
+    setError("");
+    setDashboardStats(null);
+    fetchDashboardStats();
+  };
 
   useEffect(() => {
     fetchDashboardStats();
   }, [fetchDashboardStats]);
 
+  const fetchTeams = useCallback(async () => {
+    const activeSubdomain = getEffectiveSubdomain();
+    if (!activeSubdomain || !token) return;
+
+    try {
+      const api = createApiInstance(token, activeSubdomain);
+      // Updated endpoint path - removed organization from URL
+      const response = await api.get("/teams");
+      setTeams(response.data);
+    } catch (err) {
+      setError(handleApiError(err));
+    }
+  }, [token, getEffectiveSubdomain, handleApiError]);
+
+  const fetchUsers = useCallback(async () => {
+    const activeSubdomain = getEffectiveSubdomain();
+    if (!activeSubdomain || !token) return;
+
+    try {
+      const api = createApiInstance(token, activeSubdomain);
+      // Updated endpoint path - removed organization from URL
+      const response = await api.get("/users");
+      setUsers(response.data);
+    } catch (err) {
+      setError(handleApiError(err));
+    }
+  }, [token, getEffectiveSubdomain, handleApiError]);
+
   useEffect(() => {
-    const fetchTeams = async () => {
-      try {
-        const api = createApiInstance(token, getEffectiveSubdomain());
-        const response = await api.get(
-          `/organizations/${getEffectiveSubdomain()}/teams`
-        );
-        setTeams(response.data);
-      } catch (err) {
-        setError(handleApiError(err));
-      }
-    };
-
-    const fetchUsers = async () => {
-      try {
-        const api = createApiInstance(token, getEffectiveSubdomain());
-        const response = await api.get(
-          `/organizations/${getEffectiveSubdomain()}/users`
-        );
-        setUsers(response.data);
-      } catch (err) {
-        setError(handleApiError(err));
-      }
-    };
-
     if (token && getEffectiveSubdomain()) {
       fetchTeams();
       fetchUsers();
     }
-  }, [token, getEffectiveSubdomain, handleApiError]);
+  }, [token, getEffectiveSubdomain, fetchTeams, fetchUsers]);
 
   const capitalizedOrgName =
     dashboardStats?.organization?.name?.toUpperCase() || "";
@@ -129,8 +144,18 @@ const AdminDashboard = ({ organizationSubdomain }) => {
           Welcome to the {capitalizedOrgName} Admin Dashboard
         </h1>
       </div>
+      {/* Error display with retry button */}
       {error && (
-        <div className="bg-red-100 text-red-700 p-3 rounded mb-4">{error}</div>
+        <div className="bg-red-100 text-red-700 p-3 rounded mb-4 flex justify-between items-center">
+          <span>{error}</span>
+          <button
+            onClick={retryDashboard}
+            className="flex items-center bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
+          >
+            <RefreshCw className="w-4 h-4 mr-1" />
+            Retry
+          </button>
+        </div>
       )}
       <div className="flex flex-wrap gap-4 mb-6">
         <button
@@ -158,7 +183,11 @@ const AdminDashboard = ({ organizationSubdomain }) => {
           {showUsers ? "Hide Users" : "Show Users"}
         </button>
       </div>
-      {dashboardStats ? (
+      {loading ? (
+        <div className="flex justify-center items-center h-64">
+          <RefreshCw className="w-12 h-12 text-blue-500 animate-spin" />
+        </div>
+      ) : dashboardStats ? (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-6">
             <StatCard
@@ -267,9 +296,9 @@ const AdminDashboard = ({ organizationSubdomain }) => {
             </div>
           )}
         </>
-      ) : (
+      ) : !error ? (
         <p className="text-gray-500 mb-6">Loading dashboard metrics...</p>
-      )}
+      ) : null}
     </div>
   );
 };
