@@ -8,27 +8,29 @@ const createApiInstance = (token, subdomain) => {
 
   const isDev = process.env.NODE_ENV === "development";
 
-  const effectiveSubdomain = subdomain || (isDev ? "demo" : null);
-  if (!effectiveSubdomain) {
-    console.error("No subdomain provided for API instance");
-    throw new Error("Organization subdomain is required");
+  // Determine the base URL
+  let baseURL;
+  if (process.env.REACT_APP_API_BASE_URL) {
+    baseURL = process.env.REACT_APP_API_BASE_URL;
+  } else if (isDev) {
+    baseURL = "http://itsm-api.lvh.me:3000/api/v1";
+  } else {
+    baseURL = "https://itsm-api.onrender.com/api/v1";
   }
 
-  // Determine the base URL
-  const baseURL =
-    process.env.REACT_APP_API_BASE_URL ||
-    (isDev
-      ? `http://${effectiveSubdomain}.lvh.me:3000/api/v1`
-      : `https://${effectiveSubdomain}.itsm-api.onrender.com/api/v1`);
-
   const authHeader = `Bearer ${token}`;
-  console.log("Creating API instance:", { baseURL, Authorization: authHeader });
+  console.log("Creating API instance:", {
+    baseURL,
+    subdomain,
+    Authorization: authHeader,
+  });
 
   const instance = axios.create({
     baseURL,
     headers: {
       "Content-Type": "application/json",
       Authorization: authHeader,
+      "X-Organization-Subdomain": subdomain, // Add organization subdomain header
     },
     timeout: 15000,
     withCredentials: true,
@@ -46,6 +48,8 @@ const createApiInstance = (token, subdomain) => {
           "Resource not found:",
           errorMessage || "Organization or endpoint not found"
         );
+      } else if (error.response?.status === 500) {
+        console.error("Server error:", errorMessage || "Internal server error");
       } else {
         console.error("API error:", errorMessage || "Unknown error");
       }
