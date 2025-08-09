@@ -17,18 +17,23 @@ const Dashboard = () => {
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 3;
 
   const fetchDashboard = useCallback(async () => {
     if (!subdomain) {
-      setError("Organization subdomain missing.");
+      setError(
+        "Organization subdomain is missing. Please ensure you're logged into the correct organization."
+      );
       setLoading(false);
       return;
     }
 
     const token = localStorage.getItem("authToken");
     if (!token) {
-      setError("Authentication token missing.");
+      setError("Authentication token is missing. Please log in again.");
       setLoading(false);
+      navigate("/login");
       return;
     }
 
@@ -50,27 +55,55 @@ const Dashboard = () => {
         if (typeof data.organization === "string") {
           data.organization = { name: data.organization };
         } else if (!data.organization.name) {
-          data.organization.name = data.organization.name || "Organization";
+          data.organization.name = "Organization";
         }
       }
 
       setDashboardData(data);
+      setError("");
+      setRetryCount(0); // Reset retry count on success
     } catch (err) {
       console.error("Dashboard fetch failed:", err);
       console.error("Error details:", err.response?.data);
 
-      const message =
-        err.response?.status === 404
-          ? "Organization not found."
-          : err.response?.status === 403
-          ? "Access denied."
-          : err.message || "Failed to load dashboard.";
+      let message = "Failed to load dashboard.";
+      if (err.response) {
+        if (err.response.status === 404) {
+          message = "Organization not found. Please check the subdomain.";
+        } else if (err.response.status === 403) {
+          message =
+            "Access denied. You may not have permission to view this dashboard.";
+        } else if (err.response.status === 500) {
+          message = `Server error: ${
+            err.response.data?.error || "An unexpected error occurred"
+          }.${
+            err.response.data?.details
+              ? ` Details: ${err.response.data.details}`
+              : ""
+          }`;
+        } else {
+          message = err.response.data?.error || err.message;
+        }
+      } else if (err.code === "ECONNABORTED") {
+        message = "Request timed out. Please check your network connection.";
+      }
 
-      setError(message);
+      if (retryCount < maxRetries) {
+        setTimeout(() => {
+          setRetryCount(retryCount + 1);
+          fetchDashboard();
+        }, 2000 * (retryCount + 1));
+        setError(`Retrying... (${retryCount + 1}/${maxRetries}) ${message}`);
+      } else {
+        setError(`${message} All retries failed.`);
+        setLoading(false);
+      }
     } finally {
-      setLoading(false);
+      if (retryCount >= maxRetries) {
+        setLoading(false);
+      }
     }
-  }, [subdomain]);
+  }, [subdomain, navigate, retryCount]);
 
   useEffect(() => {
     fetchDashboard();
@@ -81,7 +114,10 @@ const Dashboard = () => {
       <div className="p-4 flex justify-center items-center h-64">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-2"></div>
-          <p>Loading dashboard data...</p>
+          <p>
+            Loading dashboard data...{" "}
+            {retryCount > 0 ? `(Retry ${retryCount}/${maxRetries})` : ""}
+          </p>
         </div>
       </div>
     );
@@ -93,12 +129,24 @@ const Dashboard = () => {
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
           <h3 className="font-bold text-lg mb-2">Dashboard Error</h3>
           <p>{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="mt-3 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-          >
-            Try Again
-          </button>
+          <div className="mt-3 space-x-2">
+            <button
+              onClick={() => {
+                setRetryCount(0);
+                setLoading(true);
+                fetchDashboard();
+              }}
+              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+            >
+              Retry
+            </button>
+            <button
+              onClick={() => navigate("/login")}
+              className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+            >
+              Back to Login
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -173,7 +221,17 @@ const Dashboard = () => {
       </div>
 
       {/* Charts */}
-      <MyChartComponent dashboardData={dashboardData} />
+      <div className="mb-6">
+        {charts.tickets_by_status ||
+        charts.tickets_by_priority ||
+        charts.top_assignees ? (
+          <MyChartComponent dashboardData={dashboardData} />
+        ) : (
+          <div className="bg-white p-5 rounded-lg shadow border text-center text-gray-500">
+            No chart data available
+          </div>
+        )}
+      </div>
 
       {/* SLA Metrics */}
       <div className="bg-white p-5 rounded-lg shadow mb-6 border">
@@ -218,7 +276,8 @@ const Dashboard = () => {
                   <th className="px-4 py-2 text-left">Status</th>
                   <th className="px-4 py-2 text-left">Priority</th>
                   <th className="px-4 py-2 text-left">Assignee</th>
-                  <th className="px-4 py-2 text-left">Reported</th>
+                  <th className="px-4 py-2 text-left">Reporter</th>
+                  <th className="px-4 py-2 text-left">Created</th>
                   <th className="px-4 py-2 text-left">SLA</th>
                 </tr>
               </thead>
@@ -226,7 +285,7 @@ const Dashboard = () => {
                 {recent_tickets.map((t) => (
                   <tr key={t.id} className="border-b hover:bg-gray-50">
                     <td className="px-4 py-2 font-medium text-indigo-600 truncate max-w-xs">
-                      {t.title}
+                      {t.title || "Untitled"}
                     </td>
                     <td className="px-4 py-2">
                       <span
@@ -237,6 +296,8 @@ const Dashboard = () => {
                             escalated: "bg-purple-100 text-purple-800",
                             resolved: "bg-green-100 text-green-800",
                             closed: "bg-gray-100 text-gray-800",
+                            suspended: "bg-orange-100 text-orange-800",
+                            pending: "bg-gray-200 text-gray-800",
                           }[t.status] || "bg-gray-100 text-gray-800"
                         }`}
                       >
@@ -247,10 +308,10 @@ const Dashboard = () => {
                       <span
                         className={`px-2 py-1 rounded-full text-xs ${
                           {
-                            Critical: "bg-red-100 text-red-800",
-                            High: "bg-orange-100 text-orange-800",
-                            Medium: "bg-yellow-100 text-yellow-800",
-                            Low: "bg-green-100 text-green-800",
+                            p1: "bg-red-100 text-red-800",
+                            p2: "bg-orange-100 text-orange-800",
+                            p3: "bg-yellow-100 text-yellow-800",
+                            p4: "bg-green-100 text-green-800",
                           }[t.priority] || "bg-gray-100 text-gray-800"
                         }`}
                       >
@@ -258,6 +319,7 @@ const Dashboard = () => {
                       </span>
                     </td>
                     <td className="px-4 py-2">{t.assignee || "Unassigned"}</td>
+                    <td className="px-4 py-2">{t.reporter || "Unknown"}</td>
                     <td className="px-4 py-2 text-gray-500">
                       {t.created_at
                         ? new Date(t.created_at).toLocaleDateString()
