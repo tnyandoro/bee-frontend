@@ -9,7 +9,6 @@ import createApiInstance from "../utils/api";
 import { useAuth } from "../contexts/authContext";
 import TicketsBarChart from "./TicketsBarChart";
 
-// Local stat card component
 const StatCard = ({ title, value, color, textColor }) => (
   <div className={`p-4 rounded shadow ${color} ${textColor}`}>
     <h2 className="text-lg font-semibold">{title}</h2>
@@ -47,9 +46,8 @@ const AdminDashboard = ({ organizationSubdomain }) => {
         setError("Session expired. Attempting to refresh token...");
         refreshToken()
           .then((newToken) => {
-            if (newToken) {
-              setError("");
-            } else {
+            if (newToken) setError("");
+            else {
               logout();
               navigate("/login");
             }
@@ -79,8 +77,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
       );
       setDashboardStats(response.data);
     } catch (err) {
-      const errorMessage = handleApiError(err);
-      setError(errorMessage);
+      setError(handleApiError(err));
     } finally {
       setLoading(false);
     }
@@ -129,7 +126,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     }
   }, [token, getEffectiveSubdomain, fetchTeams, fetchUsers]);
 
-  // Safely get stats or default to zeros to prevent crashes
   const stats = dashboardStats?.stats || {
     total_tickets: 0,
     open_tickets: 0,
@@ -146,14 +142,12 @@ const AdminDashboard = ({ organizationSubdomain }) => {
 
   return (
     <div className="mt-2 p-4 ml-4">
-      {/* Ensure sidebar spacing */}
       <div className="bg-gray-200 shadow-xl rounded-lg mb-4 p-4">
         <h1 className="text-3xl font-semibold">
           Welcome to the {capitalizedOrgName} Admin Dashboard
         </h1>
       </div>
 
-      {/* Error display with retry button */}
       {error && (
         <div className="bg-red-100 text-red-700 p-3 rounded mb-4 flex justify-between items-center">
           <span>{error}</span>
@@ -253,7 +247,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
 
           <TicketsBarChart stats={stats} />
 
-          {/* Create User Modal */}
           {isCreateUserFormOpen && (
             <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-[9999]">
               <div className="bg-white p-6 rounded-xl w-full max-w-md shadow-xl relative">
@@ -271,7 +264,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
             </div>
           )}
 
-          {/* Create Team Modal */}
           {isCreateTeamFormOpen && (
             <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-[9999]">
               <div className="bg-white p-6 rounded-xl w-full max-w-md shadow-xl relative">
