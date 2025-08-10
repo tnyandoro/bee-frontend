@@ -85,7 +85,6 @@ export const AuthProvider = ({ children }) => {
 
         const apiBase = getApiBaseUrl();
 
-        // Note: Explicitly add /api/v1 to path here
         const response = await axios.get(
           `${apiBase}/api/v1/organizations/${subdomain}/profile`,
           {
@@ -155,15 +154,15 @@ export const AuthProvider = ({ children }) => {
     if (token && effectiveSubdomain) {
       verifyAuth(token, effectiveSubdomain);
     } else {
-      // No token: treat as "not authenticated" but not an error.
+      // If no token, treat as "not authenticated" but do NOT set an error
+      // This prevents "Authentication token missing" error on public pages
       setState((prev) => ({
-        ...prev,
         currentUser: null,
         organization: null,
         subdomain: effectiveSubdomain,
         token: null,
         loading: false,
-        error: null, // Clear error to avoid showing auth missing messages
+        error: null, // Clear error here!
       }));
     }
   }, [getAuthTokens, verifyAuth]);
@@ -181,7 +180,6 @@ export const AuthProvider = ({ children }) => {
 
         const apiBase = getApiBaseUrl();
 
-        // Explicitly add /api/v1 to path
         const response = await axios.post(`${apiBase}/api/v1/login`, {
           email,
           password,
@@ -190,7 +188,7 @@ export const AuthProvider = ({ children }) => {
 
         const { auth_token, user } = response.data;
 
-        // Save tokens
+        // Save tokens in localStorage
         localStorage.setItem("authToken", auth_token);
         localStorage.setItem("subdomain", subdomain);
         localStorage.setItem("email", user.email);

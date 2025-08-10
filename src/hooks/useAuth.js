@@ -1,4 +1,3 @@
-// src/hooks/useAuth.js or src/contexts/authContext.js
 import { useState, useEffect, useCallback } from "react";
 
 const useAuth = () => {

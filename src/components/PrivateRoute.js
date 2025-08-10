@@ -22,14 +22,11 @@ const PrivateRoute = ({ children, allowedRoles = [] }) => {
     );
   }
 
-  if (!currentUser) {
-    console.log("PrivateRoute: No user, redirecting to /login");
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
-
+  // Handle session or auth errors first
   if (error) {
     const sessionExpired = error.toLowerCase().includes("expired");
     const isUnauthorized = error.toLowerCase().includes("unauthorized");
+
     if (sessionExpired || isUnauthorized) {
       console.log("PrivateRoute: Session error, redirecting to /login", {
         error,
@@ -45,9 +42,17 @@ const PrivateRoute = ({ children, allowedRoles = [] }) => {
         />
       );
     }
+    // If error is non-critical, just log and continue
     console.warn("PrivateRoute: Non-critical error, proceeding", { error });
   }
 
+  // Now check if user exists
+  if (!currentUser) {
+    console.log("PrivateRoute: No user, redirecting to /login");
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // Check if user has required roles (if any roles are required)
   if (allowedRoles.length > 0) {
     const hasAccess =
       allowedRoles.includes(currentUser.role) ||
@@ -62,6 +67,7 @@ const PrivateRoute = ({ children, allowedRoles = [] }) => {
     }
   }
 
+  // All checks passed, render children
   return children;
 };
 

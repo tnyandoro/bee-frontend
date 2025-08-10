@@ -25,9 +25,9 @@ const metricColors = {
 };
 
 const Dashboard = () => {
-  const { user, subdomain } = useAuth();
-  const navigate = useNavigate();
+  const { currentUser, subdomain, error: authError } = useAuth();
 
+  const navigate = useNavigate();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -183,14 +183,14 @@ const Dashboard = () => {
 
   return (
     <div className="p-4 max-w-7xl mx-auto">
-      {/* Header */}
+      {/* Header with current user */}
       <div className="bg-indigo-600 text-white shadow-lg rounded-lg mb-6 p-6">
         <h1 className="text-2xl font-bold">
           {orgName.toUpperCase()} DASHBOARD
         </h1>
-        {user?.name && (
+        {currentUser?.name && (
           <p className="text-indigo-100">
-            Welcome, <span className="font-semibold">{user.name}</span>
+            Welcome, <span className="font-semibold">{currentUser.name}</span>
           </p>
         )}
       </div>
