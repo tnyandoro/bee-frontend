@@ -30,7 +30,7 @@ const createApiInstance = (token, subdomain) => {
     headers: {
       "Content-Type": "application/json",
       Authorization: authHeader,
-      "X-Organization-Subdomain": subdomain, // Add organization subdomain header
+      "X-Organization-Subdomain": subdomain,
     },
     timeout: 15000,
     withCredentials: true,

@@ -1,24 +1,37 @@
+// src/components/Dashboard.js
 import React, { useState, useEffect, useCallback } from "react";
-import axios from "axios";
-import MyChartComponent from "./MyChartComponent";
 import { useAuth } from "../contexts/authContext";
+import createApiInstance from "../utils/api";
+import MyChartComponent from "./MyChartComponent";
 import { useNavigate } from "react-router-dom";
 
-const getApiBaseUrl = () => {
-  return process.env.REACT_APP_API_BASE_URL || "http://localhost:3000/api/v1";
+const maxRetries = 3;
+
+// Static Tailwind color mappings for StatCard
+const statColors = {
+  blue: "bg-blue-100 text-blue-800",
+  indigo: "bg-indigo-100 text-indigo-800",
+  purple: "bg-purple-100 text-purple-800",
+  red: "bg-red-100 text-red-800",
+  emerald: "bg-emerald-100 text-emerald-800",
+  teal: "bg-teal-100 text-teal-800",
+};
+
+const metricColors = {
+  red: "border-red-200 bg-red-50 text-red-700",
+  yellow: "border-yellow-200 bg-yellow-50 text-yellow-700",
+  green: "border-green-200 bg-green-50 text-green-700",
+  blue: "border-blue-200 bg-blue-50 text-blue-700",
 };
 
 const Dashboard = () => {
-  const { organization, currentUser } = useAuth();
-  const subdomain =
-    organization?.subdomain || localStorage.getItem("subdomain");
+  const { user, subdomain } = useAuth();
   const navigate = useNavigate();
 
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [retryCount, setRetryCount] = useState(0);
-  const maxRetries = 3;
 
   const fetchDashboard = useCallback(async () => {
     if (!subdomain) {
@@ -37,20 +50,16 @@ const Dashboard = () => {
       return;
     }
 
-    try {
-      const url = `${getApiBaseUrl()}/organizations/${subdomain}/dashboard`;
-      const response = await axios.get(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        timeout: 15000,
-      });
+    setLoading(true);
+    setError("");
 
-      // Normalize response data
+    try {
+      const api = createApiInstance(token, subdomain);
+      const response = await api.get(`/organizations/${subdomain}/dashboard`);
+
       const data = response.data.data || response.data;
 
-      // Ensure organization data is properly structured
+      // Normalize organization object
       if (data && data.organization) {
         if (typeof data.organization === "string") {
           data.organization = { name: data.organization };
@@ -61,7 +70,7 @@ const Dashboard = () => {
 
       setDashboardData(data);
       setError("");
-      setRetryCount(0); // Reset retry count on success
+      setRetryCount(0); // reset retry on success
     } catch (err) {
       console.error("Dashboard fetch failed:", err);
       console.error("Error details:", err.response?.data);
@@ -89,11 +98,11 @@ const Dashboard = () => {
       }
 
       if (retryCount < maxRetries) {
-        setTimeout(() => {
-          setRetryCount(retryCount + 1);
-          fetchDashboard();
-        }, 2000 * (retryCount + 1));
+        setRetryCount((prev) => prev + 1);
         setError(`Retrying... (${retryCount + 1}/${maxRetries}) ${message}`);
+
+        // Retry with exponential backoff
+        setTimeout(fetchDashboard, 2000 * (retryCount + 1));
       } else {
         setError(`${message} All retries failed.`);
         setLoading(false);
@@ -160,7 +169,6 @@ const Dashboard = () => {
     );
   }
 
-  // Safely extract values with defaults
   const org = dashboardData.organization || {};
   const stats = dashboardData.stats || {};
   const charts = dashboardData.charts || {};
@@ -168,10 +176,7 @@ const Dashboard = () => {
   const recent_tickets = dashboardData.recent_tickets || [];
   const meta = dashboardData.meta || { fetched_at: new Date().toISOString() };
 
-  // Get organization name safely
   const orgName = typeof org === "string" ? org : org.name || "Organization";
-
-  // Format updated time
   const updatedTime = meta.fetched_at
     ? new Date(meta.fetched_at).toLocaleString()
     : "Just now";
@@ -183,9 +188,9 @@ const Dashboard = () => {
         <h1 className="text-2xl font-bold">
           {orgName.toUpperCase()} DASHBOARD
         </h1>
-        {currentUser?.name && (
+        {user?.name && (
           <p className="text-indigo-100">
-            Welcome, <span className="font-semibold">{currentUser.name}</span>
+            Welcome, <span className="font-semibold">{user.name}</span>
           </p>
         )}
       </div>
@@ -359,23 +364,26 @@ const Dashboard = () => {
 };
 
 // --- StatCard Component ---
-const StatCard = ({ label, value, color }) => (
-  <div
-    className={`p-4 bg-${color}-100 text-${color}-800 rounded-lg shadow-sm text-center`}
-  >
-    <div className="text-sm font-medium">{label}</div>
-    <div className="text-2xl font-bold">{value}</div>
-  </div>
-);
+const StatCard = ({ label, value, color }) => {
+  const colorClass = statColors[color] || "bg-gray-100 text-gray-800";
+  return (
+    <div className={`p-4 rounded-lg shadow-sm text-center ${colorClass}`}>
+      <div className="text-sm font-medium">{label}</div>
+      <div className="text-2xl font-bold">{value}</div>
+    </div>
+  );
+};
 
-// --- Reusable MetricCard ---
-const MetricCard = ({ label, value, color }) => (
-  <div
-    className={`p-3 text-center rounded border border-${color}-200 bg-${color}-50`}
-  >
-    <div className="text-sm text-gray-600 font-medium">{label}</div>
-    <div className={`text-xl font-bold text-${color}-700`}>{value}</div>
-  </div>
-);
+// --- MetricCard Component ---
+const MetricCard = ({ label, value, color }) => {
+  const colorClass =
+    metricColors[color] || "border-gray-200 bg-gray-50 text-gray-700";
+  return (
+    <div className={`p-3 text-center rounded border ${colorClass}`}>
+      <div className="text-sm text-gray-600 font-medium">{label}</div>
+      <div className={`text-xl font-bold`}>{value}</div>
+    </div>
+  );
+};
 
 export default Dashboard;
