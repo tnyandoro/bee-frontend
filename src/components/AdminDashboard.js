@@ -75,7 +75,9 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     try {
       const api = createApiInstance(token, activeSubdomain);
       // Updated endpoint path - removed organization from URL
-      const response = await api.get("/dashboard");
+      const response = await api.get(
+        `/organizations/${activeSubdomain}/dashboard`
+      );
       setDashboardStats(response.data);
     } catch (err) {
       const errorMessage = handleApiError(err);
@@ -103,7 +105,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     try {
       const api = createApiInstance(token, activeSubdomain);
       // Updated endpoint path - removed organization from URL
-      const response = await api.get("/teams");
+      const response = await api.get(`/organizations/${activeSubdomain}/teams`);
       setTeams(response.data);
     } catch (err) {
       setError(handleApiError(err));
@@ -117,7 +119,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     try {
       const api = createApiInstance(token, activeSubdomain);
       // Updated endpoint path - removed organization from URL
-      const response = await api.get("/users");
+      const response = await api.get(`/organizations/${activeSubdomain}/users`);
       setUsers(response.data);
     } catch (err) {
       setError(handleApiError(err));
