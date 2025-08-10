@@ -74,7 +74,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
 
     try {
       const api = createApiInstance(token, activeSubdomain);
-      // Updated endpoint path - removed organization from URL
       const response = await api.get(
         `/organizations/${activeSubdomain}/dashboard`
       );
@@ -87,7 +86,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     }
   }, [token, getEffectiveSubdomain, handleApiError]);
 
-  // Function to retry loading dashboard
   const retryDashboard = () => {
     setError("");
     setDashboardStats(null);
@@ -104,7 +102,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
 
     try {
       const api = createApiInstance(token, activeSubdomain);
-      // Updated endpoint path - removed organization from URL
       const response = await api.get(`/organizations/${activeSubdomain}/teams`);
       setTeams(response.data);
     } catch (err) {
@@ -118,7 +115,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
 
     try {
       const api = createApiInstance(token, activeSubdomain);
-      // Updated endpoint path - removed organization from URL
       const response = await api.get(`/organizations/${activeSubdomain}/users`);
       setUsers(response.data);
     } catch (err) {
@@ -133,18 +129,30 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     }
   }, [token, getEffectiveSubdomain, fetchTeams, fetchUsers]);
 
+  // Safely get stats or default to zeros to prevent crashes
+  const stats = dashboardStats?.stats || {
+    total_tickets: 0,
+    open_tickets: 0,
+    assigned_tickets: 0,
+    escalated_tickets: 0,
+    resolved_tickets: 0,
+    closed_tickets: 0,
+    total_problems: 0,
+    total_members: 0,
+  };
+
   const capitalizedOrgName =
     dashboardStats?.organization?.name?.toUpperCase() || "";
 
   return (
     <div className="mt-2 p-4 ml-4">
-      {" "}
       {/* Ensure sidebar spacing */}
       <div className="bg-gray-200 shadow-xl rounded-lg mb-4 p-4">
         <h1 className="text-3xl font-semibold">
           Welcome to the {capitalizedOrgName} Admin Dashboard
         </h1>
       </div>
+
       {/* Error display with retry button */}
       {error && (
         <div className="bg-red-100 text-red-700 p-3 rounded mb-4 flex justify-between items-center">
@@ -158,6 +166,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
           </button>
         </div>
       )}
+
       <div className="flex flex-wrap gap-4 mb-6">
         <button
           onClick={() => setIsCreateUserFormOpen(true)}
@@ -184,6 +193,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
           {showUsers ? "Hide Users" : "Show Users"}
         </button>
       </div>
+
       {loading ? (
         <div className="flex justify-center items-center h-64">
           <RefreshCw className="w-12 h-12 text-blue-500 animate-spin" />
@@ -193,55 +203,55 @@ const AdminDashboard = ({ organizationSubdomain }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-6">
             <StatCard
               title="Total Tickets"
-              value={dashboardStats.stats.total_tickets}
+              value={stats.total_tickets}
               color="bg-blue-100"
               textColor="text-blue-800"
             />
             <StatCard
               title="Open Tickets"
-              value={dashboardStats.stats.open_tickets}
+              value={stats.open_tickets}
               color="bg-yellow-100"
               textColor="text-yellow-800"
             />
             <StatCard
               title="Assigned Tickets"
-              value={dashboardStats.stats.assigned_tickets}
+              value={stats.assigned_tickets}
               color="bg-indigo-100"
               textColor="text-indigo-800"
             />
             <StatCard
               title="Escalated Tickets"
-              value={dashboardStats.stats.escalated_tickets}
+              value={stats.escalated_tickets}
               color="bg-purple-100"
               textColor="text-purple-800"
             />
             <StatCard
               title="Resolved Tickets"
-              value={dashboardStats.stats.resolved_tickets}
+              value={stats.resolved_tickets}
               color="bg-green-200"
               textColor="text-green-900"
             />
             <StatCard
               title="Closed Tickets"
-              value={dashboardStats.stats.closed_tickets}
+              value={stats.closed_tickets}
               color="bg-green-100"
               textColor="text-green-800"
             />
             <StatCard
               title="Problems"
-              value={dashboardStats.stats.total_problems}
+              value={stats.total_problems}
               color="bg-red-100"
               textColor="text-red-800"
             />
             <StatCard
               title="Team Members"
-              value={dashboardStats.stats.total_members}
+              value={stats.total_members}
               color="bg-teal-100"
               textColor="text-teal-800"
             />
           </div>
 
-          <TicketsBarChart stats={dashboardStats.stats} />
+          <TicketsBarChart stats={stats} />
 
           {/* Create User Modal */}
           {isCreateUserFormOpen && (
