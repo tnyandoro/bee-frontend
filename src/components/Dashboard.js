@@ -1,5 +1,6 @@
-import React, { useEffect, useState, useCallback } from "react";
-import createApiInstance from "../api";
+// src/components/Dashboard.js
+import React, { useState, useEffect, useCallback } from "react";
+import createApiInstance from "../utils/api";
 
 const Dashboard = ({ token, subdomain }) => {
   const [data, setData] = useState(() => {
