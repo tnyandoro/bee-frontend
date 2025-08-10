@@ -4,6 +4,22 @@ import createApiInstance from "../utils/api";
 import { useAuth } from "../contexts/authContext";
 import { useNavigate } from "react-router-dom";
 
+// Mock teams data for fallback
+const mockTeams = [
+  {
+    id: "mock-1",
+    name: "Engineering",
+    user_ids: ["u1", "u2", "u3"],
+    created_at: "2024-06-01T10:00:00Z",
+  },
+  {
+    id: "mock-2",
+    name: "Support",
+    user_ids: ["u4", "u5"],
+    created_at: "2024-07-15T14:30:00Z",
+  },
+];
+
 const TeamList = ({ organizationSubdomain }) => {
   const { token, subdomain: authSubdomain, refreshToken, logout } = useAuth();
   const navigate = useNavigate();
@@ -12,10 +28,7 @@ const TeamList = ({ organizationSubdomain }) => {
   const [isError, setIsError] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Get the effective subdomain to use
   const getEffectiveSubdomain = useCallback(() => {
-    console.log("organizationSubdomain:", organizationSubdomain);
-    console.log("authSubdomain:", authSubdomain);
     const subdomain =
       organizationSubdomain &&
       organizationSubdomain !== "undefined" &&
@@ -28,7 +41,6 @@ const TeamList = ({ organizationSubdomain }) => {
         : process.env.NODE_ENV === "development"
         ? "demo"
         : null;
-    console.log("Selected subdomain:", subdomain);
     return subdomain;
   }, [organizationSubdomain, authSubdomain]);
 
@@ -40,7 +52,7 @@ const TeamList = ({ organizationSubdomain }) => {
           .then((newToken) => {
             if (newToken) {
               setMessage("");
-              fetchTeams(); // Retry after refresh
+              fetchTeams();
             } else {
               logout();
               navigate("/login");
@@ -84,24 +96,25 @@ const TeamList = ({ organizationSubdomain }) => {
       const api = createApiInstance(token, activeSubdomain);
       const response = await api.get(`/organizations/${activeSubdomain}/teams`);
       setTeams(response.data || []);
+      console.log("Fetched teams from API:", response.data);
     } catch (error) {
-      setMessage(handleApiError(error));
-      setIsError(true);
+      console.warn("API failed, using mock teams:", error);
+      setMessage("Using mock data due to API error.");
+      setTeams(mockTeams);
+      setIsError(false); // it's not fatal if mock loads
     } finally {
       setLoading(false);
     }
-  }, [token, getEffectiveSubdomain, handleApiError, navigate]);
+  }, [token, getEffectiveSubdomain, navigate]);
 
   useEffect(() => {
-    // Only fetch if we have both requirements
     if (getEffectiveSubdomain() && token) {
       fetchTeams();
     }
-  }, [fetchTeams]);
+  }, [fetchTeams, getEffectiveSubdomain, token]);
 
   const handleDelete = async (teamId) => {
     if (!window.confirm("Are you sure you want to delete this team?")) return;
-
     const activeSubdomain = getEffectiveSubdomain();
     if (!activeSubdomain) {
       setMessage("No organization subdomain available");
@@ -120,7 +133,7 @@ const TeamList = ({ organizationSubdomain }) => {
       await api.delete(`/organizations/${activeSubdomain}/teams/${teamId}`);
       setMessage("Team deleted successfully");
       setIsError(false);
-      fetchTeams(); // Refresh the list
+      fetchTeams();
     } catch (error) {
       setMessage(handleApiError(error));
       setIsError(true);
@@ -150,7 +163,7 @@ const TeamList = ({ organizationSubdomain }) => {
       <div className="overflow-x-auto">
         <table className="min-w-full bg-white border">
           <thead className="bg-blue-100">
-            <tr className="bg-gray-100">
+            <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
                 Name
               </th>
@@ -177,9 +190,7 @@ const TeamList = ({ organizationSubdomain }) => {
                   <td className="p-3 border">
                     <button
                       className="text-blue-500 hover:text-blue-700 mr-2"
-                      onClick={() => {
-                        /* Edit functionality */
-                      }}
+                      onClick={() => console.log("Edit team", team.id)}
                     >
                       Edit
                     </button>
