@@ -6,7 +6,7 @@ const PrivateRoute = ({ children, allowedRoles = [] }) => {
   const { currentUser, loading, error, isAdmin } = useAuth();
   const location = useLocation();
 
-  console.log("PrivateRoute: ", {
+  console.log("PrivateRoute:", {
     currentUser,
     loading,
     error,
@@ -22,15 +22,15 @@ const PrivateRoute = ({ children, allowedRoles = [] }) => {
     );
   }
 
-  // Handle session or auth errors first
+  // Handle session expiration or unauthorized errors early
   if (error) {
     const sessionExpired = error.toLowerCase().includes("expired");
     const isUnauthorized = error.toLowerCase().includes("unauthorized");
-
     if (sessionExpired || isUnauthorized) {
-      console.log("PrivateRoute: Session error, redirecting to /login", {
-        error,
-      });
+      console.log(
+        "PrivateRoute: Session expired or unauthorized, redirecting to /login",
+        { error }
+      );
       return (
         <Navigate
           to="/login"
@@ -42,24 +42,24 @@ const PrivateRoute = ({ children, allowedRoles = [] }) => {
         />
       );
     }
-    // If error is non-critical, just log and continue
+    // Log other errors but do not block route
     console.warn("PrivateRoute: Non-critical error, proceeding", { error });
   }
 
-  // Now check if user exists
+  // If no authenticated user, redirect to login
   if (!currentUser) {
     console.log("PrivateRoute: No user, redirecting to /login");
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Check if user has required roles (if any roles are required)
+  // If allowedRoles are specified, check user role
   if (allowedRoles.length > 0) {
     const hasAccess =
       allowedRoles.includes(currentUser.role) ||
       (allowedRoles.includes("admin") && isAdmin);
 
     if (!hasAccess) {
-      console.log("PrivateRoute: No access, redirecting to /forbidden", {
+      console.log("PrivateRoute: Access denied, redirecting to /forbidden", {
         userRole: currentUser.role,
         allowedRoles,
       });
@@ -67,7 +67,7 @@ const PrivateRoute = ({ children, allowedRoles = [] }) => {
     }
   }
 
-  // All checks passed, render children
+  // User is authenticated and authorized; render children
   return children;
 };
 
