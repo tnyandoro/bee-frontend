@@ -8,28 +8,31 @@ const createApiInstance = (token, subdomain) => {
 
   const isDev = process.env.NODE_ENV === "development";
 
-  // Determine the base URL
-  let baseURL;
-  if (process.env.REACT_APP_API_BASE_URL) {
-    baseURL = process.env.REACT_APP_API_BASE_URL;
-  } else if (isDev) {
-    baseURL = "http://itsm-api.lvh.me:3000/api/v1";
-  } else {
-    baseURL = "https://itsm-api.onrender.com/api/v1";
+  // Get base URL from env or fallback to default
+  let baseURL =
+    process.env.REACT_APP_API_BASE_URL ||
+    (isDev
+      ? "http://itsm-api.lvh.me:3000/api/v1"
+      : "https://itsm-api.onrender.com/api/v1");
+
+  // Remove trailing '/api/v1' if present to avoid double versioning
+  if (baseURL.endsWith("/api/v1")) {
+    // Keep it, we want /api/v1 as part of baseURL
+  } else if (baseURL.endsWith("/api/v1/")) {
+    baseURL = baseURL.slice(0, -1); // remove trailing slash
   }
 
-  const authHeader = `Bearer ${token}`;
   console.log("Creating API instance:", {
     baseURL,
     subdomain,
-    Authorization: authHeader,
+    Authorization: `Bearer ${token}`,
   });
 
   const instance = axios.create({
     baseURL,
     headers: {
       "Content-Type": "application/json",
-      Authorization: authHeader,
+      Authorization: `Bearer ${token}`,
       "X-Organization-Subdomain": subdomain,
     },
     timeout: 15000,
@@ -41,17 +44,27 @@ const createApiInstance = (token, subdomain) => {
     (error) => {
       const errorMessage = error.response?.data?.error || error.message;
 
-      if (error.response?.status === 401) {
-        console.error("Authentication error:", errorMessage || "Unauthorized");
-      } else if (error.response?.status === 404) {
-        console.error(
-          "Resource not found:",
-          errorMessage || "Organization or endpoint not found"
-        );
-      } else if (error.response?.status === 500) {
-        console.error("Server error:", errorMessage || "Internal server error");
-      } else {
-        console.error("API error:", errorMessage || "Unknown error");
+      switch (error.response?.status) {
+        case 401:
+          console.error(
+            "Authentication error:",
+            errorMessage || "Unauthorized"
+          );
+          break;
+        case 404:
+          console.error(
+            "Resource not found:",
+            errorMessage || "Organization or endpoint not found"
+          );
+          break;
+        case 500:
+          console.error(
+            "Server error:",
+            errorMessage || "Internal server error"
+          );
+          break;
+        default:
+          console.error("API error:", errorMessage || "Unknown error");
       }
 
       return Promise.reject(error);
