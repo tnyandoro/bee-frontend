@@ -27,8 +27,11 @@ export const useAuth = () => {
   };
 };
 
+// Remove trailing /api/v1 from base URL if present to avoid double api versioning
 const getApiBaseUrl = () => {
-  return process.env.REACT_APP_API_BASE_URL || "http://localhost:3000/api/v1";
+  const rawBase =
+    process.env.REACT_APP_API_BASE_URL || "http://localhost:3000/api/v1";
+  return rawBase.replace(/\/api\/v1\/?$/, "");
 };
 
 export const AuthProvider = ({ children }) => {
@@ -48,7 +51,6 @@ export const AuthProvider = ({ children }) => {
       const email = localStorage.getItem("email");
       const role = localStorage.getItem("role");
       const userId = localStorage.getItem("userId");
-
       return { token, subdomain, email, role, userId };
     } catch (e) {
       console.warn("LocalStorage access error:", e);
@@ -80,10 +82,12 @@ export const AuthProvider = ({ children }) => {
 
       try {
         setState((prev) => ({ ...prev, loading: true, error: null }));
+
         const apiBase = getApiBaseUrl();
 
+        // Note: Explicitly add /api/v1 to path here
         const response = await axios.get(
-          `${apiBase}/organizations/${subdomain}/profile`,
+          `${apiBase}/api/v1/organizations/${subdomain}/profile`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -104,6 +108,7 @@ export const AuthProvider = ({ children }) => {
           department_id: user.department_id,
         };
 
+        // Save in localStorage
         localStorage.setItem("authToken", token);
         localStorage.setItem("subdomain", subdomain);
         localStorage.setItem("email", sanitizedUser.email);
@@ -141,6 +146,7 @@ export const AuthProvider = ({ children }) => {
     [logout]
   );
 
+  // On mount: try to initialize auth from localStorage tokens
   useEffect(() => {
     const { token, subdomain } = getAuthTokens();
     const effectiveSubdomain =
@@ -159,6 +165,7 @@ export const AuthProvider = ({ children }) => {
     }
   }, [getAuthTokens, verifyAuth]);
 
+  // Login function
   const login = useCallback(
     async (email, password, domain) => {
       try {
@@ -171,7 +178,8 @@ export const AuthProvider = ({ children }) => {
 
         const apiBase = getApiBaseUrl();
 
-        const response = await axios.post(`${apiBase}/login`, {
+        // Explicitly add /api/v1 to path
+        const response = await axios.post(`${apiBase}/api/v1/login`, {
           email,
           password,
           subdomain,
@@ -179,12 +187,14 @@ export const AuthProvider = ({ children }) => {
 
         const { auth_token, user } = response.data;
 
+        // Save tokens
         localStorage.setItem("authToken", auth_token);
         localStorage.setItem("subdomain", subdomain);
         localStorage.setItem("email", user.email);
         localStorage.setItem("role", user.role);
         localStorage.setItem("userId", user.id);
 
+        // Verify after login
         const isVerified = await verifyAuth(auth_token, subdomain);
         if (!isVerified) throw new Error("Verification after login failed");
 
