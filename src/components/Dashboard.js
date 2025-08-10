@@ -5,9 +5,72 @@ import createApiInstance from "../utils/api";
 import MyChartComponent from "./MyChartComponent";
 import { useNavigate } from "react-router-dom";
 
+// Mock data for testing fallback
+const mockData = {
+  organization: { name: "Mock Organization" },
+  stats: {
+    open_tickets: 5,
+    assigned_tickets: 10,
+    escalated_tickets: 1,
+    high_priority_tickets: 2,
+    resolved_tickets: 8,
+    closed_tickets: 12,
+  },
+  charts: {
+    tickets_by_status: {
+      open: 5,
+      assigned: 10,
+      escalated: 1,
+      resolved: 8,
+      closed: 12,
+    },
+    tickets_by_priority: {
+      p1: 2,
+      p2: 5,
+      p3: 8,
+      p4: 11,
+    },
+    top_assignees: [
+      { name: "User A", tickets: 10 },
+      { name: "User B", tickets: 7 },
+    ],
+  },
+  sla: {
+    breached: 1,
+    breaching_soon: 3,
+    on_time_rate_percent: 95,
+    avg_resolution_hours: 12,
+  },
+  recent_tickets: [
+    {
+      id: 1,
+      title: "Sample ticket 1",
+      status: "open",
+      priority: "p1",
+      assignee: "User A",
+      reporter: "User X",
+      created_at: new Date().toISOString(),
+      sla_breached: false,
+      breaching_sla: true,
+    },
+    {
+      id: 2,
+      title: "Sample ticket 2",
+      status: "resolved",
+      priority: "p3",
+      assignee: "User B",
+      reporter: "User Y",
+      created_at: new Date().toISOString(),
+      sla_breached: false,
+      breaching_sla: false,
+    },
+  ],
+  meta: { fetched_at: new Date().toISOString() },
+};
+
 const maxRetries = 3;
 
-// Static Tailwind color mappings for StatCard
+// Tailwind color mappings for StatCard
 const statColors = {
   blue: "bg-blue-100 text-blue-800",
   indigo: "bg-indigo-100 text-indigo-800",
@@ -33,57 +96,6 @@ const Dashboard = () => {
   const [error, setError] = useState("");
   const [retryCount, setRetryCount] = useState(0);
 
-  // Mock data for testing UI rendering
-  const mockData = {
-    organization: { name: "Acme Corp" },
-    stats: {
-      open_tickets: 12,
-      assigned_tickets: 7,
-      escalated_tickets: 2,
-      high_priority_tickets: 1,
-      resolved_tickets: 20,
-      closed_tickets: 15,
-    },
-    charts: {
-      tickets_by_status: { open: 12, closed: 15 },
-      tickets_by_priority: { p1: 3, p2: 7, p3: 10 },
-      top_assignees: { "John Doe": 10, "Jane Smith": 7 },
-    },
-    sla: {
-      breached: 1,
-      breaching_soon: 2,
-      on_time_rate_percent: 95,
-      avg_resolution_hours: 6,
-    },
-    recent_tickets: [
-      {
-        id: 1,
-        title: "Sample ticket 1",
-        status: "open",
-        priority: "p1",
-        assignee: "John Doe",
-        reporter: "Alice",
-        created_at: "2025-08-09T10:00:00Z",
-        sla_breached: false,
-        breaching_sla: false,
-      },
-      {
-        id: 2,
-        title: "Sample ticket 2",
-        status: "closed",
-        priority: "p3",
-        assignee: "Jane Smith",
-        reporter: "Bob",
-        created_at: "2025-08-08T09:30:00Z",
-        sla_breached: true,
-        breaching_sla: false,
-      },
-    ],
-    meta: {
-      fetched_at: new Date().toISOString(),
-    },
-  };
-
   const fetchDashboard = useCallback(async () => {
     if (!subdomain) {
       setError(
@@ -108,12 +120,17 @@ const Dashboard = () => {
       const api = createApiInstance(token, subdomain);
       const response = await api.get(`/organizations/${subdomain}/dashboard`);
 
-      console.log("Raw response.data:", response.data);
+      console.log("Full API response:", response);
 
       const data = response.data.data || response.data;
 
-      if (!data || Object.keys(data).length === 0) {
-        console.warn("Dashboard data empty, loading mock data");
+      // Fallback to mock data if no valid data
+      if (
+        !data ||
+        Object.keys(data).length === 0 ||
+        (!data.stats && !data.recent_tickets && !data.organization)
+      ) {
+        console.warn("Dashboard data empty or incomplete, loading mock data");
         setDashboardData(mockData);
       } else {
         // Normalize organization object
@@ -128,52 +145,40 @@ const Dashboard = () => {
       }
 
       setError("");
-      setRetryCount(0); // reset retry on success
+      setRetryCount(0);
+      setLoading(false);
     } catch (err) {
       console.error("Dashboard fetch failed:", err);
-      console.error("Error details:", err.response?.data);
+      setError("Failed to load dashboard. Using mock data.");
+      setDashboardData(mockData);
+      setLoading(false);
 
-      let message = "Failed to load dashboard.";
-      if (err.response) {
-        if (err.response.status === 404) {
-          message = "Organization not found. Please check the subdomain.";
-        } else if (err.response.status === 403) {
-          message =
-            "Access denied. You may not have permission to view this dashboard.";
-        } else if (err.response.status === 500) {
-          message = `Server error: ${
-            err.response.data?.error || "An unexpected error occurred"
-          }.${
-            err.response.data?.details
-              ? ` Details: ${err.response.data.details}`
-              : ""
-          }`;
-        } else {
-          message = err.response.data?.error || err.message;
-        }
-      } else if (err.code === "ECONNABORTED") {
-        message = "Request timed out. Please check your network connection.";
-      }
-
+      // Disabled retry logic for testing
+      /*
       if (retryCount < maxRetries) {
         setRetryCount((prev) => prev + 1);
         setError(`Retrying... (${retryCount + 1}/${maxRetries}) ${message}`);
-
-        // Retry with exponential backoff
         setTimeout(fetchDashboard, 2000 * (retryCount + 1));
       } else {
         setError(`${message} All retries failed.`);
         setLoading(false);
       }
-    } finally {
-      if (retryCount >= maxRetries) {
-        setLoading(false);
-      }
+      */
     }
-  }, [subdomain, navigate, retryCount]);
+  }, [subdomain, navigate /*retryCount*/]);
 
   useEffect(() => {
     fetchDashboard();
+
+    const timer = setTimeout(() => {
+      if (!dashboardData) {
+        console.warn("Timeout reached, loading mock data");
+        setDashboardData(mockData);
+        setLoading(false);
+      }
+    }, 8000);
+
+    return () => clearTimeout(timer);
   }, [fetchDashboard]);
 
   if (loading) {
