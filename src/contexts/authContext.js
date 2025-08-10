@@ -27,11 +27,9 @@ export const useAuth = () => {
   };
 };
 
-// Remove trailing /api/v1 from base URL if present to avoid double api versioning
+// Return the API base URL including the /api/v1 suffix
 const getApiBaseUrl = () => {
-  const rawBase =
-    process.env.REACT_APP_API_BASE_URL || "http://localhost:3000/api/v1";
-  return rawBase.replace(/\/api\/v1\/?$/, "");
+  return process.env.REACT_APP_API_BASE_URL || "http://localhost:3000/api/v1";
 };
 
 export const AuthProvider = ({ children }) => {
@@ -85,8 +83,9 @@ export const AuthProvider = ({ children }) => {
 
         const apiBase = getApiBaseUrl();
 
+        // <-- Removed extra /api/v1 here -->
         const response = await axios.get(
-          `${apiBase}/api/v1/organizations/${subdomain}/profile`,
+          `${apiBase}/organizations/${subdomain}/profile`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -180,7 +179,8 @@ export const AuthProvider = ({ children }) => {
 
         const apiBase = getApiBaseUrl();
 
-        const response = await axios.post(`${apiBase}/api/v1/login`, {
+        // <-- Removed extra /api/v1 here -->
+        const response = await axios.post(`${apiBase}/login`, {
           email,
           password,
           subdomain,
