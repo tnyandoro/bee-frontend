@@ -26,17 +26,20 @@ const Login = ({ loginType = "User" }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Show splash for 2 seconds on mount
     const splashTimeout = setTimeout(() => setShowSplash(false), 2000);
     return () => clearTimeout(splashTimeout);
   }, []);
 
   useEffect(() => {
+    // If token exists, redirect based on role
     const token = localStorage.getItem("authToken");
     if (token) {
       handleExistingSessionRedirect();
     }
   }, [navigate]);
 
+  // Sanitize subdomain input to lowercase, alphanumeric + hyphen only
   const sanitizeSubdomain = (input) => {
     return input
       .toLowerCase()
@@ -52,16 +55,19 @@ const Login = ({ loginType = "User" }) => {
     }));
   };
 
+  // When a session exists, redirect by stored role
   const handleExistingSessionRedirect = () => {
     const storedSubdomain = localStorage.getItem("subdomain");
     const storedRole = localStorage.getItem("role");
 
+    console.log("Existing session detected:", storedSubdomain, storedRole);
+
     if (storedSubdomain && storedRole) {
-      navigate(
-        storedRole === "system_admin" || storedRole === "domain_admin"
-          ? "/dashboard"
-          : "/user/dashboard"
-      );
+      if (storedRole === "system_admin" || storedRole === "domain_admin") {
+        navigate("/dashboard");
+      } else {
+        navigate("/user/dashboard");
+      }
     }
   };
 
@@ -93,19 +99,30 @@ const Login = ({ loginType = "User" }) => {
     }
 
     setErrors(newErrors);
+    // Return true if no errors
     return !Object.values(newErrors).some((error) => error);
   };
 
   const handleLogin = async (e) => {
     e.preventDefault();
+
+    // Sanitize subdomain again just in case
+    setFormData((prev) => ({
+      ...prev,
+      subdomain: sanitizeSubdomain(prev.subdomain),
+    }));
+
     if (!validateForm()) return;
 
     setIsLoading(true);
     setErrors((prev) => ({ ...prev, general: "" }));
 
     try {
+      console.log("Attempting login with:", formData.email, formData.subdomain);
+
       await login(formData.email, formData.password, formData.subdomain);
-      console.log("Login successful, navigating based on role");
+
+      console.log("Login successful, navigating based on stored role");
 
       toast.success("You have successfully logged in", {
         position: "top-right",
@@ -118,11 +135,18 @@ const Login = ({ loginType = "User" }) => {
       });
 
       const storedRole = localStorage.getItem("role");
-      navigate(
-        storedRole === "system_admin" || storedRole === "domain_admin"
-          ? "/dashboard"
-          : "/user/dashboard"
-      );
+      if (!storedRole) {
+        // Defensive fallback in case role missing
+        console.warn("Role missing after login, defaulting to user dashboard");
+        navigate("/user/dashboard");
+      } else if (
+        storedRole === "system_admin" ||
+        storedRole === "domain_admin"
+      ) {
+        navigate("/dashboard");
+      } else {
+        navigate("/user/dashboard");
+      }
     } catch (error) {
       console.error("Login error:", error.message);
       let errorMessage = "Login failed. Please try again";
@@ -207,6 +231,7 @@ const Login = ({ loginType = "User" }) => {
                 }`}
                 disabled={isLoading}
                 autoComplete="organization"
+                required
               />
               {errors.subdomain && (
                 <p className="mt-1 text-sm text-red-600">{errors.subdomain}</p>
@@ -234,11 +259,13 @@ const Login = ({ loginType = "User" }) => {
                 }`}
                 disabled={isLoading}
                 autoComplete="email"
+                required
               />
               {errors.email && (
                 <p className="mt-1 text-sm text-red-600">{errors.email}</p>
               )}
             </div>
+
             <div>
               <label
                 htmlFor="password"
@@ -261,6 +288,7 @@ const Login = ({ loginType = "User" }) => {
                   }`}
                   disabled={isLoading}
                   autoComplete="current-password"
+                  required
                 />
                 <button
                   type="button"
