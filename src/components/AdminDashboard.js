@@ -30,24 +30,27 @@ const AdminDashboard = ({ organizationSubdomain }) => {
   const [teams, setTeams] = useState([]);
   const [dashboardStats, setDashboardStats] = useState(null);
 
+  // Detect correct subdomain
   const getEffectiveSubdomain = useCallback(() => {
-    return organizationSubdomain && organizationSubdomain !== "undefined"
-      ? organizationSubdomain
-      : authSubdomain && authSubdomain !== "undefined"
-      ? authSubdomain
-      : process.env.NODE_ENV === "development"
-      ? "demo"
-      : null;
+    if (organizationSubdomain && organizationSubdomain !== "undefined") {
+      return organizationSubdomain;
+    }
+    if (authSubdomain && authSubdomain !== "undefined") {
+      return authSubdomain;
+    }
+    return process.env.NODE_ENV === "development" ? "demo" : null;
   }, [organizationSubdomain, authSubdomain]);
 
+  // Handle token expiration
   const handleApiError = useCallback(
     (error) => {
       if (error.response?.status === 401) {
         setError("Session expired. Attempting to refresh token...");
         refreshToken()
           .then((newToken) => {
-            if (newToken) setError("");
-            else {
+            if (newToken) {
+              setError("");
+            } else {
               logout();
               navigate("/login");
             }
@@ -63,6 +66,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     [navigate, refreshToken, logout]
   );
 
+  // Fetch dashboard stats
   const fetchDashboardStats = useCallback(async () => {
     const activeSubdomain = getEffectiveSubdomain();
     if (!activeSubdomain || !token) return;
@@ -93,6 +97,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     fetchDashboardStats();
   }, [fetchDashboardStats]);
 
+  // Fetch teams
   const fetchTeams = useCallback(async () => {
     const activeSubdomain = getEffectiveSubdomain();
     if (!activeSubdomain || !token) return;
@@ -106,6 +111,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     }
   }, [token, getEffectiveSubdomain, handleApiError]);
 
+  // Fetch users
   const fetchUsers = useCallback(async () => {
     const activeSubdomain = getEffectiveSubdomain();
     if (!activeSubdomain || !token) return;
@@ -194,6 +200,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
         </div>
       ) : dashboardStats ? (
         <>
+          {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-6">
             <StatCard
               title="Total Tickets"
@@ -245,8 +252,10 @@ const AdminDashboard = ({ organizationSubdomain }) => {
             />
           </div>
 
+          {/* Chart */}
           <TicketsBarChart stats={stats} />
 
+          {/* Create User Modal */}
           {isCreateUserFormOpen && (
             <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-[9999]">
               <div className="bg-white p-6 rounded-xl w-full max-w-md shadow-xl relative">
@@ -264,6 +273,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
             </div>
           )}
 
+          {/* Create Team Modal */}
           {isCreateTeamFormOpen && (
             <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-[9999]">
               <div className="bg-white p-6 rounded-xl w-full max-w-md shadow-xl relative">
@@ -281,6 +291,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
             </div>
           )}
 
+          {/* Team List */}
           {showTeams && (
             <div className="mt-6">
               <h3 className="text-xl font-semibold text-gray-700 mb-2">
@@ -290,6 +301,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
             </div>
           )}
 
+          {/* User List */}
           {showUsers && (
             <div className="mt-6">
               <h3 className="text-xl font-semibold text-gray-700 mb-2">
