@@ -155,12 +155,15 @@ export const AuthProvider = ({ children }) => {
     if (token && effectiveSubdomain) {
       verifyAuth(token, effectiveSubdomain);
     } else {
+      // No token: treat as "not authenticated" but not an error.
       setState((prev) => ({
         ...prev,
+        currentUser: null,
+        organization: null,
+        subdomain: effectiveSubdomain,
+        token: null,
         loading: false,
-        error: effectiveSubdomain
-          ? "Authentication token missing"
-          : "No organization subdomain available",
+        error: null, // Clear error to avoid showing auth missing messages
       }));
     }
   }, [getAuthTokens, verifyAuth]);
