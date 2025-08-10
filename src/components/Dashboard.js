@@ -57,7 +57,11 @@ const Dashboard = () => {
       const api = createApiInstance(token, subdomain);
       const response = await api.get(`/organizations/${subdomain}/dashboard`);
 
+      console.log("Dashboard API response:", response.data);
+
       const data = response.data.data || response.data;
+
+      console.log("Normalized dashboard data:", data);
 
       // Normalize organization object
       if (data && data.organization) {
@@ -173,13 +177,18 @@ const Dashboard = () => {
   const stats = dashboardData.stats || {};
   const charts = dashboardData.charts || {};
   const sla = dashboardData.sla || {};
-  const recent_tickets = dashboardData.recent_tickets || [];
+  const recentTickets =
+    dashboardData.recent_tickets || dashboardData.recentTickets || [];
   const meta = dashboardData.meta || { fetched_at: new Date().toISOString() };
 
   const orgName = typeof org === "string" ? org : org.name || "Organization";
   const updatedTime = meta.fetched_at
     ? new Date(meta.fetched_at).toLocaleString()
     : "Just now";
+
+  // Defensive fallback for stats keys (camelCase or snake_case)
+  const getStatValue = (snakeKey, camelKey) =>
+    stats[snakeKey] ?? stats[camelKey] ?? 0;
 
   return (
     <div className="p-4 max-w-7xl mx-auto">
@@ -197,30 +206,34 @@ const Dashboard = () => {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-        <StatCard label="Open" value={stats.open_tickets || 0} color="blue" />
+        <StatCard
+          label="Open"
+          value={getStatValue("open_tickets", "openTickets")}
+          color="blue"
+        />
         <StatCard
           label="Assigned"
-          value={stats.assigned_tickets || 0}
+          value={getStatValue("assigned_tickets", "assignedTickets")}
           color="indigo"
         />
         <StatCard
           label="Escalated"
-          value={stats.escalated_tickets || 0}
+          value={getStatValue("escalated_tickets", "escalatedTickets")}
           color="purple"
         />
         <StatCard
           label="Critical"
-          value={stats.high_priority_tickets || 0}
+          value={getStatValue("high_priority_tickets", "highPriorityTickets")}
           color="red"
         />
         <StatCard
           label="Resolved"
-          value={stats.resolved_tickets || 0}
+          value={getStatValue("resolved_tickets", "resolvedTickets")}
           color="emerald"
         />
         <StatCard
           label="Closed"
-          value={stats.closed_tickets || 0}
+          value={getStatValue("closed_tickets", "closedTickets")}
           color="teal"
         />
       </div>
@@ -246,22 +259,26 @@ const Dashboard = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <MetricCard
             label="Missed SLA"
-            value={sla.breached || 0}
+            value={sla.breached || sla.breachedCount || 0}
             color="red"
           />
           <MetricCard
             label="Breaching Soon"
-            value={sla.breaching_soon || 0}
+            value={sla.breaching_soon || sla.breachingSoon || 0}
             color="yellow"
           />
           <MetricCard
             label="On-Time Rate"
-            value={`${sla.on_time_rate_percent || 100}%`}
+            value={`${
+              sla.on_time_rate_percent || sla.onTimeRatePercent || 100
+            }%`}
             color="green"
           />
           <MetricCard
             label="Avg Resolution"
-            value={`${sla.avg_resolution_hours || 0}h`}
+            value={`${
+              sla.avg_resolution_hours || sla.avgResolutionHours || 0
+            }h`}
             color="blue"
           />
         </div>
@@ -272,7 +289,7 @@ const Dashboard = () => {
         <h3 className="text-lg font-semibold mb-3 text-gray-800">
           Recent Tickets
         </h3>
-        {recent_tickets.length > 0 ? (
+        {recentTickets.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full table-auto">
               <thead>
@@ -287,7 +304,7 @@ const Dashboard = () => {
                 </tr>
               </thead>
               <tbody className="text-sm">
-                {recent_tickets.map((t) => (
+                {recentTickets.map((t) => (
                   <tr key={t.id} className="border-b hover:bg-gray-50">
                     <td className="px-4 py-2 font-medium text-indigo-600 truncate max-w-xs">
                       {t.title || "Untitled"}
@@ -359,6 +376,16 @@ const Dashboard = () => {
       <div className="text-xs text-gray-500 text-right mt-4">
         Updated: {updatedTime}
       </div>
+
+      {/* DEBUG: Raw JSON output for dashboard data */}
+      <details className="mt-8 p-4 bg-gray-50 rounded shadow-inner max-h-64 overflow-auto">
+        <summary className="cursor-pointer font-semibold text-gray-700">
+          Show Raw Dashboard Data (Debug)
+        </summary>
+        <pre className="text-xs text-gray-700 whitespace-pre-wrap">
+          {JSON.stringify(dashboardData, null, 2)}
+        </pre>
+      </details>
     </div>
   );
 };
