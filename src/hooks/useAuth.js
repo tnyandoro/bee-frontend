@@ -1,25 +1,39 @@
 import { useState, useEffect, useCallback } from "react";
 
 const useAuth = () => {
-  const [token, setToken] = useState(localStorage.getItem("authToken") || "");
+  const [token, setToken] = useState(localStorage.getItem("authToken") || null);
   const [subdomain, setSubdomain] = useState(
-    localStorage.getItem("subdomain") || ""
+    localStorage.getItem("subdomain") || null
   );
   const [user, setUser] = useState(null);
   const [permissions, setPermissions] = useState({});
-  const [loading, setLoading] = useState(true); // Full auth loading state
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const API_BASE =
     process.env.REACT_APP_API_BASE_URL || "https://itsm-api.onrender.com";
 
+  // Store token/subdomain in both state and localStorage
   const updateAuth = useCallback((newToken, newSubdomain) => {
-    setToken(newToken);
-    setSubdomain(newSubdomain);
-    localStorage.setItem("authToken", newToken || "");
-    localStorage.setItem("subdomain", newSubdomain || "");
+    const cleanToken = newToken || null;
+    const cleanSubdomain = newSubdomain || null;
+    setToken(cleanToken);
+    setSubdomain(cleanSubdomain);
+    if (cleanToken) {
+      localStorage.setItem("authToken", cleanToken);
+    } else {
+      localStorage.removeItem("authToken");
+    }
+    if (cleanSubdomain) {
+      localStorage.setItem("subdomain", cleanSubdomain);
+    } else {
+      localStorage.removeItem("subdomain");
+    }
   }, []);
 
+  // -------------------
+  // Auth API calls
+  // -------------------
   const login = async (email, password, loginSubdomain) => {
     setLoading(true);
     setError(null);
@@ -31,32 +45,23 @@ const useAuth = () => {
           "Content-Type": "application/json",
           Accept: "application/json",
         },
-        body: JSON.stringify({
-          email,
-          password,
-          subdomain: loginSubdomain,
-        }),
+        body: JSON.stringify({ email, password, subdomain: loginSubdomain }),
       });
 
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Login failed");
-      }
+      if (!response.ok) throw new Error(data.error || "Login failed");
 
       const authToken = data.auth_token;
       const orgSubdomain = data.subdomain || loginSubdomain;
-
       updateAuth(authToken, orgSubdomain);
 
-      // Fetch profile and permissions in parallel
+      // Fetch user data in parallel
       const [profileData, permissionsData] = await Promise.all([
         fetchProfile(authToken, orgSubdomain),
         fetchPermissions(authToken, orgSubdomain),
       ]);
 
-      // Optional: Enforce admin access here
-      if (!permissionsData.can_access_admin_dashboard) {
+      if (!permissionsData?.can_access_admin_dashboard) {
         throw new Error("User does not have admin privileges");
       }
     } catch (err) {
@@ -74,35 +79,29 @@ const useAuth = () => {
   const fetchProfile = useCallback(
     async (authToken, profileSubdomain) => {
       if (!authToken || !profileSubdomain) return null;
-
       try {
-        const response = await fetch(
-          `${API_BASE}/api/v1/organizations/${profileSubdomain}/profile`,
-          {
-            headers: {
-              Authorization: `Bearer ${authToken}`,
-              Accept: "application/json",
-            },
-          }
-        );
+        const url = `${API_BASE}/api/v1/organizations/${profileSubdomain}/profile?subdomain=${profileSubdomain}`;
+        const response = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+            Accept: "application/json",
+          },
+        });
 
         if (!response.ok) {
-          if (response.status === 401 || response.status === 403) {
+          if ([401, 403].includes(response.status))
             throw new Error("Unauthorized");
-          }
           throw new Error(`Profile fetch failed: ${response.status}`);
         }
 
         const data = await response.json();
-        const userData = {
+        setUser({
           ...data.user,
           role: data.user.role || "viewer",
           is_admin: data.user.is_admin || false,
           organization: data.organization,
-        };
-
-        setUser(userData);
-        return userData;
+        });
+        return data.user;
       } catch (error) {
         console.error("Profile fetch error:", error);
         throw error;
@@ -112,11 +111,11 @@ const useAuth = () => {
   );
 
   const fetchPermissions = useCallback(
-    async (authToken, subdomain) => {
-      if (!authToken || !subdomain) return null;
-
+    async (authToken, permSubdomain) => {
+      if (!authToken || !permSubdomain) return null;
       try {
-        const response = await fetch(`${API_BASE}/api/v1/permissions`, {
+        const url = `${API_BASE}/api/v1/permissions?subdomain=${permSubdomain}`;
+        const response = await fetch(url, {
           headers: {
             Authorization: `Bearer ${authToken}`,
             Accept: "application/json",
@@ -124,19 +123,15 @@ const useAuth = () => {
         });
 
         if (!response.ok) {
-          if (response.status === 401 || response.status === 403) {
+          if ([401, 403].includes(response.status))
             throw new Error("Unauthorized");
-          }
           throw new Error(`Permissions fetch failed: ${response.status}`);
         }
 
         const data = await response.json();
-
-        // Ensure data.data if your API wraps response
-        const permissionsData = data.data || data;
-
-        setPermissions(permissionsData);
-        return permissionsData;
+        const perms = data.data || data;
+        setPermissions(perms);
+        return perms;
       } catch (error) {
         console.error("Permissions fetch error:", error);
         setPermissions({});
@@ -149,7 +144,7 @@ const useAuth = () => {
   const logout = async () => {
     try {
       if (token && subdomain) {
-        await fetch(`${API_BASE}/api/v1/logout`, {
+        await fetch(`${API_BASE}/api/v1/logout?subdomain=${subdomain}`, {
           method: "DELETE",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -167,11 +162,9 @@ const useAuth = () => {
     }
   };
 
-  const verifyAdminRole = () => {
-    return permissions.can_access_admin_dashboard === true;
-  };
-
-  // Initialize on mount
+  // -------------------
+  // Init on mount
+  // -------------------
   useEffect(() => {
     const initializeAuth = async () => {
       if (token && subdomain) {
@@ -182,14 +175,15 @@ const useAuth = () => {
           ]);
         } catch (error) {
           console.error("Initialization error:", error);
-          updateAuth(null, null);
-          setUser(null);
-          setPermissions({});
+          if (error.message === "Unauthorized") {
+            updateAuth(null, null);
+            setUser(null);
+            setPermissions({});
+          }
         }
       }
       setLoading(false);
     };
-
     initializeAuth();
   }, [token, subdomain, fetchProfile, fetchPermissions, updateAuth]);
 
@@ -204,7 +198,7 @@ const useAuth = () => {
     login,
     logout,
     updateAuth,
-    verifyAdminRole,
+    verifyAdminRole: () => permissions.can_access_admin_dashboard === true,
   };
 };
 
