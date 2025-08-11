@@ -13,27 +13,19 @@ const useAuth = () => {
   const API_BASE =
     process.env.REACT_APP_API_BASE_URL || "https://itsm-api.onrender.com";
 
-  // Store token/subdomain in both state and localStorage
   const updateAuth = useCallback((newToken, newSubdomain) => {
     const cleanToken = newToken || null;
     const cleanSubdomain = newSubdomain || null;
     setToken(cleanToken);
     setSubdomain(cleanSubdomain);
-    if (cleanToken) {
-      localStorage.setItem("authToken", cleanToken);
-    } else {
-      localStorage.removeItem("authToken");
-    }
-    if (cleanSubdomain) {
-      localStorage.setItem("subdomain", cleanSubdomain);
-    } else {
-      localStorage.removeItem("subdomain");
-    }
+
+    if (cleanToken) localStorage.setItem("authToken", cleanToken);
+    else localStorage.removeItem("authToken");
+
+    if (cleanSubdomain) localStorage.setItem("subdomain", cleanSubdomain);
+    else localStorage.removeItem("subdomain");
   }, []);
 
-  // -------------------
-  // Auth API calls
-  // -------------------
   const login = async (email, password, loginSubdomain) => {
     setLoading(true);
     setError(null);
@@ -55,7 +47,6 @@ const useAuth = () => {
       const orgSubdomain = data.subdomain || loginSubdomain;
       updateAuth(authToken, orgSubdomain);
 
-      // Fetch user data in parallel
       const [profileData, permissionsData] = await Promise.all([
         fetchProfile(authToken, orgSubdomain),
         fetchPermissions(authToken, orgSubdomain),
@@ -79,14 +70,17 @@ const useAuth = () => {
   const fetchProfile = useCallback(
     async (authToken, profileSubdomain) => {
       if (!authToken || !profileSubdomain) return null;
+
       try {
-        const url = `${API_BASE}/api/v1/organizations/${profileSubdomain}/profile?subdomain=${profileSubdomain}`;
-        const response = await fetch(url, {
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-            Accept: "application/json",
-          },
-        });
+        const response = await fetch(
+          `${API_BASE}/api/v1/organizations/${profileSubdomain}/profile?subdomain=${profileSubdomain}`,
+          {
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+              Accept: "application/json",
+            },
+          }
+        );
 
         if (!response.ok) {
           if ([401, 403].includes(response.status))
@@ -95,13 +89,15 @@ const useAuth = () => {
         }
 
         const data = await response.json();
-        setUser({
+        const userData = {
           ...data.user,
           role: data.user.role || "viewer",
           is_admin: data.user.is_admin || false,
           organization: data.organization,
-        });
-        return data.user;
+        };
+
+        setUser(userData);
+        return userData;
       } catch (error) {
         console.error("Profile fetch error:", error);
         throw error;
@@ -113,14 +109,17 @@ const useAuth = () => {
   const fetchPermissions = useCallback(
     async (authToken, permSubdomain) => {
       if (!authToken || !permSubdomain) return null;
+
       try {
-        const url = `${API_BASE}/api/v1/permissions?subdomain=${permSubdomain}`;
-        const response = await fetch(url, {
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-            Accept: "application/json",
-          },
-        });
+        const response = await fetch(
+          `${API_BASE}/api/v1/permissions?subdomain=${permSubdomain}`,
+          {
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+              Accept: "application/json",
+            },
+          }
+        );
 
         if (!response.ok) {
           if ([401, 403].includes(response.status))
@@ -129,9 +128,9 @@ const useAuth = () => {
         }
 
         const data = await response.json();
-        const perms = data.data || data;
-        setPermissions(perms);
-        return perms;
+        const permissionsData = data.data || data;
+        setPermissions(permissionsData);
+        return permissionsData;
       } catch (error) {
         console.error("Permissions fetch error:", error);
         setPermissions({});
@@ -162,9 +161,6 @@ const useAuth = () => {
     }
   };
 
-  // -------------------
-  // Init on mount
-  // -------------------
   useEffect(() => {
     const initializeAuth = async () => {
       if (token && subdomain) {
@@ -184,6 +180,7 @@ const useAuth = () => {
       }
       setLoading(false);
     };
+
     initializeAuth();
   }, [token, subdomain, fetchProfile, fetchPermissions, updateAuth]);
 
