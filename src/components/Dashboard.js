@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useCallback } from "react";
-import createApiInstance from "../api";
-import MyChartComponent from "./MyChartComponent"; // your charts
+import React, { useState, useEffect, useCallback } from "react";
+import { useAuth } from "../contexts/authContext";
+import createApiInstance from "../utils/api";
+import MyChartComponent from "./MyChartComponent";
 
 // Mock dashboard data
 const mockDashboardData = {
