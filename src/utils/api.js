@@ -13,7 +13,7 @@ const createApiInstance = (token, subdomain) => {
     process.env.REACT_APP_API_BASE_URL ||
     (isDev
       ? "http://itsm-api.lvh.me:3000/api/v1"
-      : "https://itsm-api.onrender.com/api/v1");
+      : "https://itsm-api.onrender.com");
 
   // Remove trailing '/api/v1' if present to avoid double versioning
   if (baseURL.endsWith("/api/v1")) {
