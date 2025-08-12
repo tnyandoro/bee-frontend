@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "../contexts/authContext";
 import { FaUser, FaLock, FaArrowLeft, FaEdit } from "react-icons/fa";
 import createApiInstance from "../utils/api";
@@ -59,16 +59,23 @@ const Profile = () => {
     phone_number: "",
   });
 
-  const api = createApiInstance(token, subdomain);
+  // Create API instance once
+  const api = useRef(createApiInstance(token, subdomain)).current;
+
+  // Track whether fetchProfile has been called
+  const isFetching = useRef(false);
 
   // Fetch profile data
   const fetchProfile = useCallback(async () => {
-    if (!token || !subdomain) {
-      setError("Please log in to view your profile.");
+    if (!token || !subdomain || isFetching.current) {
+      if (!token || !subdomain) {
+        setError("Please log in to view your profile.");
+      }
       setLoading(false);
       return;
     }
 
+    isFetching.current = true;
     try {
       const res = await api.get(`/organizations/${subdomain}/profile`);
       setProfile(res.data);
@@ -82,9 +89,11 @@ const Profile = () => {
       setError("Failed to fetch profile data: " + message);
     } finally {
       setLoading(false);
+      isFetching.current = false;
     }
   }, [api, token, subdomain]);
 
+  // Fetch profile only once on mount or when token/subdomain changes
   useEffect(() => {
     fetchProfile();
   }, [fetchProfile]);
@@ -220,7 +229,7 @@ const Profile = () => {
         </label>
         <label
           className="flex items-center py-2 px-4 mb-2 bg-blue-700 hover:bg-blue-600 rounded cursor-pointer transition"
-          onClick={() => setEditMode(true)}
+          onClick={() => setActiveTab("profile") && setEditMode(true)}
         >
           <FaEdit className="mr-2" /> Edit Profile
         </label>
