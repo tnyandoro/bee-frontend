@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "../contexts/authContext";
-import Cookies from "js-cookie";
-import axios from "axios";
+import createApiInstance from "../utils/api";
 import MyChartComponent from "./MyChartComponent";
 import { useNavigate } from "react-router-dom";
 
@@ -88,35 +87,28 @@ const metricColors = {
 };
 
 const Dashboard = () => {
-  const { currentUser, subdomain, token, logout } = useAuth();
+  const { currentUser, subdomain, error: authError } = useAuth();
   const navigate = useNavigate();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [retryCount, setRetryCount] = useState(0);
-  const isFetching = useRef(false);
-
-  const getApiBaseUrl = () => {
-    return (
-      process.env.REACT_APP_API_BASE_URL ||
-      (process.env.NODE_ENV === "development"
-        ? "/api/v1"
-        : "https://itsm-api.onrender.com/api/v1")
-    );
-  };
+  const isFetching = useRef(false); // Track fetch status
 
   const fetchDashboard = useCallback(async () => {
-    if (!subdomain || !token) {
+    if (!subdomain) {
       setError(
-        !subdomain
-          ? "Organization subdomain is missing. Please ensure you're logged into the correct organization."
-          : "Authentication token is missing. Please log in again."
+        "Organization subdomain is missing. Please ensure you're logged into the correct organization."
       );
       setLoading(false);
-      if (!token) {
-        logout();
-        navigate("/login");
-      }
+      return;
+    }
+
+    const token = localStorage.getItem("authToken");
+    if (!token) {
+      setError("Authentication token is missing. Please log in again.");
+      setLoading(false);
+      navigate("/login");
       return;
     }
 
@@ -131,23 +123,11 @@ const Dashboard = () => {
     isFetching.current = true;
     setLoading(true);
     setError("");
-    console.log(new Date().toISOString(), "Starting fetchDashboard", {
-      token,
-      subdomain,
-    });
 
     try {
-      const response = await axios.get(
-        `${getApiBaseUrl()}/organizations/${subdomain}/dashboard`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-            "X-Organization-Subdomain": subdomain,
-          },
-          withCredentials: true,
-        }
-      );
+      const api = createApiInstance(token, subdomain);
+      const response = await api.get(`/organizations/${subdomain}/dashboard`);
+      console.log(new Date().toISOString(), "Full API response:", response);
 
       const data = response.data.data || response.data;
 
@@ -168,6 +148,7 @@ const Dashboard = () => {
       setDashboardData(data);
       setError("");
       setRetryCount(0);
+      setLoading(false);
     } catch (err) {
       console.error(new Date().toISOString(), "Dashboard fetch failed:", err);
       let errorMsg = "Failed to load dashboard.";
@@ -175,7 +156,6 @@ const Dashboard = () => {
         errorMsg = "Server is waking up (may take up to 30s). Please retry.";
       } else if (err.response?.status === 401) {
         errorMsg = "Session expired. Please log in again.";
-        logout();
         navigate("/login");
       } else if (err.response?.status === 404) {
         errorMsg = "Organization dashboard not found.";
@@ -191,6 +171,8 @@ const Dashboard = () => {
       }
 
       setError(errorMsg);
+      setLoading(false);
+
       if (retryCount < maxRetries) {
         setRetryCount((prev) => prev + 1);
         setTimeout(() => {
@@ -203,19 +185,29 @@ const Dashboard = () => {
       }
     } finally {
       isFetching.current = false;
-      setLoading(false);
     }
-  }, [subdomain, token, logout, navigate, retryCount]);
+  }, [subdomain, navigate, retryCount]);
 
   useEffect(() => {
-    if (currentUser && token && subdomain && !isFetching.current) {
+    if (!isFetching.current) {
+      console.log(new Date().toISOString(), "Starting fetchDashboard");
       fetchDashboard();
-    } else if (!currentUser || !token) {
-      setError("Authentication required. Please log in.");
-      logout();
-      navigate("/login");
     }
-  }, [currentUser, token, subdomain, fetchDashboard, logout, navigate]);
+
+    const timer = setTimeout(() => {
+      if (isFetching.current) {
+        console.warn(
+          new Date().toISOString(),
+          "Timeout reached, API still loading"
+        );
+        setError("Server is waking up (may take up to 30s). Please retry.");
+        setLoading(false);
+        isFetching.current = false;
+      }
+    }, 30000);
+
+    return () => clearTimeout(timer);
+  }, [fetchDashboard]);
 
   if (loading) {
     return (
@@ -289,6 +281,7 @@ const Dashboard = () => {
 
   return (
     <div className="p-4 max-w-7xl mx-auto">
+      {/* Header with current user */}
       <div className="bg-indigo-600 text-white shadow-lg rounded-lg mb-6 p-6">
         <h1 className="text-2xl font-bold">
           {orgName.toUpperCase()} DASHBOARD
@@ -300,6 +293,7 @@ const Dashboard = () => {
         )}
       </div>
 
+      {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
         <StatCard label="Open" value={stats.open_tickets || 0} color="blue" />
         <StatCard
@@ -329,6 +323,7 @@ const Dashboard = () => {
         />
       </div>
 
+      {/* Charts */}
       <div className="mb-6">
         {charts.tickets_by_status ||
         charts.tickets_by_priority ||
@@ -341,6 +336,7 @@ const Dashboard = () => {
         )}
       </div>
 
+      {/* SLA Metrics */}
       <div className="bg-white p-5 rounded-lg shadow mb-6 border">
         <h3 className="text-lg font-semibold mb-3 text-gray-800">
           SLA Performance
@@ -369,6 +365,7 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {/* Recent Tickets */}
       <div className="bg-white p-5 rounded-lg shadow border overflow-hidden">
         <h3 className="text-lg font-semibold mb-3 text-gray-800">
           Recent Tickets
@@ -456,6 +453,7 @@ const Dashboard = () => {
         )}
       </div>
 
+      {/* Meta Info */}
       <div className="text-xs text-gray-500 text-right mt-4">
         Updated: {updatedTime}
       </div>
@@ -487,3 +485,4 @@ const MetricCard = ({ label, value, color }) => {
 };
 
 export default Dashboard;
+//kkkk
