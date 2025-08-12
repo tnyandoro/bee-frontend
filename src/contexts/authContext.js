@@ -15,7 +15,6 @@ export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) throw new Error("useAuth must be used within an AuthProvider");
 
-  // Defensive subdomain fallback
   const fallbackSubdomain =
     context.subdomain ||
     context.organization?.subdomain ||
@@ -28,7 +27,6 @@ export const useAuth = () => {
   };
 };
 
-// Return the API base URL including the /api/v1 suffix
 const getApiBaseUrl = () => {
   return (
     process.env.REACT_APP_API_BASE_URL ||
@@ -38,20 +36,17 @@ const getApiBaseUrl = () => {
   );
 };
 
-// Sanitize input to prevent injection
 const sanitizeInput = (input, isEmail = false) => {
   if (!input) return null;
   if (isEmail) {
-    // Allow alphanumeric, @, ., -, _, + for emails
     const sanitized = input.toLowerCase().replace(/[^a-z0-9@.\-_+]/g, "");
-    console.log("Sanitized email:", sanitized); // Debug log
-    // Basic email validation
-    if (!sanitized.includes("@") || !sanitized.includes(".")) {
+    console.log("Sanitized email:", sanitized, "from input:", input); // Debug log
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(sanitized)) {
       throw new Error("Invalid email format");
     }
     return sanitized;
   }
-  // For subdomain: alphanumeric, hyphens, underscores
   return input.toLowerCase().replace(/[^a-z0-9-_]/g, "");
 };
 
@@ -176,7 +171,6 @@ export const AuthProvider = ({ children }) => {
           department_id: user.department_id,
         };
 
-        // Save in cookies
         Cookies.set("authToken", token, {
           secure: true,
           sameSite: "strict",
@@ -234,7 +228,6 @@ export const AuthProvider = ({ children }) => {
     [logout]
   );
 
-  // On mount: try to initialize auth from cookies
   useEffect(() => {
     const { token, subdomain } = getAuthTokens();
     const effectiveSubdomain =
@@ -255,7 +248,6 @@ export const AuthProvider = ({ children }) => {
     }
   }, [getAuthTokens, verifyAuth]);
 
-  // Handle unauthorized event
   useEffect(() => {
     const handleUnauthorized = () => {
       logout();
@@ -265,7 +257,6 @@ export const AuthProvider = ({ children }) => {
       window.removeEventListener("auth:unauthorized", handleUnauthorized);
   }, [logout]);
 
-  // Login function
   const login = useCallback(
     async (email, password, domain) => {
       try {
@@ -298,7 +289,6 @@ export const AuthProvider = ({ children }) => {
 
         const { auth_token, user } = response.data;
 
-        // Save tokens in cookies
         Cookies.set("authToken", auth_token, {
           secure: true,
           sameSite: "strict",
@@ -325,7 +315,6 @@ export const AuthProvider = ({ children }) => {
           expires: 1,
         });
 
-        // Verify after login
         const isVerified = await verifyAuth(auth_token, sanitizedSubdomain);
         if (!isVerified) throw new Error("Verification after login failed");
 
@@ -336,7 +325,7 @@ export const AuthProvider = ({ children }) => {
             ? "Organization not found"
             : error.response?.data?.message || "Login failed";
 
-        console.error("Login error:", errorMessage); // Debug log
+        console.error("Login error:", errorMessage, error); // Debug log
         setState((prev) => ({ ...prev, error: errorMessage, loading: false }));
         throw new Error(errorMessage);
       }
