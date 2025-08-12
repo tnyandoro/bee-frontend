@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { X, RefreshCw } from "lucide-react";
 import CreateUserForm from "./CreateUserForm";
@@ -30,6 +30,14 @@ const AdminDashboard = ({ organizationSubdomain }) => {
   const [teams, setTeams] = useState([]);
   const [dashboardStats, setDashboardStats] = useState(null);
 
+  // Create API instance once
+  const api = useRef(null);
+
+  // Track fetching states
+  const isFetchingStats = useRef(false);
+  const isFetchingTeams = useRef(false);
+  const isFetchingUsers = useRef(false);
+
   // Detect correct subdomain
   const getEffectiveSubdomain = useCallback(() => {
     if (organizationSubdomain && organizationSubdomain !== "undefined") {
@@ -41,6 +49,15 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     return process.env.NODE_ENV === "development" ? "demo" : null;
   }, [organizationSubdomain, authSubdomain]);
 
+  // Initialize API instance
+  useEffect(() => {
+    const activeSubdomain = getEffectiveSubdomain();
+    if (activeSubdomain && token && !api.current) {
+      console.log("Initializing API instance:", { token, activeSubdomain }); // Debug log
+      api.current = createApiInstance(token, activeSubdomain);
+    }
+  }, [token, getEffectiveSubdomain]);
+
   // Handle token expiration
   const handleApiError = useCallback(
     (error) => {
@@ -49,6 +66,10 @@ const AdminDashboard = ({ organizationSubdomain }) => {
         refreshToken()
           .then((newToken) => {
             if (newToken) {
+              api.current = createApiInstance(
+                newToken,
+                getEffectiveSubdomain()
+              );
               setError("");
             } else {
               logout();
@@ -63,74 +84,109 @@ const AdminDashboard = ({ organizationSubdomain }) => {
       }
       return error.response?.data?.error || "An error occurred";
     },
-    [navigate, refreshToken, logout]
+    [navigate, refreshToken, logout, getEffectiveSubdomain]
   );
 
   // Fetch dashboard stats
   const fetchDashboardStats = useCallback(async () => {
     const activeSubdomain = getEffectiveSubdomain();
-    if (!activeSubdomain || !token) return;
+    if (!activeSubdomain || !token || !api.current || isFetchingStats.current) {
+      if (!activeSubdomain || !token) {
+        setError("Missing subdomain or token.");
+      }
+      setLoading(false);
+      return;
+    }
 
-    setError("");
+    isFetchingStats.current = true;
     setLoading(true);
+    setError("");
 
     try {
-      const api = createApiInstance(token, activeSubdomain);
-      const response = await api.get(
+      const response = await api.current.get(
         `/organizations/${activeSubdomain}/dashboard`
       );
+      console.log("Dashboard stats response:", response.data); // Debug log
       setDashboardStats(response.data);
     } catch (err) {
+      console.error("Fetch dashboard stats error:", err); // Debug log
       setError(handleApiError(err));
     } finally {
       setLoading(false);
+      isFetchingStats.current = false;
     }
   }, [token, getEffectiveSubdomain, handleApiError]);
-
-  const retryDashboard = () => {
-    setError("");
-    setDashboardStats(null);
-    fetchDashboardStats();
-  };
-
-  useEffect(() => {
-    fetchDashboardStats();
-  }, [fetchDashboardStats]);
 
   // Fetch teams
   const fetchTeams = useCallback(async () => {
     const activeSubdomain = getEffectiveSubdomain();
-    if (!activeSubdomain || !token) return;
+    if (!activeSubdomain || !token || !api.current || isFetchingTeams.current) {
+      if (!activeSubdomain || !token) {
+        setError("Missing subdomain or token.");
+      }
+      return;
+    }
 
+    isFetchingTeams.current = true;
     try {
-      const api = createApiInstance(token, activeSubdomain);
-      const response = await api.get(`/organizations/${activeSubdomain}/teams`);
+      const response = await api.current.get(
+        `/organizations/${activeSubdomain}/teams`
+      );
+      console.log("Teams response:", response.data); // Debug log
       setTeams(response.data);
     } catch (err) {
+      console.error("Fetch teams error:", err); // Debug log
       setError(handleApiError(err));
+    } finally {
+      isFetchingTeams.current = false;
     }
   }, [token, getEffectiveSubdomain, handleApiError]);
 
   // Fetch users
   const fetchUsers = useCallback(async () => {
     const activeSubdomain = getEffectiveSubdomain();
-    if (!activeSubdomain || !token) return;
+    if (!activeSubdomain || !token || !api.current || isFetchingUsers.current) {
+      if (!activeSubdomain || !token) {
+        setError("Missing subdomain or token.");
+      }
+      return;
+    }
 
+    isFetchingUsers.current = true;
     try {
-      const api = createApiInstance(token, activeSubdomain);
-      const response = await api.get(`/organizations/${activeSubdomain}/users`);
+      const response = await api.current.get(
+        `/organizations/${activeSubdomain}/users`
+      );
+      console.log("Users response:", response.data); // Debug log
       setUsers(response.data);
     } catch (err) {
+      console.error("Fetch users error:", err); // Debug log
       setError(handleApiError(err));
+    } finally {
+      isFetchingUsers.current = false;
     }
   }, [token, getEffectiveSubdomain, handleApiError]);
 
+  // Fetch data on mount or when token/subdomain changes
   useEffect(() => {
-    if (token && getEffectiveSubdomain()) {
+    if (token && getEffectiveSubdomain() && api.current) {
+      fetchDashboardStats();
       fetchTeams();
       fetchUsers();
     }
-  }, [token, getEffectiveSubdomain, fetchTeams, fetchUsers]);
+  }, [
+    token,
+    getEffectiveSubdomain,
+    fetchDashboardStats,
+    fetchTeams,
+    fetchUsers,
+  ]);
+
+  const retryDashboard = () => {
+    setError("");
+    setDashboardStats(null);
+    fetchDashboardStats();
+  };
 
   const stats = dashboardStats?.stats || {
     total_tickets: 0,
@@ -144,7 +200,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
   };
 
   const capitalizedOrgName =
-    dashboardStats?.organization?.name?.toUpperCase() || "";
+    dashboardStats?.organization?.name?.toUpperCase() || "Organization";
 
   return (
     <div className="mt-2 p-4 ml-4">
