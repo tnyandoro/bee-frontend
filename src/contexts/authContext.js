@@ -15,7 +15,7 @@ export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) throw new Error("useAuth must be used within an AuthProvider");
 
-  // Defensive subdomain fallback
+  // Defensive subdomain fallback fix
   const fallbackSubdomain =
     context.subdomain ||
     context.organization?.subdomain ||
@@ -39,9 +39,19 @@ const getApiBaseUrl = () => {
 };
 
 // Sanitize input to prevent injection
-const sanitizeInput = (input) => {
+const sanitizeInput = (input, isEmail = false) => {
   if (!input) return null;
-  // Allow alphanumeric, hyphens, and underscores; convert to lowercase
+  if (isEmail) {
+    // Allow alphanumeric, @, ., -, _, + for emails
+    const sanitized = input.toLowerCase().replace(/[^a-z0-9@._-+]/g, "");
+    console.log("Sanitized email:", sanitized); // Debug log
+    // Basic email validation
+    if (!sanitized.includes("@") || !sanitized.includes(".")) {
+      throw new Error("Invalid email format");
+    }
+    return sanitized;
+  }
+  // For subdomain: alphanumeric, hyphens, underscores
   return input.toLowerCase().replace(/[^a-z0-9-_]/g, "");
 };
 
@@ -166,7 +176,7 @@ export const AuthProvider = ({ children }) => {
           department_id: user.department_id,
         };
 
-        // Save in cookies (not HttpOnly, as frontend needs access)
+        // Save in cookies
         Cookies.set("authToken", token, {
           secure: true,
           sameSite: "strict",
@@ -264,14 +274,22 @@ export const AuthProvider = ({ children }) => {
         const sanitizedSubdomain =
           sanitizeInput(domain) ||
           (process.env.NODE_ENV === "development" ? "demo" : null);
+        const sanitizedEmail = sanitizeInput(email, true);
+        console.log(
+          "Login attempt with email:",
+          email,
+          "sanitized:",
+          sanitizedEmail
+        ); // Debug log
         if (!sanitizedSubdomain) throw new Error("Subdomain is required");
+        if (!sanitizedEmail) throw new Error("Valid email is required");
 
         const apiBase = getApiBaseUrl();
 
         const response = await axios.post(
           `${apiBase}/login`,
           {
-            email: sanitizeInput(email),
+            email: sanitizedEmail,
             password,
             subdomain: sanitizedSubdomain,
           },
@@ -318,6 +336,7 @@ export const AuthProvider = ({ children }) => {
             ? "Organization not found"
             : error.response?.data?.message || "Login failed";
 
+        console.error("Login error:", errorMessage); // Debug log
         setState((prev) => ({ ...prev, error: errorMessage, loading: false }));
         throw new Error(errorMessage);
       }
