@@ -115,12 +115,23 @@ const AdminDashboard = ({ organizationSubdomain }) => {
         `/organizations/${activeSubdomain}/dashboard`
       );
       console.log("Dashboard stats response:", response.data);
-      const statsData = response.data?.data; // Access nested 'data'
+      const statsData = response.data?.data;
       if (!statsData?.stats) {
         console.warn("Dashboard stats missing in response:", response.data);
         setError("No stats data returned from the server.");
         setDashboardStats(null);
       } else {
+        // Check if stats are all zeros (except total_members, which may be non-zero)
+        const { total_members, ...otherStats } = statsData.stats;
+        const statsEmpty = Object.values(otherStats).every(
+          (value) => value === 0
+        );
+        if (statsEmpty && statsData.recent_tickets?.length > 0) {
+          console.warn("Stats are empty despite recent tickets:", statsData);
+          setError(
+            "Ticket statistics are empty. Possible data issue in the database."
+          );
+        }
         setDashboardStats(statsData);
       }
     } catch (err) {
@@ -174,7 +185,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
         `/organizations/${activeSubdomain}/users`
       );
       console.log("Users response:", response.data);
-      setUsers(response.data.data || response.data); // Handle nested 'data'
+      setUsers(response.data.data || response.data);
     } catch (err) {
       const errorMessage = handleApiError(err);
       setError(errorMessage);
