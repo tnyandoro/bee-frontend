@@ -20,6 +20,7 @@
     "cloudinary-react": "^1.8.1",
     "formik": "^2.4.6",
     "gss-itsm-front": "file:",
+    "js-cookie": "^3.0.5",
     "lodash.debounce": "^4.0.8",
     "lottie-react": "^2.4.1",
     "lucide-react": "^0.523.0",
