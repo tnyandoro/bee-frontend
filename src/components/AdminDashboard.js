@@ -115,14 +115,18 @@ const AdminDashboard = ({ organizationSubdomain }) => {
         `/organizations/${activeSubdomain}/dashboard`
       );
       console.log("Dashboard stats response:", response.data);
-      if (!response.data?.stats) {
+      const statsData = response.data?.data; // Access nested 'data'
+      if (!statsData?.stats) {
         console.warn("Dashboard stats missing in response:", response.data);
         setError("No stats data returned from the server.");
+        setDashboardStats(null);
+      } else {
+        setDashboardStats(statsData);
       }
-      setDashboardStats(response.data);
     } catch (err) {
       const errorMessage = handleApiError(err);
       setError(errorMessage);
+      setDashboardStats(null);
     } finally {
       setLoading(false);
       isFetchingStats.current = false;
@@ -170,7 +174,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
         `/organizations/${activeSubdomain}/users`
       );
       console.log("Users response:", response.data);
-      setUsers(response.data);
+      setUsers(response.data.data || response.data); // Handle nested 'data'
     } catch (err) {
       const errorMessage = handleApiError(err);
       setError(errorMessage);
@@ -182,6 +186,10 @@ const AdminDashboard = ({ organizationSubdomain }) => {
   // Fetch data on mount or when token/subdomain changes
   useEffect(() => {
     if (token && getEffectiveSubdomain() && api.current) {
+      console.log(
+        "Fetching dashboard data for subdomain:",
+        getEffectiveSubdomain()
+      );
       fetchDashboardStats();
       fetchTeams();
       fetchUsers();
