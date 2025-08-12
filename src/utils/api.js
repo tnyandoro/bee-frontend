@@ -8,25 +8,18 @@ const createApiInstance = (token, subdomain) => {
 
   const isDev = process.env.NODE_ENV === "development";
 
-  // Get base URL from env or fallback to default
-  let baseURL =
-    process.env.REACT_APP_API_BASE_URL ||
-    (isDev
-      ? "http://itsm-api.lvh.me:3000/api/v1"
-      : "https://itsm-api.onrender.com");
+  // Use HTTPS in production; relative URL in development for flexibility
+  let baseURL = isDev
+    ? "/api/v1" // Relative path for dev proxy
+    : process.env.REACT_APP_API_BASE_URL ||
+      "https://itsm-api.onrender.com/api/v1";
 
-  // Remove trailing '/api/v1' if present to avoid double versioning
-  if (baseURL.endsWith("/api/v1")) {
-    // Keep it, we want /api/v1 as part of baseURL
-  } else if (baseURL.endsWith("/api/v1/")) {
-    baseURL = baseURL.slice(0, -1); // remove trailing slash
+  // Ensure no trailing slash
+  if (baseURL.endsWith("/")) {
+    baseURL = baseURL.slice(0, -1);
   }
 
-  console.log("Creating API instance:", {
-    baseURL,
-    subdomain,
-    Authorization: `Bearer ${token}`,
-  });
+  console.log("Creating API instance:", { baseURL, subdomain }); // No token in logs
 
   const instance = axios.create({
     baseURL,
@@ -36,38 +29,42 @@ const createApiInstance = (token, subdomain) => {
       "X-Organization-Subdomain": subdomain,
     },
     timeout: 60000,
-    withCredentials: true,
+    withCredentials: true, // Keep for CORS with credentials, verify backend CORS
   });
 
   instance.interceptors.response.use(
     (response) => response,
     (error) => {
-      const errorMessage = error.response?.data?.error || error.message;
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        "An unexpected error occurred";
 
       switch (error.response?.status) {
         case 401:
-          console.error(
-            "Authentication error:",
-            errorMessage || "Unauthorized"
+          console.error("Authentication error:", errorMessage);
+          // Trigger logout or redirect to login in auth context
+          window.dispatchEvent(new CustomEvent("auth:unauthorized"));
+          return Promise.reject(
+            new Error("Session expired. Please log in again.")
           );
-          break;
+        case 403:
+          console.error("Forbidden:", errorMessage);
+          return Promise.reject(
+            new Error("You do not have permission to access this resource.")
+          );
         case 404:
-          console.error(
-            "Resource not found:",
-            errorMessage || "Organization or endpoint not found"
-          );
-          break;
+          console.error("Resource not found:", errorMessage);
+          return Promise.reject(new Error("Requested resource not found."));
         case 500:
-          console.error(
-            "Server error:",
-            errorMessage || "Internal server error"
+          console.error("Server error:", errorMessage);
+          return Promise.reject(
+            new Error("Server error. Please try again later.")
           );
-          break;
         default:
-          console.error("API error:", errorMessage || "Unknown error");
+          console.error("API error:", errorMessage);
+          return Promise.reject(new Error(errorMessage));
       }
-
-      return Promise.reject(error);
     }
   );
 
