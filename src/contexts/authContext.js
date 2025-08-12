@@ -15,7 +15,7 @@ export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) throw new Error("useAuth must be used within an AuthProvider");
 
-  // Defensive subdomain fallback fix
+  // Defensive subdomain fallback
   const fallbackSubdomain =
     context.subdomain ||
     context.organization?.subdomain ||
@@ -43,7 +43,7 @@ const sanitizeInput = (input, isEmail = false) => {
   if (!input) return null;
   if (isEmail) {
     // Allow alphanumeric, @, ., -, _, + for emails
-    const sanitized = input.toLowerCase().replace(/[^a-z0-9@._-+]/g, "");
+    const sanitized = input.toLowerCase().replace(/[^a-z0-9@.\-_+]/g, "");
     console.log("Sanitized email:", sanitized); // Debug log
     // Basic email validation
     if (!sanitized.includes("@") || !sanitized.includes(".")) {
