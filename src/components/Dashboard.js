@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "../contexts/authContext";
 import createApiInstance from "../utils/api";
 import MyChartComponent from "./MyChartComponent";
 import { useNavigate } from "react-router-dom";
 
-// Mock data for testing fallback
+// Mock data for development testing only
 const mockData = {
   organization: { name: "Mock Organization" },
   stats: {
@@ -88,12 +88,12 @@ const metricColors = {
 
 const Dashboard = () => {
   const { currentUser, subdomain, error: authError } = useAuth();
-
   const navigate = useNavigate();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [retryCount, setRetryCount] = useState(0);
+  const isFetching = useRef(false); // Track fetch status
 
   const fetchDashboard = useCallback(async () => {
     if (!subdomain) {
@@ -112,73 +112,102 @@ const Dashboard = () => {
       return;
     }
 
+    if (isFetching.current) {
+      console.log(
+        new Date().toISOString(),
+        "Fetch already in progress, skipping"
+      );
+      return;
+    }
+
+    isFetching.current = true;
     setLoading(true);
     setError("");
 
     try {
       const api = createApiInstance(token, subdomain);
       const response = await api.get(`/organizations/${subdomain}/dashboard`);
-
-      console.log("Full API response:", response);
+      console.log(new Date().toISOString(), "Full API response:", response);
 
       const data = response.data.data || response.data;
 
-      // Fallback to mock data if no valid data
-      if (
-        !data ||
-        Object.keys(data).length === 0 ||
-        (!data.stats && !data.recent_tickets && !data.organization)
-      ) {
-        console.warn("Dashboard data empty or incomplete, loading mock data");
-        setDashboardData(mockData);
-      } else {
-        // Normalize organization object
-        if (data.organization) {
-          if (typeof data.organization === "string") {
-            data.organization = { name: data.organization };
-          } else if (!data.organization.name) {
-            data.organization.name = "Organization";
-          }
+      // Normalize organization object
+      if (data.organization) {
+        if (typeof data.organization === "string") {
+          data.organization = { name: data.organization };
+        } else if (!data.organization.name) {
+          data.organization.name = "Organization";
         }
-        setDashboardData(data);
       }
 
+      console.log(
+        new Date().toISOString(),
+        "Processed data:",
+        JSON.stringify(data, null, 2)
+      );
+      setDashboardData(data);
       setError("");
       setRetryCount(0);
       setLoading(false);
     } catch (err) {
-      console.error("Dashboard fetch failed:", err);
-      setError("Failed to load dashboard. Using mock data.");
-      setDashboardData(mockData);
+      console.error(new Date().toISOString(), "Dashboard fetch failed:", err);
+      let errorMsg = "Failed to load dashboard.";
+      if (err.code === "ECONNABORTED" || err.message.includes("timeout")) {
+        errorMsg = "Server is waking up (may take up to 30s). Please retry.";
+      } else if (err.response?.status === 401) {
+        errorMsg = "Session expired. Please log in again.";
+        navigate("/login");
+      } else if (err.response?.status === 404) {
+        errorMsg = "Organization dashboard not found.";
+      }
+
+      const isDev = process.env.NODE_ENV === "development";
+      if (isDev) {
+        console.warn(
+          new Date().toISOString(),
+          "Using mock data in development due to error"
+        );
+        setDashboardData(mockData);
+      }
+
+      setError(errorMsg);
       setLoading(false);
 
-      // Disabled retry logic for testing
-      /*
       if (retryCount < maxRetries) {
         setRetryCount((prev) => prev + 1);
-        setError(`Retrying... (${retryCount + 1}/${maxRetries}) ${message}`);
-        setTimeout(fetchDashboard, 2000 * (retryCount + 1));
-      } else {
-        setError(`${message} All retries failed.`);
-        setLoading(false);
+        setTimeout(() => {
+          console.log(
+            new Date().toISOString(),
+            `Retrying fetch (${retryCount + 1}/${maxRetries})`
+          );
+          fetchDashboard();
+        }, 2000 * (retryCount + 1));
       }
-      */
+    } finally {
+      isFetching.current = false;
     }
-  }, [subdomain, navigate /*retryCount*/]);
+  }, [subdomain, navigate, retryCount]);
 
   useEffect(() => {
-    fetchDashboard();
+    if (!isFetching.current) {
+      console.log(new Date().toISOString(), "Starting fetchDashboard");
+      fetchDashboard();
+    }
 
     const timer = setTimeout(() => {
-      if (!dashboardData) {
-        console.warn("Timeout reached, loading mock data");
-        setDashboardData(mockData);
+      if (isFetching.current) {
+        console.warn(
+          new Date().toISOString(),
+          "Timeout reached, API still loading"
+        );
+        setError("Server is waking up (may take up to 30s). Please retry.");
         setLoading(false);
+        isFetching.current = false;
       }
     }, 30000);
 
     return () => clearTimeout(timer);
-  }, [dashboardData, fetchDashboard]);
+  }, [fetchDashboard]);
 
   if (loading) {
     return (
@@ -186,8 +215,9 @@ const Dashboard = () => {
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-2"></div>
           <p>
-            Loading dashboard data...{" "}
-            {retryCount > 0 ? `(Retry ${retryCount}/${maxRetries})` : ""}
+            Loading dashboard data... First load may take up to 30s if server is
+            idle.
+            {retryCount > 0 ? ` (Retry ${retryCount}/${maxRetries})` : ""}
           </p>
         </div>
       </div>
@@ -203,6 +233,7 @@ const Dashboard = () => {
           <div className="mt-3 space-x-2">
             <button
               onClick={() => {
+                setError("");
                 setRetryCount(0);
                 setLoading(true);
                 fetchDashboard();
@@ -219,6 +250,11 @@ const Dashboard = () => {
             </button>
           </div>
         </div>
+        {dashboardData && (
+          <div className="mt-4 text-gray-500 text-center">
+            Showing last known data while retrying...
+          </div>
+        )}
       </div>
     );
   }
@@ -295,7 +331,7 @@ const Dashboard = () => {
           <MyChartComponent dashboardData={dashboardData} />
         ) : (
           <div className="bg-white p-5 rounded-lg shadow border text-center text-gray-500">
-            No chart data available
+            No chart data available for this organization
           </div>
         )}
       </div>
@@ -412,7 +448,7 @@ const Dashboard = () => {
           </div>
         ) : (
           <p className="text-gray-500 text-center py-4">
-            No recent tickets found
+            No recent tickets found for this organization
           </p>
         )}
       </div>
