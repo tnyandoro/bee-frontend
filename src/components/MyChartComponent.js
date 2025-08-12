@@ -13,9 +13,10 @@ import {
   PieController,
   BarController,
   LineController,
+  Filler, // Added Filler plugin
 } from "chart.js";
 
-// Register required controllers and elements
+// Register required controllers and elements, including Filler
 ChartJS.register(
   PieController,
   BarController,
@@ -28,7 +29,8 @@ ChartJS.register(
   LineElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  Filler
 );
 
 const MyChartComponent = ({ dashboardData }) => {
@@ -41,7 +43,7 @@ const MyChartComponent = ({ dashboardData }) => {
   const barChartInstance = useRef(null);
   const lineChartInstance = useRef(null);
 
-  // Clean up charts on unmount or re-render
+  // Clean up charts on unmount
   useEffect(() => {
     return () => {
       [pieChartInstance, barChartInstance, lineChartInstance].forEach((ref) => {
@@ -59,11 +61,25 @@ const MyChartComponent = ({ dashboardData }) => {
 
     pieChartInstance.current?.destroy();
 
-    const { Critical, High, Medium, Low } = charts.tickets_by_priority;
-    const data = [Critical, High, Medium, Low];
+    // Normalize priority keys (handle p1/p2/p3/p4 or Critical/High/Medium/Low)
+    const priorityMap = {
+      p1: "Critical (P1)",
+      p2: "High (P2)",
+      p3: "Medium (P3)",
+      p4: "Low (P4)",
+      Critical: "Critical (P1)",
+      High: "High (P2)",
+      Medium: "Medium (P3)",
+      Low: "Low (P4)",
+    };
+
     const labels = ["Critical (P1)", "High (P2)", "Medium (P3)", "Low (P4)"];
-    const backgroundColors = ["#f87171", "#fbbf24", "#facc15", "#34d399"];
-    const borders = ["#ef4444", "#f59e0b", "#eab308", "#10b981"];
+    const data = labels.map((label) => {
+      const key = Object.keys(charts.tickets_by_priority).find(
+        (k) => priorityMap[k] === label
+      );
+      return charts.tickets_by_priority[key] || 0;
+    });
 
     pieChartInstance.current = new ChartJS(ctx, {
       type: "pie",
@@ -72,8 +88,8 @@ const MyChartComponent = ({ dashboardData }) => {
         datasets: [
           {
             data,
-            backgroundColor: backgroundColors,
-            borderColor: borders,
+            backgroundColor: ["#f87171", "#fbbf24", "#facc15", "#34d399"],
+            borderColor: ["#ef4444", "#f59e0b", "#eab308", "#10b981"],
             borderWidth: 1,
           },
         ],
@@ -114,9 +130,9 @@ const MyChartComponent = ({ dashboardData }) => {
       .filter((key) => statusMap[key])
       .map((key) => statusMap[key]);
 
-    const data = labels.map((_, i) => {
+    const data = labels.map((label) => {
       const key = Object.keys(charts.tickets_by_status).find(
-        (k) => statusMap[k] === labels[i]
+        (k) => statusMap[k] === label
       );
       return charts.tickets_by_status[key] || 0;
     });
@@ -161,7 +177,7 @@ const MyChartComponent = ({ dashboardData }) => {
     lineChartInstance.current?.destroy();
 
     const labels = charts.top_assignees.map((a) => a.name);
-    const data = charts.top_assignees.map((a) => a.count);
+    const data = charts.top_assignees.map((a) => a.tickets || a.count || 0); // Handle tickets or count
 
     lineChartInstance.current = new ChartJS(ctx, {
       type: "line",
@@ -184,6 +200,7 @@ const MyChartComponent = ({ dashboardData }) => {
         plugins: {
           legend: { position: "top" },
           title: { display: true, text: "Top Assignees" },
+          filler: { propagate: true }, // Explicitly enable filler
         },
         scales: {
           y: {
@@ -195,10 +212,17 @@ const MyChartComponent = ({ dashboardData }) => {
     });
   }, [dashboardData, charts]);
 
-  if (!dashboardData || !charts) {
+  // Handle empty or invalid chart data
+  if (
+    !dashboardData ||
+    !charts ||
+    (!charts.tickets_by_priority &&
+      !charts.tickets_by_status &&
+      !charts.top_assignees)
+  ) {
     return (
       <div className="text-center text-gray-500 my-8">
-        Loading chart data...
+        No chart data available for this organization
       </div>
     );
   }
@@ -207,20 +231,26 @@ const MyChartComponent = ({ dashboardData }) => {
     <div className="w-full flex flex-col gap-8 mt-6 px-2">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full max-w-6xl mx-auto">
         {/* Pie Chart: Priority */}
-        <div className="bg-white p-4 rounded-lg shadow">
-          <canvas ref={pieChartRef} />
-        </div>
+        {charts.tickets_by_priority && (
+          <div className="bg-white p-4 rounded-lg shadow">
+            <canvas ref={pieChartRef} />
+          </div>
+        )}
 
         {/* Bar Chart: Status */}
-        <div className="bg-white p-4 rounded-lg shadow">
-          <canvas ref={barChartRef} />
-        </div>
+        {charts.tickets_by_status && (
+          <div className="bg-white p-4 rounded-lg shadow">
+            <canvas ref={barChartRef} />
+          </div>
+        )}
       </div>
 
       {/* Line Chart: Top Assignees */}
-      <div className="bg-white p-4 rounded-lg shadow w-full max-w-6xl mx-auto aspect-video">
-        <canvas ref={lineChartRef} />
-      </div>
+      {charts.top_assignees?.length > 0 && (
+        <div className="bg-white p-4 rounded-lg shadow w-full max-w-6xl mx-auto aspect-video">
+          <canvas ref={lineChartRef} />
+        </div>
+      )}
     </div>
   );
 };
