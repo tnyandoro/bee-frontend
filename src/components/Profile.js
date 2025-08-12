@@ -1,15 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useAuth } from "../contexts/authContext";
-import { FaUser, FaLock, FaArrowLeft } from "react-icons/fa";
-import axios from "axios";
-
-// Base API instance
-const api = axios.create({
-  baseURL: "https://itsm-api.onrender.com/api/v1",
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
+import { FaUser, FaLock, FaArrowLeft, FaEdit } from "react-icons/fa";
+import createApiInstance from "../utils/api";
 
 // Profile Picture Uploader Component
 const ProfilePictureUploader = ({ onUploadSuccess, uploading }) => {
@@ -61,35 +53,41 @@ const Profile = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [profilePicture, setProfilePicture] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [formData, setFormData] = useState({
+    full_name: "",
+    phone_number: "",
+  });
+
+  const api = createApiInstance(token, subdomain);
 
   // Fetch profile data
+  const fetchProfile = useCallback(async () => {
+    if (!token || !subdomain) {
+      setError("Please log in to view your profile.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const res = await api.get(`/organizations/${subdomain}/profile`);
+      setProfile(res.data);
+      setProfilePicture(res.data.avatar_url || null);
+      setFormData({
+        full_name: res.data.full_name || "",
+        phone_number: res.data.phone_number || "",
+      });
+    } catch (err) {
+      const message = err.response?.data?.error || err.message;
+      setError("Failed to fetch profile data: " + message);
+    } finally {
+      setLoading(false);
+    }
+  }, [api, token, subdomain]);
+
   useEffect(() => {
-    const fetchProfile = async () => {
-      if (!token || !subdomain) {
-        setError("Please log in to view your profile.");
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const res = await api.get(`/organizations/${subdomain}/profile`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        setProfile(res.data);
-        setProfilePicture(res.data.avatar_url || null);
-      } catch (err) {
-        const message = err.response?.data?.error || err.message;
-        setError("Failed to fetch profile data: " + message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchProfile();
-  }, [token, subdomain]);
+  }, [fetchProfile]);
 
   // Handle avatar upload
   const handleUploadSuccess = async (file) => {
@@ -100,22 +98,16 @@ const Profile = () => {
     formData.append("user[avatar]", file);
 
     try {
-      const response = await axios.patch(
-        `https://itsm-api.onrender.com/api/v1/organizations/${subdomain}/users/${currentUser.id}`,
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "multipart/form-data",
-          },
-        }
+      const response = await api.patch(
+        `/organizations/${subdomain}/users/${currentUser.id}`,
+        formData
       );
 
-      // Update local state
       const newAvatarUrl = response.data.avatar_url;
       if (newAvatarUrl) {
         setProfilePicture(newAvatarUrl);
-        updateUser({ avatar_url: newAvatarUrl }); // Update global context
+        setProfile((prev) => ({ ...prev, avatar_url: newAvatarUrl }));
+        updateUser({ avatar_url: newAvatarUrl });
         alert("Profile picture updated successfully!");
       }
     } catch (err) {
@@ -128,15 +120,57 @@ const Profile = () => {
   };
 
   // Change password
-  const handleChangePassword = () => {
-    if (newPassword === confirmPassword) {
+  const handleChangePassword = async () => {
+    if (!newPassword || !confirmPassword) {
+      alert("Please enter both new password and confirmation.");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      alert("Passwords do not match!");
+      return;
+    }
+
+    try {
+      await api.post("/password/update", {
+        new_password: newPassword,
+        confirm_password: confirmPassword,
+      });
       alert("Password changed successfully!");
       setNewPassword("");
       setConfirmPassword("");
       setActiveTab("profile");
-    } else {
-      alert("Passwords do not match!");
+    } catch (err) {
+      const message = err.response?.data?.error || "Failed to change password.";
+      alert(message);
     }
+  };
+
+  // Update profile
+  const handleUpdateProfile = async () => {
+    if (!formData.full_name || !formData.phone_number) {
+      alert("Please fill in all required fields.");
+      return;
+    }
+
+    try {
+      const response = await api.patch(
+        `/organizations/${subdomain}/users/${currentUser.id}`,
+        { user: formData }
+      );
+      setProfile((prev) => ({ ...prev, ...response.data }));
+      updateUser(response.data);
+      setEditMode(false);
+      alert("Profile updated successfully!");
+    } catch (err) {
+      const message = err.response?.data?.error || "Failed to update profile.";
+      alert(message);
+    }
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   if (loading) return <div className="p-4">Loading profile...</div>;
@@ -186,15 +220,15 @@ const Profile = () => {
         </label>
         <label
           className="flex items-center py-2 px-4 mb-2 bg-blue-700 hover:bg-blue-600 rounded cursor-pointer transition"
-          onClick={() => alert("Profile updated!")}
+          onClick={() => setEditMode(true)}
         >
-          <FaArrowLeft className="mr-2" /> Update Profile
+          <FaEdit className="mr-2" /> Edit Profile
         </label>
       </div>
 
       {/* Main Content */}
       <div className="flex-1 p-4">
-        {activeTab === "profile" ? (
+        {activeTab === "profile" && !editMode ? (
           <div>
             {isAdmin && (
               <p className="text-green-500 mb-2">You have admin privileges.</p>
@@ -225,11 +259,12 @@ const Profile = () => {
               ))}
             </div>
           </div>
-        ) : (
+        ) : activeTab === "settings" ? (
           <div>
             <h2 className="text-xl font-semibold mb-4">Change Password</h2>
             <input
               type="password"
+              name="new_password"
               placeholder="New Password"
               className="w-full p-2 border rounded mb-4"
               value={newPassword}
@@ -237,6 +272,7 @@ const Profile = () => {
             />
             <input
               type="password"
+              name="confirm_password"
               placeholder="Confirm Password"
               className="w-full p-2 border rounded mb-4"
               value={confirmPassword}
@@ -248,6 +284,46 @@ const Profile = () => {
             >
               Change Password
             </button>
+          </div>
+        ) : (
+          <div>
+            <h2 className="text-xl font-semibold mb-4">Edit Profile</h2>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex flex-col items-start mb-2">
+                <label className="font-bold text-lg">Full Name</label>
+                <input
+                  type="text"
+                  name="full_name"
+                  value={formData.full_name}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded"
+                />
+              </div>
+              <div className="flex flex-col items-start mb-2">
+                <label className="font-bold text-lg">Phone</label>
+                <input
+                  type="text"
+                  name="phone_number"
+                  value={formData.phone_number}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button
+                className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+                onClick={handleUpdateProfile}
+              >
+                Save Changes
+              </button>
+              <button
+                className="w-full py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition"
+                onClick={() => setEditMode(false)}
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         )}
       </div>
