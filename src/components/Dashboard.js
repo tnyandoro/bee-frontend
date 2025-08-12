@@ -87,35 +87,29 @@ const metricColors = {
 };
 
 const Dashboard = () => {
-  const { currentUser, subdomain, error: authError } = useAuth();
+  const { currentUser, token, subdomain, error: authError } = useAuth();
   const navigate = useNavigate();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [retryCount, setRetryCount] = useState(0);
-  const isFetching = useRef(false); // Track fetch status
+  const isFetching = useRef(false);
 
   const fetchDashboard = useCallback(async () => {
-    if (!subdomain) {
+    if (!subdomain || !token) {
       setError(
-        "Organization subdomain is missing. Please ensure you're logged into the correct organization."
+        !subdomain
+          ? "Organization subdomain is missing. Please ensure you're logged into the correct organization."
+          : "Authentication token is missing. Please log in again."
       );
       setLoading(false);
-      return;
-    }
-
-    const token = localStorage.getItem("authToken");
-    if (!token) {
-      setError("Authentication token is missing. Please log in again.");
-      setLoading(false);
-      navigate("/login");
+      if (!token) navigate("/login");
       return;
     }
 
     if (isFetching.current) {
       console.log(
-        new Date().toISOString(),
-        "Fetch already in progress, skipping"
+        `${new Date().toISOString()} Fetch already in progress, skipping`
       );
       return;
     }
@@ -127,7 +121,7 @@ const Dashboard = () => {
     try {
       const api = createApiInstance(token, subdomain);
       const response = await api.get(`/organizations/${subdomain}/dashboard`);
-      console.log(new Date().toISOString(), "Full API response:", response);
+      console.log(`${new Date().toISOString()} Full API response:`, response);
 
       const data = response.data.data || response.data;
 
@@ -141,16 +135,14 @@ const Dashboard = () => {
       }
 
       console.log(
-        new Date().toISOString(),
-        "Processed data:",
+        `${new Date().toISOString()} Processed data:`,
         JSON.stringify(data, null, 2)
       );
       setDashboardData(data);
       setError("");
       setRetryCount(0);
-      setLoading(false);
     } catch (err) {
-      console.error(new Date().toISOString(), "Dashboard fetch failed:", err);
+      console.error(`${new Date().toISOString()} Dashboard fetch failed:`, err);
       let errorMsg = "Failed to load dashboard.";
       if (err.code === "ECONNABORTED" || err.message.includes("timeout")) {
         errorMsg = "Server is waking up (may take up to 30s). Please retry.";
@@ -164,49 +156,33 @@ const Dashboard = () => {
       const isDev = process.env.NODE_ENV === "development";
       if (isDev) {
         console.warn(
-          new Date().toISOString(),
-          "Using mock data in development due to error"
+          `${new Date().toISOString()} Using mock data in development due to error`
         );
         setDashboardData(mockData);
       }
 
       setError(errorMsg);
-      setLoading(false);
-
       if (retryCount < maxRetries) {
         setRetryCount((prev) => prev + 1);
         setTimeout(() => {
           console.log(
-            new Date().toISOString(),
-            `Retrying fetch (${retryCount + 1}/${maxRetries})`
+            `${new Date().toISOString()} Retrying fetch (${
+              retryCount + 1
+            }/${maxRetries})`
           );
+          isFetching.current = false; // Allow retry
           fetchDashboard();
         }, 2000 * (retryCount + 1));
       }
     } finally {
+      setLoading(false);
       isFetching.current = false;
     }
-  }, [subdomain, navigate, retryCount]);
+  }, [token, subdomain, navigate, retryCount]);
 
   useEffect(() => {
-    if (!isFetching.current) {
-      console.log(new Date().toISOString(), "Starting fetchDashboard");
-      fetchDashboard();
-    }
-
-    const timer = setTimeout(() => {
-      if (isFetching.current) {
-        console.warn(
-          new Date().toISOString(),
-          "Timeout reached, API still loading"
-        );
-        setError("Server is waking up (may take up to 30s). Please retry.");
-        setLoading(false);
-        isFetching.current = false;
-      }
-    }, 30000);
-
-    return () => clearTimeout(timer);
+    console.log(`${new Date().toISOString()} Starting fetchDashboard`);
+    fetchDashboard();
   }, [fetchDashboard]);
 
   if (loading) {
@@ -236,6 +212,7 @@ const Dashboard = () => {
                 setError("");
                 setRetryCount(0);
                 setLoading(true);
+                isFetching.current = false;
                 fetchDashboard();
               }}
               className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
@@ -485,4 +462,3 @@ const MetricCard = ({ label, value, color }) => {
 };
 
 export default Dashboard;
-//kkkk
