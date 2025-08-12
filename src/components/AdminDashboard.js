@@ -53,7 +53,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
   useEffect(() => {
     const activeSubdomain = getEffectiveSubdomain();
     if (activeSubdomain && token && !api.current) {
-      console.log("Initializing API instance:", { token, activeSubdomain }); // Debug log
+      console.log("Initializing API instance:", { token, activeSubdomain });
       api.current = createApiInstance(token, activeSubdomain);
     }
   }, [token, getEffectiveSubdomain]);
@@ -61,6 +61,11 @@ const AdminDashboard = ({ organizationSubdomain }) => {
   // Handle token expiration
   const handleApiError = useCallback(
     (error) => {
+      console.error("API error details:", {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message,
+      });
       if (error.response?.status === 401) {
         setError("Session expired. Attempting to refresh token...");
         refreshToken()
@@ -76,13 +81,16 @@ const AdminDashboard = ({ organizationSubdomain }) => {
               navigate("/login");
             }
           })
-          .catch(() => {
+          .catch((err) => {
+            console.error("Token refresh failed:", err);
             logout();
             navigate("/login");
           });
         return "Session expired.";
       }
-      return error.response?.data?.error || "An error occurred";
+      return (
+        error.response?.data?.error || `An error occurred: ${error.message}`
+      );
     },
     [navigate, refreshToken, logout, getEffectiveSubdomain]
   );
@@ -106,11 +114,15 @@ const AdminDashboard = ({ organizationSubdomain }) => {
       const response = await api.current.get(
         `/organizations/${activeSubdomain}/dashboard`
       );
-      console.log("Dashboard stats response:", response.data); // Debug log
+      console.log("Dashboard stats response:", response.data);
+      if (!response.data?.stats) {
+        console.warn("Dashboard stats missing in response:", response.data);
+        setError("No stats data returned from the server.");
+      }
       setDashboardStats(response.data);
     } catch (err) {
-      console.error("Fetch dashboard stats error:", err); // Debug log
-      setError(handleApiError(err));
+      const errorMessage = handleApiError(err);
+      setError(errorMessage);
     } finally {
       setLoading(false);
       isFetchingStats.current = false;
@@ -132,11 +144,11 @@ const AdminDashboard = ({ organizationSubdomain }) => {
       const response = await api.current.get(
         `/organizations/${activeSubdomain}/teams`
       );
-      console.log("Teams response:", response.data); // Debug log
+      console.log("Teams response:", response.data);
       setTeams(response.data);
     } catch (err) {
-      console.error("Fetch teams error:", err); // Debug log
-      setError(handleApiError(err));
+      const errorMessage = handleApiError(err);
+      setError(errorMessage);
     } finally {
       isFetchingTeams.current = false;
     }
@@ -157,11 +169,11 @@ const AdminDashboard = ({ organizationSubdomain }) => {
       const response = await api.current.get(
         `/organizations/${activeSubdomain}/users`
       );
-      console.log("Users response:", response.data); // Debug log
+      console.log("Users response:", response.data);
       setUsers(response.data);
     } catch (err) {
-      console.error("Fetch users error:", err); // Debug log
-      setError(handleApiError(err));
+      const errorMessage = handleApiError(err);
+      setError(errorMessage);
     } finally {
       isFetchingUsers.current = false;
     }
