@@ -159,10 +159,7 @@ const Dashboard = () => {
           `${new Date().toISOString()} Using mock data in development due to error`
         );
         setDashboardData(mockData);
-      }
-
-      setError(errorMsg);
-      if (retryCount < maxRetries) {
+      } else if (retryCount < maxRetries) {
         setRetryCount((prev) => prev + 1);
         setTimeout(() => {
           console.log(
@@ -170,10 +167,13 @@ const Dashboard = () => {
               retryCount + 1
             }/${maxRetries})`
           );
-          isFetching.current = false; // Allow retry
+          isFetching.current = false;
           fetchDashboard();
-        }, 2000 * (retryCount + 1));
+        }, 3000 * (retryCount + 1));
+        return;
       }
+
+      setError(errorMsg);
     } finally {
       setLoading(false);
       isFetching.current = false;
@@ -258,7 +258,6 @@ const Dashboard = () => {
 
   return (
     <div className="p-4 max-w-7xl mx-auto">
-      {/* Header with current user */}
       <div className="bg-indigo-600 text-white shadow-lg rounded-lg mb-6 p-6">
         <h1 className="text-2xl font-bold">
           {orgName.toUpperCase()} DASHBOARD
@@ -270,7 +269,6 @@ const Dashboard = () => {
         )}
       </div>
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
         <StatCard label="Open" value={stats.open_tickets || 0} color="blue" />
         <StatCard
@@ -300,7 +298,6 @@ const Dashboard = () => {
         />
       </div>
 
-      {/* Charts */}
       <div className="mb-6">
         {charts.tickets_by_status ||
         charts.tickets_by_priority ||
@@ -313,7 +310,6 @@ const Dashboard = () => {
         )}
       </div>
 
-      {/* SLA Metrics */}
       <div className="bg-white p-5 rounded-lg shadow mb-6 border">
         <h3 className="text-lg font-semibold mb-3 text-gray-800">
           SLA Performance
@@ -342,7 +338,6 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Recent Tickets */}
       <div className="bg-white p-5 rounded-lg shadow border overflow-hidden">
         <h3 className="text-lg font-semibold mb-3 text-gray-800">
           Recent Tickets
@@ -430,7 +425,6 @@ const Dashboard = () => {
         )}
       </div>
 
-      {/* Meta Info */}
       <div className="text-xs text-gray-500 text-right mt-4">
         Updated: {updatedTime}
       </div>
