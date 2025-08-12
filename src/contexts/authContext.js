@@ -307,7 +307,7 @@ export const AuthProvider = ({ children }) => {
           expires: 1,
         });
 
-        // Verify after login mm
+        // Verify after login
         const isVerified = await verifyAuth(auth_token, sanitizedSubdomain);
         if (!isVerified) throw new Error("Verification after login failed");
 
