@@ -37,12 +37,16 @@ const getApiBaseUrl = () => {
 };
 
 const sanitizeInput = (input, isEmail = false) => {
-  if (!input) return null;
+  if (!input || typeof input !== "string") {
+    console.warn("Invalid input for sanitization:", input);
+    return null;
+  }
   if (isEmail) {
     const sanitized = input.toLowerCase().replace(/[^a-z0-9@.\-_+]/g, "");
-    console.log("Sanitized email:", sanitized, "from input:", input); // Debug log
+    console.log("Sanitize email - input:", input, "output:", sanitized); // Debug log
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(sanitized)) {
+      console.error("Invalid email format after sanitization:", sanitized);
       throw new Error("Invalid email format");
     }
     return sanitized;
@@ -67,6 +71,13 @@ export const AuthProvider = ({ children }) => {
       const email = Cookies.get("email");
       const role = Cookies.get("role");
       const userId = Cookies.get("userId");
+      console.log("Retrieved tokens:", {
+        token,
+        subdomain,
+        email,
+        role,
+        userId,
+      }); // Debug log
       return { token, subdomain, email, role, userId };
     } catch (e) {
       console.warn("Cookie access error:", e);
@@ -88,6 +99,9 @@ export const AuthProvider = ({ children }) => {
     Cookies.remove("email", { path: "/", secure: true, sameSite: "strict" });
     Cookies.remove("role", { path: "/", secure: true, sameSite: "strict" });
     Cookies.remove("userId", { path: "/", secure: true, sameSite: "strict" });
+    localStorage.removeItem("authToken"); // Clear legacy localStorage
+    localStorage.removeItem("subdomain");
+    localStorage.removeItem("role");
     setState({
       currentUser: null,
       organization: null,
@@ -267,10 +281,12 @@ export const AuthProvider = ({ children }) => {
           (process.env.NODE_ENV === "development" ? "demo" : null);
         const sanitizedEmail = sanitizeInput(email, true);
         console.log(
-          "Login attempt with email:",
+          "Login attempt - raw email:",
           email,
-          "sanitized:",
-          sanitizedEmail
+          "sanitized email:",
+          sanitizedEmail,
+          "subdomain:",
+          sanitizedSubdomain
         ); // Debug log
         if (!sanitizedSubdomain) throw new Error("Subdomain is required");
         if (!sanitizedEmail) throw new Error("Valid email is required");
@@ -314,6 +330,11 @@ export const AuthProvider = ({ children }) => {
           sameSite: "strict",
           expires: 1,
         });
+
+        // Clear legacy localStorage
+        localStorage.removeItem("authToken");
+        localStorage.removeItem("subdomain");
+        localStorage.removeItem("role");
 
         const isVerified = await verifyAuth(auth_token, sanitizedSubdomain);
         if (!isVerified) throw new Error("Verification after login failed");

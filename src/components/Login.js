@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../contexts/authContext";
 import { toast } from "react-toastify";
+import Cookies from "js-cookie";
 import logor from "../assets/logor.png";
 import bg from "../assets/main_bg.png";
 import splashLogo from "../assets/splash_logo.png";
@@ -26,20 +27,17 @@ const Login = ({ loginType = "User" }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Show splash for 2 seconds on mount
     const splashTimeout = setTimeout(() => setShowSplash(false), 2000);
     return () => clearTimeout(splashTimeout);
   }, []);
 
   useEffect(() => {
-    // If token exists, redirect based on role
-    const token = localStorage.getItem("authToken");
+    const token = Cookies.get("authToken");
     if (token) {
       handleExistingSessionRedirect();
     }
   }, [navigate]);
 
-  // Sanitize subdomain input to lowercase, alphanumeric + hyphen only
   const sanitizeSubdomain = (input) => {
     return input
       .toLowerCase()
@@ -51,16 +49,14 @@ const Login = ({ loginType = "User" }) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: name === "subdomain" ? sanitizeSubdomain(value) : value,
+      [name]: name === "subdomain" ? sanitizeSubdomain(value) : value.trim(),
     }));
   };
 
-  // When a session exists, redirect by stored role
   const handleExistingSessionRedirect = () => {
-    const storedSubdomain = localStorage.getItem("subdomain");
-    const storedRole = localStorage.getItem("role");
-
-    console.log("Existing session detected:", storedSubdomain, storedRole);
+    const storedSubdomain = Cookies.get("subdomain");
+    const storedRole = Cookies.get("role");
+    console.log("Existing session detected:", { storedSubdomain, storedRole });
 
     if (storedSubdomain && storedRole) {
       if (storedRole === "system_admin" || storedRole === "domain_admin") {
@@ -88,7 +84,7 @@ const Login = ({ loginType = "User" }) => {
 
     if (!formData.email.trim()) {
       newErrors.email = "Email is required";
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = "Invalid email format";
     }
 
@@ -99,30 +95,19 @@ const Login = ({ loginType = "User" }) => {
     }
 
     setErrors(newErrors);
-    // Return true if no errors
     return !Object.values(newErrors).some((error) => error);
   };
 
   const handleLogin = async (e) => {
     e.preventDefault();
-
-    // Sanitize subdomain again just in case
-    setFormData((prev) => ({
-      ...prev,
-      subdomain: sanitizeSubdomain(prev.subdomain),
-    }));
-
     if (!validateForm()) return;
 
     setIsLoading(true);
     setErrors((prev) => ({ ...prev, general: "" }));
 
     try {
-      console.log("Attempting login with:", formData.email, formData.subdomain);
-
+      console.log("Submitting login with:", formData); // Debug log
       await login(formData.email, formData.password, formData.subdomain);
-
-      console.log("Login successful, navigating based on stored role");
 
       toast.success("You have successfully logged in", {
         position: "top-right",
@@ -134,9 +119,8 @@ const Login = ({ loginType = "User" }) => {
         theme: "light",
       });
 
-      const storedRole = localStorage.getItem("role");
+      const storedRole = Cookies.get("role");
       if (!storedRole) {
-        // Defensive fallback in case role missing
         console.warn("Role missing after login, defaulting to user dashboard");
         navigate("/user/dashboard");
       } else if (
@@ -148,7 +132,7 @@ const Login = ({ loginType = "User" }) => {
         navigate("/user/dashboard");
       }
     } catch (error) {
-      console.error("Login error:", error.message);
+      console.error("Login error:", error.message, error);
       let errorMessage = "Login failed. Please try again";
 
       if (error.message.includes("timeout")) {
@@ -156,7 +140,7 @@ const Login = ({ loginType = "User" }) => {
       } else if (error.message.includes("Organization not found")) {
         errorMessage = "Organization not found";
       } else if (error.message.includes("Invalid credentials")) {
-        errorMessage = "Invalid credentials";
+        errorMessage = "Invalid email or password";
       } else if (error.message.includes("Invalid role")) {
         errorMessage = "User role is invalid or missing";
       } else if (error.message) {
@@ -165,6 +149,7 @@ const Login = ({ loginType = "User" }) => {
 
       setErrors({
         subdomain: errorMessage.includes("Organization") ? errorMessage : "",
+        email: errorMessage.includes("credentials") ? errorMessage : "",
         password: errorMessage.includes("credentials") ? errorMessage : "",
         general: errorMessage,
       });
@@ -269,7 +254,7 @@ const Login = ({ loginType = "User" }) => {
             <div>
               <label
                 htmlFor="password"
-                className="block text-sm font-medium text-gray-700 mb-1"
+                className="foobar text-sm font-medium text-gray-700 mb-1"
               >
                 Password
               </label>
@@ -297,7 +282,6 @@ const Login = ({ loginType = "User" }) => {
                   tabIndex={-1}
                 >
                   {showPassword ? (
-                    // Eye-off icon
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       className="h-5 w-5"
@@ -312,7 +296,6 @@ const Login = ({ loginType = "User" }) => {
                       <path d="M1 1l22 22" />
                     </svg>
                   ) : (
-                    // Eye icon
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       className="h-5 w-5"
@@ -388,4 +371,3 @@ const Login = ({ loginType = "User" }) => {
 };
 
 export default Login;
-// login
