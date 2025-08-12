@@ -175,10 +175,10 @@ const Dashboard = () => {
         setDashboardData(mockData);
         setLoading(false);
       }
-    }, 8000);
+    }, 30000);
 
     return () => clearTimeout(timer);
-  }, [fetchDashboard]);
+  }, [dashboardData, fetchDashboard]);
 
   if (loading) {
     return (

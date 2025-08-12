@@ -35,7 +35,7 @@ const createApiInstance = (token, subdomain) => {
       Authorization: `Bearer ${token}`,
       "X-Organization-Subdomain": subdomain,
     },
-    timeout: 15000,
+    timeout: 60000,
     withCredentials: true,
   });
 
