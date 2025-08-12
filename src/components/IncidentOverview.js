@@ -1,12 +1,17 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import ResolveTicket from "./ResolveTicket";
-import apiBaseUrl from "../config";
+import createApiInstance from "../utils/api";
 import * as XLSX from "xlsx";
 import { useMemo } from "react";
 
 const IncidentOverview = () => {
   const [tickets, setTickets] = useState([]);
+  const [pagination, setPagination] = useState({
+    current_page: 1,
+    total_pages: 1,
+    total_entries: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedTicket, setSelectedTicket] = useState(null);
@@ -18,6 +23,11 @@ const IncidentOverview = () => {
   const authToken = useMemo(() => localStorage.getItem("authToken") || "", []);
   const navigate = useNavigate();
 
+  const api = useMemo(
+    () => createApiInstance(authToken, subdomain),
+    [authToken, subdomain]
+  );
+
   const validateToken = useCallback(async () => {
     if (!authToken || !subdomain) {
       setError("Please log in to view incidents.");
@@ -28,53 +38,72 @@ const IncidentOverview = () => {
     }
 
     try {
-      const response = await fetch(`${apiBaseUrl}/verify`, {
-        headers: { Authorization: `Bearer ${authToken}` },
-      });
-      if (!response.ok) {
+      const response = await api.get("/verify");
+      if (response.status !== 200) {
         throw new Error("Invalid token");
       }
       return true;
     } catch (err) {
-      setError("Session expired. Please log in again.");
+      setError("Session expired or server unreachable. Please log in again.");
       localStorage.removeItem("authToken");
       localStorage.removeItem("subdomain");
       navigate("/login");
       return false;
     }
-  }, [authToken, subdomain, navigate]);
+  }, [api, navigate]);
 
-  const fetchTickets = useCallback(async () => {
-    const isTokenValid = await validateToken();
-    if (!isTokenValid) return;
+  const fetchTickets = useCallback(
+    async (page = 1) => {
+      const isTokenValid = await validateToken();
+      if (!isTokenValid) return;
 
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch(
-        `${apiBaseUrl}/organizations/${subdomain}/tickets?page=1&per_page=100`,
-        {
-          headers: {
-            Authorization: `Bearer ${authToken}`,
+      setLoading(true);
+      setError(null);
+      try {
+        console.log("Starting fetchTickets for page:", page);
+        const response = await api.get(`/organizations/${subdomain}/tickets`, {
+          params: {
+            page,
+            per_page: 10,
+            ticket_type: "Incident",
+            status: statusFilter || undefined,
+            team_id: teamFilter || undefined,
+            assignee_id: assigneeFilter || undefined,
+            priority: priorityFilter || undefined,
           },
+        });
+        console.log("Tickets API response:", response.data);
+        setTickets(response.data.tickets || []);
+        setPagination(
+          response.data.pagination || {
+            current_page: 1,
+            total_pages: 1,
+            total_entries: 0,
+          }
+        );
+      } catch (err) {
+        console.error("Fetch tickets error:", err);
+        setError(err.response?.data?.error || "Failed to fetch incidents");
+        if (err.response?.status === 401) {
+          localStorage.removeItem("authToken");
+          localStorage.removeItem("subdomain");
+          navigate("/login");
         }
-      );
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to fetch tickets");
+      } finally {
+        setLoading(false);
       }
-      setTickets(data.tickets || []);
-    } catch (err) {
-      setError(err.message);
-      if (err.message.includes("Unauthorized")) {
-        localStorage.removeItem("authToken");
-        localStorage.removeItem("subdomain");
-        navigate("/login");
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [authToken, subdomain, navigate, validateToken]);
+    },
+    [
+      api,
+      subdomain,
+      statusFilter,
+      teamFilter,
+      assigneeFilter,
+      priorityFilter,
+      validateToken,
+      navigate,
+    ]
+  );
 
   useEffect(() => {
     if (subdomain && authToken) {
@@ -92,31 +121,33 @@ const IncidentOverview = () => {
   const handleResolveSuccess = async () => {
     setSelectedTicket(null);
     setLoading(true);
-    await fetchTickets();
+    await fetchTickets(pagination.current_page);
   };
 
   const handleResolveCancel = () => {
     setSelectedTicket(null);
   };
 
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= pagination.total_pages) {
+      fetchTickets(newPage);
+    }
+  };
+
   const downloadExport = async (format = "csv") => {
     const filters = new URLSearchParams();
     if (statusFilter) filters.append("status", statusFilter);
-    if (teamFilter) filters.append("team", teamFilter);
-    if (assigneeFilter) filters.append("assignee", assigneeFilter);
+    if (teamFilter) filters.append("team_id", teamFilter);
+    if (assigneeFilter) filters.append("assignee_id", assigneeFilter);
     if (priorityFilter) filters.append("priority", priorityFilter);
+    filters.append("ticket_type", "Incident");
 
-    const url = `${apiBaseUrl}/organizations/${subdomain}/tickets/export.${format}?${filters}`;
+    const url = `/organizations/${subdomain}/tickets/export.${format}?${filters}`;
 
     try {
-      const response = await fetch(url, {
-        headers: { Authorization: `Bearer ${authToken}` },
-      });
-
-      if (!response.ok) throw new Error("Export failed");
-
-      const blob = await response.blob();
-      const filename = `tickets-${new Date().toISOString()}.${format}`;
+      const response = await api.get(url, { responseType: "blob" });
+      const blob = response.data;
+      const filename = `incidents-${new Date().toISOString()}.${format}`;
       const downloadUrl = URL.createObjectURL(blob);
 
       const a = document.createElement("a");
@@ -128,28 +159,12 @@ const IncidentOverview = () => {
       URL.revokeObjectURL(downloadUrl);
     } catch (error) {
       console.error("Export error:", error);
-      alert("Export failed. Try again.");
+      alert("Export failed. Please try again.");
     }
   };
 
   const exportToExcel = () => {
-    const filteredData = tickets
-      .filter((t) => (statusFilter ? t.status === statusFilter : true))
-      .filter((t) =>
-        assigneeFilter
-          ? t.assignee?.name
-              ?.toLowerCase()
-              .includes(assigneeFilter.toLowerCase())
-          : true
-      )
-      .filter((t) =>
-        teamFilter
-          ? t.team?.name?.toLowerCase().includes(teamFilter.toLowerCase())
-          : true
-      )
-      .filter((t) => (priorityFilter ? t.priority === priorityFilter : true));
-
-    const exportData = filteredData.map((ticket) => ({
+    const filteredData = tickets.map((ticket) => ({
       "Ticket Number": ticket.ticket_number,
       Title: ticket.title,
       Status: ticket.status,
@@ -159,17 +174,17 @@ const IncidentOverview = () => {
       Assignee: ticket.assignee?.name || "Unassigned",
     }));
 
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const worksheet = XLSX.utils.json_to_sheet(filteredData);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Tickets");
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Incidents");
 
-    XLSX.writeFile(workbook, `tickets-${new Date().toISOString()}.xlsx`);
+    XLSX.writeFile(workbook, `incidents-${new Date().toISOString()}.xlsx`);
   };
 
   if (!subdomain || !authToken) {
     return (
       <div className="text-red-500 text-center">
-        Please log in to view Tickets.
+        Please log in to view incidents.
       </div>
     );
   }
@@ -200,7 +215,7 @@ const IncidentOverview = () => {
           type="text"
           value={teamFilter}
           onChange={(e) => setTeamFilter(e.target.value)}
-          placeholder="Filter by Team"
+          placeholder="Filter by Team ID"
           className="w-full md:w-1/5 px-4 py-2 border rounded-md shadow-sm"
         />
 
@@ -208,7 +223,7 @@ const IncidentOverview = () => {
           type="text"
           value={assigneeFilter}
           onChange={(e) => setAssigneeFilter(e.target.value)}
-          placeholder="Filter by Assignee"
+          placeholder="Filter by Assignee ID"
           className="w-full md:w-1/5 px-4 py-2 border rounded-md shadow-sm"
         />
 
@@ -218,10 +233,10 @@ const IncidentOverview = () => {
           className="w-full md:w-1/5 px-4 py-2 border rounded-md shadow-sm"
         >
           <option value="">All Priorities</option>
-          <option value="low">Low</option>
-          <option value="normal">Normal</option>
-          <option value="high">High</option>
-          <option value="urgent">Urgent</option>
+          <option value="0">Low</option>
+          <option value="1">Normal</option>
+          <option value="2">High</option>
+          <option value="3">Urgent</option>
         </select>
 
         <div className="flex gap-2 w-full md:w-auto">
@@ -274,6 +289,26 @@ const IncidentOverview = () => {
             ))}
         </tbody>
       </table>
+
+      <div className="flex justify-center mt-4">
+        <button
+          onClick={() => handlePageChange(pagination.current_page - 1)}
+          disabled={pagination.current_page <= 1}
+          className="px-4 py-2 mx-1 bg-gray-300 rounded disabled:opacity-50"
+        >
+          Previous
+        </button>
+        <span className="px-4 py-2">
+          Page {pagination.current_page} of {pagination.total_pages}
+        </span>
+        <button
+          onClick={() => handlePageChange(pagination.current_page + 1)}
+          disabled={pagination.current_page >= pagination.total_pages}
+          className="px-4 py-2 mx-1 bg-gray-300 rounded disabled:opacity-50"
+        >
+          Next
+        </button>
+      </div>
 
       {selectedTicket?.ticket_number && (
         <ResolveTicket
