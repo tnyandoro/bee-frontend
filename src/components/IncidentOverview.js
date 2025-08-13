@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import ResolveTicket from "./ResolveTicket";
 import createApiInstance from "../utils/api";
 import * as XLSX from "xlsx";
-import { useMemo } from "react";
+import { useAuth } from "../contexts/authContext";
 
 const IncidentOverview = () => {
+  const { currentUser, token, subdomain, logout } = useAuth();
+  const navigate = useNavigate();
   const [tickets, setTickets] = useState([]);
   const [pagination, setPagination] = useState({
     current_page: 1,
@@ -19,48 +21,67 @@ const IncidentOverview = () => {
   const [teamFilter, setTeamFilter] = useState("");
   const [assigneeFilter, setAssigneeFilter] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("");
-  const subdomain = useMemo(() => localStorage.getItem("subdomain") || "", []);
-  const authToken = useMemo(() => localStorage.getItem("authToken") || "", []);
-  const navigate = useNavigate();
+  const isFetching = useRef(false);
 
-  const api = useMemo(
-    () => createApiInstance(authToken, subdomain),
-    [authToken, subdomain]
-  );
+  const api = createApiInstance(token, subdomain);
 
   const validateToken = useCallback(async () => {
-    if (!authToken || !subdomain) {
+    if (!token || !subdomain || !currentUser) {
+      console.warn(`${new Date().toISOString()} Missing auth data`, {
+        token,
+        subdomain,
+        currentUser,
+      });
       setError("Please log in to view incidents.");
-      localStorage.removeItem("authToken");
-      localStorage.removeItem("subdomain");
-      navigate("/login");
+      logout();
+      navigate("/login", { replace: true });
       return false;
     }
 
     try {
       const response = await api.get("/verify");
-      if (response.status !== 200) {
-        throw new Error("Invalid token");
-      }
-      return true;
+      console.log(
+        `${new Date().toISOString()} Token validation response:`,
+        response.data
+      );
+      return response.status === 200;
     } catch (err) {
+      console.error(
+        `${new Date().toISOString()} Token validation failed:`,
+        err
+      );
       setError("Session expired or server unreachable. Please log in again.");
-      localStorage.removeItem("authToken");
-      localStorage.removeItem("subdomain");
-      navigate("/login");
+      logout();
+      navigate("/login", { replace: true });
       return false;
     }
-  }, [api, navigate]);
+  }, [api, token, subdomain, currentUser, logout, navigate]);
 
   const fetchTickets = useCallback(
     async (page = 1) => {
-      const isTokenValid = await validateToken();
-      if (!isTokenValid) return;
+      if (isFetching.current) {
+        console.log(
+          `${new Date().toISOString()} Fetch already in progress, skipping`
+        );
+        return;
+      }
 
+      isFetching.current = true;
       setLoading(true);
       setError(null);
+
+      const isTokenValid = await validateToken();
+      if (!isTokenValid) {
+        isFetching.current = false;
+        setLoading(false);
+        return;
+      }
+
       try {
-        console.log("Starting fetchTickets for page:", page);
+        console.log(
+          `${new Date().toISOString()} Fetching tickets for page:`,
+          page
+        );
         const response = await api.get(`/organizations/${subdomain}/tickets`, {
           params: {
             page,
@@ -72,25 +93,30 @@ const IncidentOverview = () => {
             priority: priorityFilter || undefined,
           },
         });
-        console.log("Tickets API response:", response.data);
+        console.log(
+          `${new Date().toISOString()} Tickets API response:`,
+          response.data
+        );
         setTickets(response.data.tickets || []);
         setPagination(
           response.data.pagination || {
-            current_page: 1,
+            current_page: page,
             total_pages: 1,
-            total_entries: 0,
+            total_entries: response.data.tickets?.length || 0,
           }
         );
       } catch (err) {
-        console.error("Fetch tickets error:", err);
-        setError(err.response?.data?.error || "Failed to fetch incidents");
+        console.error(`${new Date().toISOString()} Fetch tickets error:`, err);
+        let errorMsg = err.response?.data?.error || "Failed to fetch incidents";
         if (err.response?.status === 401) {
-          localStorage.removeItem("authToken");
-          localStorage.removeItem("subdomain");
-          navigate("/login");
+          errorMsg = "Session expired. Please log in again.";
+          logout();
+          navigate("/login", { replace: true });
         }
+        setError(errorMsg);
       } finally {
         setLoading(false);
+        isFetching.current = false;
       }
     },
     [
@@ -101,34 +127,37 @@ const IncidentOverview = () => {
       assigneeFilter,
       priorityFilter,
       validateToken,
+      logout,
       navigate,
     ]
   );
 
   useEffect(() => {
-    if (subdomain && authToken) {
-      fetchTickets();
-    } else {
-      setError("Please log in to view incidents.");
-      navigate("/login");
-    }
-  }, [subdomain, authToken, fetchTickets, navigate]);
+    console.log(`${new Date().toISOString()} Starting fetchTickets`);
+    fetchTickets();
+  }, [fetchTickets]);
 
   const handleResolveClick = (ticket) => {
+    console.log(
+      `${new Date().toISOString()} Resolve clicked for ticket:`,
+      ticket.ticket_number
+    );
     setSelectedTicket(ticket);
   };
 
   const handleResolveSuccess = async () => {
+    console.log(`${new Date().toISOString()} Resolve success`);
     setSelectedTicket(null);
-    setLoading(true);
     await fetchTickets(pagination.current_page);
   };
 
   const handleResolveCancel = () => {
+    console.log(`${new Date().toISOString()} Resolve cancelled`);
     setSelectedTicket(null);
   };
 
   const handlePageChange = (newPage) => {
+    console.log(`${new Date().toISOString()} Page change to:`, newPage);
     if (newPage >= 1 && newPage <= pagination.total_pages) {
       fetchTickets(newPage);
     }
@@ -143,8 +172,8 @@ const IncidentOverview = () => {
     filters.append("ticket_type", "Incident");
 
     const url = `/organizations/${subdomain}/tickets/export.${format}?${filters}`;
-
     try {
+      console.log(`${new Date().toISOString()} Downloading export:`, url);
       const response = await api.get(url, { responseType: "blob" });
       const blob = response.data;
       const filename = `incidents-${new Date().toISOString()}.${format}`;
@@ -158,12 +187,13 @@ const IncidentOverview = () => {
       a.remove();
       URL.revokeObjectURL(downloadUrl);
     } catch (error) {
-      console.error("Export error:", error);
-      alert("Export failed. Please try again.");
+      console.error(`${new Date().toISOString()} Export error:`, error);
+      setError("Export failed. Please try again.");
     }
   };
 
   const exportToExcel = () => {
+    console.log(`${new Date().toISOString()} Exporting to Excel`);
     const filteredData = tickets.map((ticket) => ({
       "Ticket Number": ticket.ticket_number,
       Title: ticket.title,
@@ -177,20 +207,52 @@ const IncidentOverview = () => {
     const worksheet = XLSX.utils.json_to_sheet(filteredData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Incidents");
-
     XLSX.writeFile(workbook, `incidents-${new Date().toISOString()}.xlsx`);
   };
 
-  if (!subdomain || !authToken) {
+  if (loading) {
     return (
-      <div className="text-red-500 text-center">
-        Please log in to view incidents.
+      <div className="p-4 flex justify-center items-center h-64">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-2"></div>
+          <p>
+            Loading incidents... First load may take up to 30s if server is
+            idle.
+          </p>
+        </div>
       </div>
     );
   }
-  if (loading)
-    return <div className="text-blue-700 text-center">Loading...</div>;
-  if (error) return <div className="text-red-500 text-center">{error}</div>;
+
+  if (error) {
+    return (
+      <div className="p-4 max-w-2xl mx-auto">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+          <h3 className="font-bold text-lg mb-2">Error</h3>
+          <p>{error}</p>
+          <div className="mt-3 space-x-2">
+            <button
+              onClick={() => {
+                console.log(`${new Date().toISOString()} Retrying fetch`);
+                setError(null);
+                setLoading(true);
+                fetchTickets(pagination.current_page);
+              }}
+              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+            >
+              Retry
+            </button>
+            <button
+              onClick={() => navigate("/login")}
+              className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+            >
+              Back to Login
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mt-2 p-2 bg-gray-100 min-h-screen">
@@ -201,7 +263,13 @@ const IncidentOverview = () => {
       <div className="flex flex-col md:flex-row flex-wrap gap-4 mb-6">
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
+          onChange={(e) => {
+            console.log(
+              `${new Date().toISOString()} Status filter changed:`,
+              e.target.value
+            );
+            setStatusFilter(e.target.value);
+          }}
           className="w-full md:w-1/5 px-4 py-2 border rounded-md shadow-sm"
         >
           <option value="">All Statuses</option>
@@ -214,7 +282,13 @@ const IncidentOverview = () => {
         <input
           type="text"
           value={teamFilter}
-          onChange={(e) => setTeamFilter(e.target.value)}
+          onChange={(e) => {
+            console.log(
+              `${new Date().toISOString()} Team filter changed:`,
+              e.target.value
+            );
+            setTeamFilter(e.target.value);
+          }}
           placeholder="Filter by Team ID"
           className="w-full md:w-1/5 px-4 py-2 border rounded-md shadow-sm"
         />
@@ -222,14 +296,26 @@ const IncidentOverview = () => {
         <input
           type="text"
           value={assigneeFilter}
-          onChange={(e) => setAssigneeFilter(e.target.value)}
+          onChange={(e) => {
+            console.log(
+              `${new Date().toISOString()} Assignee filter changed:`,
+              e.target.value
+            );
+            setAssigneeFilter(e.target.value);
+          }}
           placeholder="Filter by Assignee ID"
           className="w-full md:w-1/5 px-4 py-2 border rounded-md shadow-sm"
         />
 
         <select
           value={priorityFilter}
-          onChange={(e) => setPriorityFilter(e.target.value)}
+          onChange={(e) => {
+            console.log(
+              `${new Date().toISOString()} Priority filter changed:`,
+              e.target.value
+            );
+            setPriorityFilter(e.target.value);
+          }}
           className="w-full md:w-1/5 px-4 py-2 border rounded-md shadow-sm"
         >
           <option value="">All Priorities</option>
@@ -314,7 +400,7 @@ const IncidentOverview = () => {
         <ResolveTicket
           ticket={selectedTicket}
           subdomain={subdomain}
-          authToken={authToken}
+          authToken={token}
           onSuccess={handleResolveSuccess}
           onCancel={handleResolveCancel}
         />
