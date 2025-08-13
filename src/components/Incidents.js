@@ -12,7 +12,7 @@ import ResolveTicket from "./ResolveTicket";
 import TicketDetailsPopup from "./TicketDetailsPopup";
 
 const Incident = () => {
-  const { currentUser, subdomain, token, authError } = useAuth();
+  const { currentUser, subdomain, token, authError, logout } = useAuth();
   const [tickets, setTickets] = useState([]);
   const [pagination, setPagination] = useState({
     total_entries: 0,
@@ -28,7 +28,6 @@ const Incident = () => {
   const [error, setError] = useState(null);
   const location = useLocation();
   const navigate = useNavigate();
-  const isLoggedOut = useRef(false);
   const isFetching = useRef(false);
 
   console.log("Incident: Rendered", {
@@ -39,54 +38,23 @@ const Incident = () => {
     path: location.pathname,
   });
 
-  const logout = useCallback(() => {
-    if (isLoggedOut.current) {
-      console.log("Incident: Logout skipped, already logged out");
+  const fetchTickets = useCallback(async () => {
+    if (isFetching.current) {
+      console.log("Incident: Fetch skipped, already in progress");
       return;
     }
-    isLoggedOut.current = true;
-    console.log("Incident: Logging out", { currentUser });
-    navigate("/login");
-  }, [navigate]);
 
-  const validateToken = useCallback(async () => {
-    if (!token || !subdomain) {
-      console.warn("Incident: Missing token or subdomain", {
+    if (!token || !subdomain || !currentUser) {
+      console.warn("Incident: Missing auth data", {
         token,
         subdomain,
+        currentUser,
       });
       setError("Please log in to view incidents.");
       logout();
-      return false;
-    }
-
-    try {
-      const api = createApiInstance(token, subdomain);
-      await api.get("/verify");
-      console.log("Incident: Token validated successfully");
-      return true;
-    } catch (err) {
-      console.error("Incident: Token validation failed", {
-        error: err.message,
-        response: err.response?.data,
-      });
-      setError("Session expired or server unreachable. Please log in again.");
-      logout();
-      return false;
-    }
-  }, [token, subdomain, logout]);
-
-  const fetchTickets = useCallback(async () => {
-    if (isLoggedOut.current || isFetching.current) {
-      console.log("Incident: Fetch skipped", {
-        isLoggedOut: isLoggedOut.current,
-        isFetching: isFetching.current,
-      });
+      navigate("/login");
       return;
     }
-
-    const isTokenValid = await validateToken();
-    if (!isTokenValid) return;
 
     isFetching.current = true;
     setLoading(true);
@@ -128,16 +96,25 @@ const Incident = () => {
       if (err.response?.status === 401) {
         errorMsg = "Session expired. Please log in again.";
         logout();
+        navigate("/login");
       } else if (err.response?.status === 404) {
         errorMsg = "No incidents found for this organization.";
+        setTickets([]);
       }
       setError(errorMsg);
-      setTickets([]);
     } finally {
       setLoading(false);
       isFetching.current = false;
     }
-  }, [token, subdomain, currentPage, ticketsPerPage, logout, validateToken]);
+  }, [
+    token,
+    subdomain,
+    currentUser,
+    currentPage,
+    ticketsPerPage,
+    logout,
+    navigate,
+  ]);
 
   useEffect(() => {
     if (location.state?.newTicket) {
@@ -165,14 +142,25 @@ const Incident = () => {
   }, [location.state, fetchTickets]);
 
   useEffect(() => {
-    if (token && subdomain && !isFetching.current) {
+    if (token && subdomain && currentUser && !isFetching.current) {
       console.log("Incident: Starting fetchTickets");
       fetchTickets();
-    } else if (!token || !subdomain) {
-      console.warn("Incident: Missing token or subdomain, setting error");
+    } else {
+      console.warn("Incident: Missing auth data, setting error", {
+        token,
+        subdomain,
+        currentUser,
+      });
       setError("Please log in to view incidents.");
     }
-  }, [token, subdomain, currentPage, ticketsPerPage, fetchTickets]);
+  }, [
+    token,
+    subdomain,
+    currentPage,
+    ticketsPerPage,
+    fetchTickets,
+    currentUser,
+  ]);
 
   const handleResolve = (ticket) => {
     console.log("Incident: Resolve ticket", { ticketId: ticket.id });
