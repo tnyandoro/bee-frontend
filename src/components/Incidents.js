@@ -6,14 +6,13 @@ import {
   XCircleIcon,
   InformationCircleIcon,
 } from "@heroicons/react/24/solid";
-import { useAuth } from "../contexts/authContext"; // Use useAuth
-import createApiInstance from "../utils/api"; // Use createApiInstance
+import { useAuth } from "../contexts/authContext";
+import createApiInstance from "../utils/api";
 import ResolveTicket from "./ResolveTicket";
 import TicketDetailsPopup from "./TicketDetailsPopup";
 
-const Incident = ({ email, role }) => {
-  const { currentUser, subdomain, error: authError } = useAuth();
-  const [token, setToken] = useState(localStorage.getItem("authToken") || "");
+const Incident = () => {
+  const { currentUser, subdomain, token, authError } = useAuth();
   const [tickets, setTickets] = useState([]);
   const [pagination, setPagination] = useState({
     total_entries: 0,
@@ -30,21 +29,32 @@ const Incident = ({ email, role }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const isLoggedOut = useRef(false);
-  const isFetching = useRef(false); // Track fetch status
+  const isFetching = useRef(false);
+
+  console.log("Incident: Rendered", {
+    currentUser,
+    subdomain,
+    token,
+    authError,
+    path: location.pathname,
+  });
 
   const logout = useCallback(() => {
-    if (isLoggedOut.current) return;
+    if (isLoggedOut.current) {
+      console.log("Incident: Logout skipped, already logged out");
+      return;
+    }
     isLoggedOut.current = true;
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("subdomain");
-    localStorage.removeItem("email");
-    localStorage.removeItem("role");
-    setToken("");
+    console.log("Incident: Logging out", { currentUser });
     navigate("/login");
   }, [navigate]);
 
   const validateToken = useCallback(async () => {
     if (!token || !subdomain) {
+      console.warn("Incident: Missing token or subdomain", {
+        token,
+        subdomain,
+      });
       setError("Please log in to view incidents.");
       logout();
       return false;
@@ -53,9 +63,13 @@ const Incident = ({ email, role }) => {
     try {
       const api = createApiInstance(token, subdomain);
       await api.get("/verify");
+      console.log("Incident: Token validated successfully");
       return true;
     } catch (err) {
-      console.error(new Date().toISOString(), "Token validation failed:", err);
+      console.error("Incident: Token validation failed", {
+        error: err.message,
+        response: err.response?.data,
+      });
       setError("Session expired or server unreachable. Please log in again.");
       logout();
       return false;
@@ -64,10 +78,10 @@ const Incident = ({ email, role }) => {
 
   const fetchTickets = useCallback(async () => {
     if (isLoggedOut.current || isFetching.current) {
-      console.log(
-        new Date().toISOString(),
-        "Fetch skipped: logged out or in progress"
-      );
+      console.log("Incident: Fetch skipped", {
+        isLoggedOut: isLoggedOut.current,
+        isFetching: isFetching.current,
+      });
       return;
     }
 
@@ -81,8 +95,11 @@ const Incident = ({ email, role }) => {
     try {
       const api = createApiInstance(token, subdomain);
       const url = `/organizations/${subdomain}/tickets?page=${currentPage}&per_page=${ticketsPerPage}`;
+      console.log("Incident: Fetching tickets", { url });
       const response = await api.get(url);
-      console.log(new Date().toISOString(), "Tickets API response:", response);
+      console.log("Incident: Tickets API response", {
+        response: response.data,
+      });
 
       const fetchedTickets = Array.isArray(response.data.tickets)
         ? response.data.tickets
@@ -101,7 +118,10 @@ const Incident = ({ email, role }) => {
         }
       );
     } catch (err) {
-      console.error(new Date().toISOString(), "Fetch tickets failed:", err);
+      console.error("Incident: Fetch tickets failed", {
+        error: err.message,
+        response: err.response?.data,
+      });
       let errorMsg = `Failed to fetch incidents: ${
         err.response?.data?.error || err.message
       }`;
@@ -121,6 +141,9 @@ const Incident = ({ email, role }) => {
 
   useEffect(() => {
     if (location.state?.newTicket) {
+      console.log("Incident: New ticket received", {
+        newTicket: location.state.newTicket,
+      });
       const newTicket = {
         ...location.state.newTicket,
         created_at: location.state.newTicket.reported_at || Date.now(),
@@ -135,6 +158,7 @@ const Incident = ({ email, role }) => {
       setCurrentPage(1);
       window.history.replaceState({}, document.title);
     } else if (location.state?.refresh) {
+      console.log("Incident: Refresh triggered");
       fetchTickets();
       window.history.replaceState({}, document.title);
     }
@@ -142,15 +166,21 @@ const Incident = ({ email, role }) => {
 
   useEffect(() => {
     if (token && subdomain && !isFetching.current) {
-      console.log(new Date().toISOString(), "Starting fetchTickets");
+      console.log("Incident: Starting fetchTickets");
       fetchTickets();
     } else if (!token || !subdomain) {
+      console.warn("Incident: Missing token or subdomain, setting error");
       setError("Please log in to view incidents.");
     }
   }, [token, subdomain, currentPage, ticketsPerPage, fetchTickets]);
 
-  const handleResolve = (ticket) => setResolveTicket(ticket);
+  const handleResolve = (ticket) => {
+    console.log("Incident: Resolve ticket", { ticketId: ticket.id });
+    setResolveTicket(ticket);
+  };
+
   const handleResolveSuccess = (updatedTicket) => {
+    console.log("Incident: Resolve success", { updatedTicket });
     setTickets((prev) =>
       prev.map((t) =>
         (t.ticket_number || `INC-${t.id}`) ===
@@ -161,27 +191,45 @@ const Incident = ({ email, role }) => {
     );
     setResolveTicket(null);
   };
-  const handleResolveCancel = () => setResolveTicket(null);
-  const handleEdit = (ticket) => setSelectedTicket(ticket);
-  const handleCloseModal = () => setSelectedTicket(null);
+
+  const handleResolveCancel = () => {
+    console.log("Incident: Resolve cancelled");
+    setResolveTicket(null);
+  };
+
+  const handleEdit = (ticket) => {
+    console.log("Incident: Edit ticket", { ticketId: ticket.id });
+    setSelectedTicket(ticket);
+  };
+
+  const handleCloseModal = () => {
+    console.log("Incident: Close edit modal");
+    setSelectedTicket(null);
+  };
 
   const handleUpdateTicket = async (updatedTicket) => {
+    console.log("Incident: Updating ticket", { updatedTicket });
     try {
       const api = createApiInstance(token, subdomain);
       const response = await api.put(
         `/organizations/${subdomain}/tickets/${updatedTicket.id}`,
         { ticket: updatedTicket }
       );
+      console.log("Incident: Ticket updated", { response: response.data });
       setTickets((prev) =>
         prev.map((t) => (t.id === updatedTicket.id ? response.data.ticket : t))
       );
       setSelectedTicket(null);
     } catch (err) {
+      console.error("Incident: Failed to update ticket", {
+        error: err.message,
+      });
       setError("Failed to update ticket.");
     }
   };
 
   const handleDetails = (ticket) => {
+    console.log("Incident: Viewing ticket details", { ticketId: ticket.id });
     setDetailsTicket({
       ticketNumber: ticket.ticket_number || `INC-${ticket.id}`,
       status: ticket.status,
@@ -201,7 +249,10 @@ const Incident = ({ email, role }) => {
     });
   };
 
-  const handleCloseDetails = () => setDetailsTicket(null);
+  const handleCloseDetails = () => {
+    console.log("Incident: Close details popup");
+    setDetailsTicket(null);
+  };
 
   const getStatusColor = (status) => {
     const s = status?.toLowerCase();
@@ -280,7 +331,10 @@ const Incident = ({ email, role }) => {
     pagination.total_pages ||
     Math.ceil(filteredTickets.length / ticketsPerPage);
 
-  const handlePageChange = (page) => setCurrentPage(page);
+  const handlePageChange = (page) => {
+    console.log("Incident: Page change", { page });
+    setCurrentPage(page);
+  };
 
   return (
     <div className="relative flex flex-col w-full p-2 min-h-screen sm:px-6 lg:px-8">
@@ -304,13 +358,23 @@ const Incident = ({ email, role }) => {
         <input
           type="text"
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={(e) => {
+            console.log("Incident: Search term changed", {
+              searchTerm: e.target.value,
+            });
+            setSearchTerm(e.target.value);
+          }}
           placeholder="Search incidents"
           className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-2 sm:mb-0"
         />
         <select
           value={ticketsPerPage}
-          onChange={(e) => setTicketsPerPage(Number(e.target.value))}
+          onChange={(e) => {
+            console.log("Incident: Tickets per page changed", {
+              ticketsPerPage: e.target.value,
+            });
+            setTicketsPerPage(Number(e.target.value));
+          }}
           className="w-full sm:w-32 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
         >
           <option value={10}>10 per page</option>
@@ -326,6 +390,7 @@ const Incident = ({ email, role }) => {
             <div className="mt-3 space-x-2">
               <button
                 onClick={() => {
+                  console.log("Incident: Retry fetch");
                   setError(null);
                   setLoading(true);
                   fetchTickets();
