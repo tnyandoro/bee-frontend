@@ -46,14 +46,16 @@ const IncidentOverview = () => {
       return false;
     }
 
+    // Comment out the API call to test without /verify (like Incident and CreateTicketPage)
+    /*
     isValidating.current = true;
     try {
-      console.log(`${new Date().toISOString()} Validating token`);
+      console.log(`${new Date().toISOString()} Validating token`, { token, subdomain });
       const response = await api.get("/verify");
-      console.log(
-        `${new Date().toISOString()} Token validation response:`,
-        response.data
-      );
+      console.log(`${new Date().toISOString()} Token validation response:`, {
+        status: response.status,
+        data: response.data,
+      });
       setRetryCount(0);
       return response.status === 200;
     } catch (err) {
@@ -61,14 +63,11 @@ const IncidentOverview = () => {
         message: err.message,
         status: err.response?.status,
         data: err.response?.data,
+        headers: err.response?.headers,
       });
       if (retryCount < maxRetries) {
         setRetryCount((prev) => prev + 1);
-        setError(
-          `Token validation failed. Retrying (${
-            retryCount + 1
-          }/${maxRetries})...`
-        );
+        setError(`Token validation failed. Retrying (${retryCount + 1}/${maxRetries})...`);
         setTimeout(() => {
           isValidating.current = false;
           validateToken();
@@ -83,6 +82,13 @@ const IncidentOverview = () => {
     } finally {
       isValidating.current = false;
     }
+    */
+
+    // Skip API validation, rely on useAuth like Incident and CreateTicketPage
+    console.log(
+      `${new Date().toISOString()} Skipping token validation, assuming auth valid`
+    );
+    return true;
   }, [api, token, subdomain, currentUser, retryCount, logout, navigate]);
 
   const fetchTickets = useCallback(
@@ -121,10 +127,10 @@ const IncidentOverview = () => {
             priority: priorityFilter || undefined,
           },
         });
-        console.log(
-          `${new Date().toISOString()} Tickets API response:`,
-          response.data
-        );
+        console.log(`${new Date().toISOString()} Tickets API response:`, {
+          status: response.status,
+          data: response.data,
+        });
         setTickets(response.data.tickets || []);
         setPagination(
           response.data.pagination || {
@@ -139,6 +145,7 @@ const IncidentOverview = () => {
           message: err.message,
           status: err.response?.status,
           data: err.response?.data,
+          headers: err.response?.headers,
         });
         let errorMsg = err.response?.data?.error || "Failed to fetch incidents";
         if (err.response?.status === 401) {
@@ -179,7 +186,11 @@ const IncidentOverview = () => {
   );
 
   useEffect(() => {
-    console.log(`${new Date().toISOString()} Starting fetchTickets`);
+    console.log(`${new Date().toISOString()} Starting fetchTickets`, {
+      token: !!token,
+      subdomain: !!subdomain,
+      currentUser: !!currentUser,
+    });
     if (token && subdomain && currentUser) {
       fetchTickets();
     } else {
@@ -226,6 +237,9 @@ const IncidentOverview = () => {
     try {
       console.log(`${new Date().toISOString()} Downloading export:`, url);
       const response = await api.get(url, { responseType: "blob" });
+      console.log(`${new Date().toISOString()} Export response:`, {
+        status: response.status,
+      });
       const blob = response.data;
       const filename = `incidents-${new Date().toISOString()}.${format}`;
       const downloadUrl = URL.createObjectURL(blob);
@@ -238,7 +252,11 @@ const IncidentOverview = () => {
       a.remove();
       URL.revokeObjectURL(downloadUrl);
     } catch (error) {
-      console.error(`${new Date().toISOString()} Export error:`, error);
+      console.error(`${new Date().toISOString()} Export error:`, {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+      });
       setError("Export failed. Please try again.");
     }
   };
