@@ -7,6 +7,7 @@ const PrivateRoute = ({ children, allowedRoles = [] }) => {
   const location = useLocation();
 
   console.log("PrivateRoute:", {
+    path: location.pathname,
     currentUser,
     loading,
     error,
@@ -22,14 +23,17 @@ const PrivateRoute = ({ children, allowedRoles = [] }) => {
     );
   }
 
-  // Handle session expiration or unauthorized errors early
+  // Handle session expiration or unauthorized errors
   if (error) {
     const sessionExpired = error.toLowerCase().includes("expired");
     const isUnauthorized = error.toLowerCase().includes("unauthorized");
     if (sessionExpired || isUnauthorized) {
-      console.log(
+      console.warn(
         "PrivateRoute: Session expired or unauthorized, redirecting to /login",
-        { error }
+        {
+          error,
+          path: location.pathname,
+        }
       );
       return (
         <Navigate
@@ -42,13 +46,17 @@ const PrivateRoute = ({ children, allowedRoles = [] }) => {
         />
       );
     }
-    // Log other errors but do not block route
-    console.warn("PrivateRoute: Non-critical error, proceeding", { error });
+    console.warn("PrivateRoute: Non-critical error, proceeding", {
+      error,
+      path: location.pathname,
+    });
   }
 
   // If no authenticated user, redirect to login
   if (!currentUser) {
-    console.log("PrivateRoute: No user, redirecting to /login");
+    console.warn("PrivateRoute: No user, redirecting to /login", {
+      path: location.pathname,
+    });
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
@@ -56,18 +64,23 @@ const PrivateRoute = ({ children, allowedRoles = [] }) => {
   if (allowedRoles.length > 0) {
     const hasAccess =
       allowedRoles.includes(currentUser.role) ||
-      (allowedRoles.includes("admin") && isAdmin);
-
+      (isAdmin && allowedRoles.includes("admin"));
     if (!hasAccess) {
-      console.log("PrivateRoute: Access denied, redirecting to /forbidden", {
+      console.warn("PrivateRoute: Access denied, redirecting to /forbidden", {
         userRole: currentUser.role,
         allowedRoles,
+        isAdmin,
+        path: location.pathname,
       });
       return <Navigate to="/forbidden" state={{ from: location }} replace />;
     }
   }
 
-  // User is authenticated and authorized; render children
+  // User is authenticated and authorized
+  console.log("PrivateRoute: Access granted", {
+    userRole: currentUser.role,
+    path: location.pathname,
+  });
   return children;
 };
 
