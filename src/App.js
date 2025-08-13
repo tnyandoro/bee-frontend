@@ -6,11 +6,9 @@ import {
   Navigate,
   useLocation,
 } from "react-router-dom";
-
 import FullPageLoader from "./components/FullPageLoader";
 import { useAuth } from "./contexts/authContext";
-
-import Home from "./components/home";
+import Home from "./components/Home";
 import Header from "./components/Header";
 import Login from "./components/Login";
 import ResetPassword from "./components/ResetPassword";
@@ -30,31 +28,39 @@ import Profile from "./components/Profile";
 import CreateUserForm from "./components/CreateUserForm";
 import AdminDashboard from "./components/AdminDashboard";
 
-// Custom wrapper to handle route-based loading
 const AppWrapper = () => {
   const location = useLocation();
   const [loading, setLoading] = useState(false);
   const { currentUser, isAuthenticated, logout, subdomain } = useAuth();
 
   useEffect(() => {
+    console.log("AppWrapper: Route changed", {
+      path: location.pathname,
+      currentUser,
+      isAuthenticated,
+    });
     setLoading(true);
-    const timeout = setTimeout(() => {
-      setLoading(false);
-    }, 600); // adjust duration based on load feel
-
+    const timeout = setTimeout(() => setLoading(false), 600);
     return () => clearTimeout(timeout);
   }, [location.pathname]);
 
   const handleLogout = () => {
+    console.log("AppWrapper: Logging out", { currentUser });
     logout();
+    window.location.href = "/login"; // Force reload to clear state
   };
+
+  console.log("AppWrapper: Rendering", {
+    path: location.pathname,
+    isAuthenticated,
+    currentUser,
+  });
 
   return (
     <>
       {loading && <FullPageLoader />}
-
       <div className="App min-h-screen flex flex-col">
-        {isAuthenticated && (
+        {isAuthenticated && currentUser && (
           <>
             <Header />
             <Navbar
@@ -77,20 +83,32 @@ const AppWrapper = () => {
             />
           </>
         )}
-
-        {/* Adjusted layout so content doesn't go under sidebar */}
-        <div className={isAuthenticated ? "ml-64 pt-16 px-4 flex-1" : "flex-1"}>
+        <div
+          className={
+            isAuthenticated && currentUser
+              ? "ml-64 pt-16 px-4 flex-1"
+              : "flex-1"
+          }
+        >
           <Routes>
             <Route
               path="/"
               element={
-                isAuthenticated ? <Navigate to="/dashboard" /> : <Home />
+                isAuthenticated && currentUser ? (
+                  <Navigate to="/dashboard" />
+                ) : (
+                  <Home />
+                )
               }
             />
             <Route
               path="/login"
               element={
-                isAuthenticated ? <Navigate to="/dashboard" /> : <Login />
+                isAuthenticated && currentUser ? (
+                  <Navigate to="/dashboard" />
+                ) : (
+                  <Login />
+                )
               }
             />
             <Route path="/admin/register" element={<AdminRegister />} />
@@ -295,9 +313,14 @@ const AppWrapper = () => {
               }
             />
             <Route path="/home" element={<Home loggedIn={isAuthenticated} />} />
-            <Route path="*" element={<Navigate to="/login" />} />
             <Route path="/forgot-password" element={<ResetPassword />} />
             <Route path="/reset-password/:token" element={<ResetPassword />} />
+            <Route
+              path="*"
+              element={
+                <div className="text-red-500 text-center">Page Not Found</div>
+              }
+            />
           </Routes>
         </div>
       </div>
