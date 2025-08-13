@@ -333,5 +333,5 @@ const App = () => (
     <AppWrapper />
   </Router>
 );
-// This is the main entry point for the application
+// This is the main entry point for the application update
 export default App;
