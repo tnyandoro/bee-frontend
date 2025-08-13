@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import ResolveTicket from "./ResolveTicket";
 import createApiInstance from "../utils/api";
@@ -21,75 +27,13 @@ const IncidentOverview = () => {
   const [teamFilter, setTeamFilter] = useState("");
   const [assigneeFilter, setAssigneeFilter] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("");
-  const [retryCount, setRetryCount] = useState(0);
-  const maxRetries = 3;
   const isFetching = useRef(false);
-  const isValidating = useRef(false);
 
-  const api = createApiInstance(token, subdomain);
-
-  const validateToken = useCallback(async () => {
-    if (isValidating.current) {
-      console.log(
-        `${new Date().toISOString()} Token validation already in progress, skipping`
-      );
-      return false;
-    }
-
-    if (!token || !subdomain || !currentUser) {
-      console.warn(`${new Date().toISOString()} Missing auth data`, {
-        token,
-        subdomain,
-        currentUser,
-      });
-      setError("Please log in to view incidents.");
-      return false;
-    }
-
-    // Comment out the API call to test without /verify (like Incident and CreateTicketPage)
-    /*
-    isValidating.current = true;
-    try {
-      console.log(`${new Date().toISOString()} Validating token`, { token, subdomain });
-      const response = await api.get("/verify");
-      console.log(`${new Date().toISOString()} Token validation response:`, {
-        status: response.status,
-        data: response.data,
-      });
-      setRetryCount(0);
-      return response.status === 200;
-    } catch (err) {
-      console.error(`${new Date().toISOString()} Token validation failed:`, {
-        message: err.message,
-        status: err.response?.status,
-        data: err.response?.data,
-        headers: err.response?.headers,
-      });
-      if (retryCount < maxRetries) {
-        setRetryCount((prev) => prev + 1);
-        setError(`Token validation failed. Retrying (${retryCount + 1}/${maxRetries})...`);
-        setTimeout(() => {
-          isValidating.current = false;
-          validateToken();
-        }, 3000 * (retryCount + 1));
-        return false;
-      } else {
-        setError("Session expired or server unreachable. Please log in again.");
-        logout();
-        navigate("/login", { replace: true });
-        return false;
-      }
-    } finally {
-      isValidating.current = false;
-    }
-    */
-
-    // Skip API validation, rely on useAuth like Incident and CreateTicketPage
-    console.log(
-      `${new Date().toISOString()} Skipping token validation, assuming auth valid`
-    );
-    return true;
-  }, [api, token, subdomain, currentUser, retryCount, logout, navigate]);
+  // Memoize the API instance to prevent recreation on every render
+  const api = useMemo(
+    () => createApiInstance(token, subdomain),
+    [token, subdomain]
+  );
 
   const fetchTickets = useCallback(
     async (page = 1) => {
@@ -100,16 +44,22 @@ const IncidentOverview = () => {
         return;
       }
 
+      if (!token || !subdomain || !currentUser) {
+        console.warn(`${new Date().toISOString()} Missing auth data`, {
+          token,
+          subdomain,
+          currentUser,
+        });
+        setError("Please log in to view incidents.");
+        setLoading(false);
+        logout();
+        navigate("/login", { replace: true });
+        return;
+      }
+
       isFetching.current = true;
       setLoading(true);
       setError(null);
-
-      const isTokenValid = await validateToken();
-      if (!isTokenValid) {
-        isFetching.current = false;
-        setLoading(false);
-        return;
-      }
 
       try {
         console.log(
@@ -139,7 +89,6 @@ const IncidentOverview = () => {
             total_entries: response.data.tickets?.length || 0,
           }
         );
-        setRetryCount(0);
       } catch (err) {
         console.error(`${new Date().toISOString()} Fetch tickets error:`, {
           message: err.message,
@@ -149,21 +98,9 @@ const IncidentOverview = () => {
         });
         let errorMsg = err.response?.data?.error || "Failed to fetch incidents";
         if (err.response?.status === 401) {
-          if (retryCount < maxRetries) {
-            setRetryCount((prev) => prev + 1);
-            setError(
-              `Fetch failed. Retrying (${retryCount + 1}/${maxRetries})...`
-            );
-            setTimeout(() => {
-              isFetching.current = false;
-              fetchTickets(page);
-            }, 3000 * (retryCount + 1));
-            return;
-          } else {
-            errorMsg = "Session expired. Please log in again.";
-            logout();
-            navigate("/login", { replace: true });
-          }
+          errorMsg = "Session expired. Please log in again.";
+          logout();
+          navigate("/login", { replace: true });
         }
         setError(errorMsg);
       } finally {
@@ -178,26 +115,21 @@ const IncidentOverview = () => {
       teamFilter,
       assigneeFilter,
       priorityFilter,
-      validateToken,
-      retryCount,
+      token,
+      currentUser,
       logout,
       navigate,
     ]
   );
 
   useEffect(() => {
-    console.log(`${new Date().toISOString()} Starting fetchTickets`, {
+    console.log(`${new Date().toISOString()} Initializing IncidentOverview`, {
       token: !!token,
       subdomain: !!subdomain,
       currentUser: !!currentUser,
     });
-    if (token && subdomain && currentUser) {
-      fetchTickets();
-    } else {
-      setError("Please log in to view incidents.");
-      setLoading(false);
-    }
-  }, [fetchTickets, token, subdomain, currentUser]);
+    fetchTickets();
+  }, [fetchTickets]);
 
   const handleResolveClick = (ticket) => {
     console.log(
@@ -305,7 +237,6 @@ const IncidentOverview = () => {
                 console.log(`${new Date().toISOString()} Retrying fetch`);
                 setError(null);
                 setLoading(true);
-                setRetryCount(0);
                 fetchTickets(pagination.current_page);
               }}
               className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
