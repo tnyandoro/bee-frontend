@@ -6,16 +6,19 @@ const PrivateRoute = ({ children, allowedRoles = [] }) => {
   const { currentUser, loading, error, isAdmin } = useAuth();
   const location = useLocation();
 
-  console.log("PrivateRoute:", {
+  console.log("PrivateRoute: State", {
     path: location.pathname,
-    currentUser,
+    currentUser: currentUser || "null",
     loading,
-    error,
-    isAdmin,
+    error: error || "null",
+    isAdmin: isAdmin || "false",
     allowedRoles,
   });
 
   if (loading) {
+    console.log("PrivateRoute: Loading state, rendering spinner", {
+      path: location.pathname,
+    });
     return (
       <div className="flex justify-center items-center h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
@@ -23,7 +26,6 @@ const PrivateRoute = ({ children, allowedRoles = [] }) => {
     );
   }
 
-  // Handle session expiration or unauthorized errors
   if (error) {
     const sessionExpired = error.toLowerCase().includes("expired");
     const isUnauthorized = error.toLowerCase().includes("unauthorized");
@@ -52,7 +54,6 @@ const PrivateRoute = ({ children, allowedRoles = [] }) => {
     });
   }
 
-  // If no authenticated user, redirect to login
   if (!currentUser) {
     console.warn("PrivateRoute: No user, redirecting to /login", {
       path: location.pathname,
@@ -60,14 +61,13 @@ const PrivateRoute = ({ children, allowedRoles = [] }) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // If allowedRoles are specified, check user role
   if (allowedRoles.length > 0) {
     const hasAccess =
       allowedRoles.includes(currentUser.role) ||
       (isAdmin && allowedRoles.includes("admin"));
     if (!hasAccess) {
       console.warn("PrivateRoute: Access denied, redirecting to /forbidden", {
-        userRole: currentUser.role,
+        userRole: currentUser.role || "unknown",
         allowedRoles,
         isAdmin,
         path: location.pathname,
@@ -76,9 +76,8 @@ const PrivateRoute = ({ children, allowedRoles = [] }) => {
     }
   }
 
-  // User is authenticated and authorized
   console.log("PrivateRoute: Access granted", {
-    userRole: currentUser.role,
+    userRole: currentUser.role || "unknown",
     path: location.pathname,
   });
   return children;
