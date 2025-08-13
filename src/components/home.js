@@ -67,7 +67,7 @@ const Home = () => {
         </button>
       </div>
 
-      {/* Informational Cards yes */}
+      {/* Informational Cards ping */}
       <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto mt-16 px-4">
         <div className="bg-white rounded-lg shadow-md p-6 text-center">
           <h3 className="text-lg font-bold mb-4">What is ITSM?</h3>
