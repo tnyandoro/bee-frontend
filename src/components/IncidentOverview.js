@@ -21,11 +21,21 @@ const IncidentOverview = () => {
   const [teamFilter, setTeamFilter] = useState("");
   const [assigneeFilter, setAssigneeFilter] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("");
+  const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 3;
   const isFetching = useRef(false);
+  const isValidating = useRef(false);
 
   const api = createApiInstance(token, subdomain);
 
   const validateToken = useCallback(async () => {
+    if (isValidating.current) {
+      console.log(
+        `${new Date().toISOString()} Token validation already in progress, skipping`
+      );
+      return false;
+    }
+
     if (!token || !subdomain || !currentUser) {
       console.warn(`${new Date().toISOString()} Missing auth data`, {
         token,
@@ -33,29 +43,47 @@ const IncidentOverview = () => {
         currentUser,
       });
       setError("Please log in to view incidents.");
-      logout();
-      navigate("/login", { replace: true });
       return false;
     }
 
+    isValidating.current = true;
     try {
+      console.log(`${new Date().toISOString()} Validating token`);
       const response = await api.get("/verify");
       console.log(
         `${new Date().toISOString()} Token validation response:`,
         response.data
       );
+      setRetryCount(0);
       return response.status === 200;
     } catch (err) {
-      console.error(
-        `${new Date().toISOString()} Token validation failed:`,
-        err
-      );
-      setError("Session expired or server unreachable. Please log in again.");
-      logout();
-      navigate("/login", { replace: true });
-      return false;
+      console.error(`${new Date().toISOString()} Token validation failed:`, {
+        message: err.message,
+        status: err.response?.status,
+        data: err.response?.data,
+      });
+      if (retryCount < maxRetries) {
+        setRetryCount((prev) => prev + 1);
+        setError(
+          `Token validation failed. Retrying (${
+            retryCount + 1
+          }/${maxRetries})...`
+        );
+        setTimeout(() => {
+          isValidating.current = false;
+          validateToken();
+        }, 3000 * (retryCount + 1));
+        return false;
+      } else {
+        setError("Session expired or server unreachable. Please log in again.");
+        logout();
+        navigate("/login", { replace: true });
+        return false;
+      }
+    } finally {
+      isValidating.current = false;
     }
-  }, [api, token, subdomain, currentUser, logout, navigate]);
+  }, [api, token, subdomain, currentUser, retryCount, logout, navigate]);
 
   const fetchTickets = useCallback(
     async (page = 1) => {
@@ -105,13 +133,30 @@ const IncidentOverview = () => {
             total_entries: response.data.tickets?.length || 0,
           }
         );
+        setRetryCount(0);
       } catch (err) {
-        console.error(`${new Date().toISOString()} Fetch tickets error:`, err);
+        console.error(`${new Date().toISOString()} Fetch tickets error:`, {
+          message: err.message,
+          status: err.response?.status,
+          data: err.response?.data,
+        });
         let errorMsg = err.response?.data?.error || "Failed to fetch incidents";
         if (err.response?.status === 401) {
-          errorMsg = "Session expired. Please log in again.";
-          logout();
-          navigate("/login", { replace: true });
+          if (retryCount < maxRetries) {
+            setRetryCount((prev) => prev + 1);
+            setError(
+              `Fetch failed. Retrying (${retryCount + 1}/${maxRetries})...`
+            );
+            setTimeout(() => {
+              isFetching.current = false;
+              fetchTickets(page);
+            }, 3000 * (retryCount + 1));
+            return;
+          } else {
+            errorMsg = "Session expired. Please log in again.";
+            logout();
+            navigate("/login", { replace: true });
+          }
         }
         setError(errorMsg);
       } finally {
@@ -127,6 +172,7 @@ const IncidentOverview = () => {
       assigneeFilter,
       priorityFilter,
       validateToken,
+      retryCount,
       logout,
       navigate,
     ]
@@ -134,8 +180,13 @@ const IncidentOverview = () => {
 
   useEffect(() => {
     console.log(`${new Date().toISOString()} Starting fetchTickets`);
-    fetchTickets();
-  }, [fetchTickets]);
+    if (token && subdomain && currentUser) {
+      fetchTickets();
+    } else {
+      setError("Please log in to view incidents.");
+      setLoading(false);
+    }
+  }, [fetchTickets, token, subdomain, currentUser]);
 
   const handleResolveClick = (ticket) => {
     console.log(
@@ -236,6 +287,7 @@ const IncidentOverview = () => {
                 console.log(`${new Date().toISOString()} Retrying fetch`);
                 setError(null);
                 setLoading(true);
+                setRetryCount(0);
                 fetchTickets(pagination.current_page);
               }}
               className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
@@ -243,7 +295,11 @@ const IncidentOverview = () => {
               Retry
             </button>
             <button
-              onClick={() => navigate("/login")}
+              onClick={() => {
+                console.log(`${new Date().toISOString()} Navigating to login`);
+                logout();
+                navigate("/login", { replace: true });
+              }}
               className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
             >
               Back to Login
