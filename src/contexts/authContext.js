@@ -32,7 +32,7 @@ const getApiBaseUrl = () => {
     process.env.REACT_APP_API_BASE_URL ||
     (process.env.NODE_ENV === "development"
       ? "/api/v1"
-      : "https://itsm-api.onrender.com/api/v1")
+      : "https://itsm-lb-223501087.us-east-1.elb.amazonaws.com:3000//api/v1")
   );
 };
 

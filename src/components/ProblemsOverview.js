@@ -23,7 +23,7 @@ const ProblemsOverview = () => {
 
   const baseUrl = isLocalhost
     ? `http://${subdomain || "subdomain"}.lvh.me:3000/api/v1`
-    : `https://itsm-api.onrender.com/api/v1`;
+    : `https://itsm-lb-223501087.us-east-1.elb.amazonaws.com:3000//api/v1`;
 
   const fetchProblems = useCallback(async () => {
     if (!token || !subdomain) {

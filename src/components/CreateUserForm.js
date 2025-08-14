@@ -86,7 +86,7 @@ const CreateUserForm = ({ onClose }) => {
     setStatus({ loading: true, error: null, success: false });
 
     try {
-      const url = `https://itsm-api.onrender.com/api/v1/organizations/${subdomain}/users`;
+      const url = `https://itsm-lb-223501087.us-east-1.elb.amazonaws.com:3000//api/v1/organizations/${subdomain}/users`;
       const formDataToSend = new FormData();
 
       // Append form data
