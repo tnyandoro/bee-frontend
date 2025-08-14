@@ -6,7 +6,7 @@ import React, {
   useMemo,
 } from "react";
 import { useNavigate } from "react-router-dom";
-import useAuth from "../hooks/useAuth";
+import { useAuth } from "../contexts/authContext";
 import createApiInstance from "../utils/api";
 
 const CreateProblems = () => {
@@ -33,17 +33,17 @@ const CreateProblems = () => {
   const [tickets, setTickets] = useState([]);
   const [teams, setTeams] = useState([]);
   const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const isCheckingAuth = useRef(false);
   const isFetching = useRef(false);
-  const isMounted = useRef(false);
 
-  // Memoize the API instance
-  const api = useMemo(
-    () => createApiInstance(token, subdomain),
-    [token, subdomain]
-  );
+  // Memoize the API instance only after auth is verified
+  const api = useMemo(() => {
+    if (!token || !subdomain || !currentUser) return null;
+    return createApiInstance(token, subdomain);
+  }, [token, subdomain, currentUser]);
 
   // Log renders
   const renderCount = useRef(0);
@@ -61,49 +61,54 @@ const CreateProblems = () => {
     });
   });
 
-  // Check auth, inspired by CreateTicketPage
+  // Check auth, modeled after CreateTicketPage
   const checkAuth = useCallback(() => {
-    if (isFetching.current) {
+    if (isCheckingAuth.current) {
       console.log(
-        `${new Date().toISOString()} Auth check in progress, skipping`
+        `${new Date().toISOString()} Auth check already in progress, skipping`
       );
       return false;
     }
 
-    isFetching.current = true;
-    if (!token || !subdomain || !currentUser || !api) {
+    isCheckingAuth.current = true;
+    setLoading(true);
+    setError(null);
+
+    if (!token || !subdomain || !currentUser) {
       console.warn(`${new Date().toISOString()} Missing auth data`, {
         token: !!token,
         subdomain: !!subdomain,
         currentUser: !!currentUser,
-        api: !!api,
         isAdmin,
       });
       setError("Please log in to create a problem.");
       logout();
       navigate("/login", { replace: true });
+      isCheckingAuth.current = false;
+      setLoading(false);
       return false;
     }
+
     console.log(`${new Date().toISOString()} Auth check passed`, {
       subdomain,
       currentUser,
       isAdmin,
     });
     setError(null);
-    isFetching.current = false;
+    isCheckingAuth.current = false;
+    setLoading(false);
     return true;
-  }, [token, subdomain, currentUser, isAdmin, api, logout, navigate]);
+  }, [token, subdomain, currentUser, isAdmin, logout, navigate]);
 
   // Fetch tickets, teams, and users
   const fetchProblems = useCallback(async () => {
-    if (isFetching.current) {
-      console.log(
-        `${new Date().toISOString()} Fetch already in progress, skipping`
-      );
+    if (isFetching.current || !api) {
+      console.log(`${new Date().toISOString()} Fetch skipped`, {
+        isFetching: isFetching.current,
+        api: !!api,
+      });
       return;
     }
-
-    if (!checkAuth()) return;
 
     isFetching.current = true;
     setLoading(true);
@@ -166,17 +171,10 @@ const CreateProblems = () => {
       setLoading(false);
       isFetching.current = false;
     }
-  }, [api, subdomain, checkAuth, logout, navigate]);
+  }, [api, subdomain, logout, navigate]);
 
   useEffect(() => {
-    if (isMounted.current) return;
-    isMounted.current = true;
-    console.log(`${new Date().toISOString()} Initializing CreateProblems`, {
-      token: !!token,
-      subdomain: !!subdomain,
-      currentUser: !!currentUser,
-      isAdmin,
-    });
+    console.log(`${new Date().toISOString()} Starting auth check`);
     if (checkAuth()) {
       fetchProblems();
     }
@@ -205,7 +203,7 @@ const CreateProblems = () => {
   const handleSubmit = useCallback(
     async (e) => {
       e.preventDefault();
-      if (!checkAuth()) return;
+      if (!api || !checkAuth()) return;
 
       setError(null);
       setShowSuccessModal(false);
@@ -247,12 +245,12 @@ const CreateProblems = () => {
         setLoading(false);
       }
     },
-    [api, formData, fetchProblems]
+    [api, formData, fetchProblems, checkAuth]
   );
 
   const handleResolve = useCallback(
     async (ticketId) => {
-      if (!checkAuth()) return;
+      if (!api || !checkAuth()) return;
 
       try {
         setLoading(true);
@@ -283,7 +281,7 @@ const CreateProblems = () => {
         setLoading(false);
       }
     },
-    [api, subdomain, fetchProblems]
+    [api, subdomain, fetchProblems, checkAuth]
   );
 
   const handleEdit = useCallback((ticket) => {
@@ -339,6 +337,17 @@ const CreateProblems = () => {
     [tickets]
   );
 
+  if (loading) {
+    return (
+      <div className="p-4 flex justify-center items-center h-64">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-2"></div>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (error) {
     return (
       <div className="p-4 max-w-2xl mx-auto">
@@ -348,10 +357,10 @@ const CreateProblems = () => {
           <div className="mt-3 space-x-2">
             <button
               onClick={() => {
-                console.log(`${new Date().toISOString()} Retrying fetch`);
+                console.log(`${new Date().toISOString()} Retrying auth check`);
                 setError(null);
                 setLoading(true);
-                fetchProblems();
+                checkAuth();
               }}
               className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
             >
