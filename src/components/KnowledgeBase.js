@@ -78,7 +78,9 @@ const Knowledgebase = () => {
         if (retryCount < maxRetries) {
           setRetryCount((prev) => prev + 1);
           setError(
-            `Fetch failed. Retrying (${retryCount + 1}/${maxRetries})...`
+            `Authentication failed. Retrying (${
+              retryCount + 1
+            }/${maxRetries})...`
           );
           setTimeout(() => {
             isFetching.current = false;
@@ -90,6 +92,8 @@ const Knowledgebase = () => {
           logout();
           navigate("/login", { replace: true });
         }
+      } else if (err.response?.status === 404) {
+        errorMsg = "Knowledgebase data is not available for this organization.";
       }
       setError(errorMsg);
     } finally {
