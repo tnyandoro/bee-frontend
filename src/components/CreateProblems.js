@@ -37,6 +37,7 @@ const CreateProblems = () => {
   const [error, setError] = useState(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const isFetching = useRef(false);
+  const isMounted = useRef(false);
 
   // Memoize the API instance
   const api = useMemo(
@@ -66,30 +67,32 @@ const CreateProblems = () => {
       console.log(
         `${new Date().toISOString()} Auth check in progress, skipping`
       );
-      return;
+      return false;
     }
 
     isFetching.current = true;
-    if (!token || !subdomain || !currentUser) {
+    if (!token || !subdomain || !currentUser || !api) {
       console.warn(`${new Date().toISOString()} Missing auth data`, {
         token: !!token,
         subdomain: !!subdomain,
         currentUser: !!currentUser,
+        api: !!api,
         isAdmin,
       });
       setError("Please log in to create a problem.");
       logout();
       navigate("/login", { replace: true });
-    } else {
-      console.log(`${new Date().toISOString()} Auth check passed`, {
-        subdomain,
-        currentUser,
-        isAdmin,
-      });
-      setError(null);
+      return false;
     }
+    console.log(`${new Date().toISOString()} Auth check passed`, {
+      subdomain,
+      currentUser,
+      isAdmin,
+    });
+    setError(null);
     isFetching.current = false;
-  }, [token, subdomain, currentUser, isAdmin, logout, navigate]);
+    return true;
+  }, [token, subdomain, currentUser, isAdmin, api, logout, navigate]);
 
   // Fetch tickets, teams, and users
   const fetchProblems = useCallback(async () => {
@@ -100,18 +103,7 @@ const CreateProblems = () => {
       return;
     }
 
-    if (!token || !subdomain || !currentUser) {
-      console.warn(`${new Date().toISOString()} Missing auth data`, {
-        token: !!token,
-        subdomain: !!subdomain,
-        currentUser: !!currentUser,
-        isAdmin,
-      });
-      setError("Please log in to create a problem.");
-      logout();
-      navigate("/login", { replace: true });
-      return;
-    }
+    if (!checkAuth()) return;
 
     isFetching.current = true;
     setLoading(true);
@@ -174,20 +166,21 @@ const CreateProblems = () => {
       setLoading(false);
       isFetching.current = false;
     }
-  }, [api, token, subdomain, currentUser, isAdmin, logout, navigate]);
+  }, [api, subdomain, checkAuth, logout, navigate]);
 
   useEffect(() => {
+    if (isMounted.current) return;
+    isMounted.current = true;
     console.log(`${new Date().toISOString()} Initializing CreateProblems`, {
       token: !!token,
       subdomain: !!subdomain,
       currentUser: !!currentUser,
       isAdmin,
     });
-    checkAuth();
-    if (!error) {
+    if (checkAuth()) {
       fetchProblems();
     }
-  }, [checkAuth, fetchProblems, error]);
+  }, [checkAuth, fetchProblems]);
 
   const handleChange = useCallback(
     (e) => {
@@ -212,12 +205,7 @@ const CreateProblems = () => {
   const handleSubmit = useCallback(
     async (e) => {
       e.preventDefault();
-      if (!token || !subdomain || !currentUser) {
-        setError("Authentication required. Please log in.");
-        logout();
-        navigate("/login", { replace: true });
-        return;
-      }
+      if (!checkAuth()) return;
 
       setError(null);
       setShowSuccessModal(false);
@@ -259,20 +247,13 @@ const CreateProblems = () => {
         setLoading(false);
       }
     },
-    [
-      api,
-      token,
-      subdomain,
-      currentUser,
-      formData,
-      fetchProblems,
-      logout,
-      navigate,
-    ]
+    [api, formData, fetchProblems]
   );
 
   const handleResolve = useCallback(
     async (ticketId) => {
+      if (!checkAuth()) return;
+
       try {
         setLoading(true);
         console.log(`${new Date().toISOString()} Resolving problem`, {
@@ -403,19 +384,6 @@ const CreateProblems = () => {
     );
   }
 
-  if (loading) {
-    return (
-      <div className="p-4 flex justify-center items-center h-64">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-2"></div>
-          <p>
-            Loading problems... First load may take up to 30s if server is idle.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="bg-gray-200 container mx-auto p-1 relative">
       <div className="px-2 bg-gray-100 shadow-lg rounded-lg">
@@ -426,6 +394,18 @@ const CreateProblems = () => {
             service or system.
           </p>
         </div>
+
+        {loading && (
+          <div className="p-4 flex justify-center items-center">
+            <div className="text-center">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-2"></div>
+              <p>
+                Loading problems... First load may take up to 30s if server is
+                idle.
+              </p>
+            </div>
+          </div>
+        )}
 
         <form
           className="problem-form shadow-md rounded-lg p-4 bg-white"
@@ -751,5 +731,5 @@ const CreateProblems = () => {
     </div>
   );
 };
-// fix
+
 export default CreateProblems;
