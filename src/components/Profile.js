@@ -1,4 +1,11 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/authContext";
 import { FaUser, FaLock, FaArrowLeft, FaEdit } from "react-icons/fa";
 import createApiInstance from "../utils/api";
@@ -44,7 +51,8 @@ const ProfilePictureUploader = ({ onUploadSuccess, uploading }) => {
 };
 
 const Profile = () => {
-  const { currentUser, token, subdomain, updateUser } = useAuth();
+  const { currentUser, token, subdomain, updateUser, logout } = useAuth();
+  const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -58,26 +66,90 @@ const Profile = () => {
     full_name: "",
     phone_number: "",
   });
-
-  // Create API instance once
-  const api = useRef(createApiInstance(token, subdomain)).current;
-
-  // Track whether fetchProfile has been called
+  const isCheckingAuth = useRef(false);
   const isFetching = useRef(false);
+
+  // Memoize the API instance only after auth is verified
+  const api = useMemo(() => {
+    if (!token || !subdomain || !currentUser) return null;
+    return createApiInstance(token, subdomain);
+  }, [token, subdomain, currentUser]);
+
+  // Log renders
+  const renderCount = useRef(0);
+  useEffect(() => {
+    renderCount.current += 1;
+    console.log(`${new Date().toISOString()} Profile rendered`, {
+      renderCount: renderCount.current,
+      path: window.location.pathname,
+      authState: {
+        token: !!token,
+        subdomain: !!subdomain,
+        currentUser: !!currentUser,
+      },
+    });
+  });
+
+  // Check auth, modeled after CreateTicketPage
+  const checkAuth = useCallback(() => {
+    if (isCheckingAuth.current) {
+      console.log(
+        `${new Date().toISOString()} Auth check already in progress, skipping`
+      );
+      return false;
+    }
+
+    isCheckingAuth.current = true;
+    setLoading(true);
+    setError(null);
+
+    if (!token || !subdomain || !currentUser) {
+      console.warn(`${new Date().toISOString()} Missing auth data`, {
+        token: !!token,
+        subdomain: !!subdomain,
+        currentUser: !!currentUser,
+      });
+      setError("Please log in to view your profile.");
+      logout();
+      navigate("/login", { replace: true });
+      isCheckingAuth.current = false;
+      setLoading(false);
+      return false;
+    }
+
+    console.log(`${new Date().toISOString()} Auth check passed`, {
+      subdomain,
+      currentUser,
+    });
+    setError(null);
+    isCheckingAuth.current = false;
+    setLoading(false);
+    return true;
+  }, [token, subdomain, currentUser, logout, navigate]);
 
   // Fetch profile data
   const fetchProfile = useCallback(async () => {
-    if (!token || !subdomain || isFetching.current) {
-      if (!token || !subdomain) {
-        setError("Please log in to view your profile.");
-      }
-      setLoading(false);
+    if (isFetching.current || !api) {
+      console.log(`${new Date().toISOString()} Fetch skipped`, {
+        isFetching: isFetching.current,
+        api: !!api,
+      });
       return;
     }
 
     isFetching.current = true;
+    setLoading(true);
+    setError(null);
+
     try {
+      console.log(`${new Date().toISOString()} Fetching profile data`, {
+        url: `/organizations/${subdomain}/profile`,
+      });
       const res = await api.get(`/organizations/${subdomain}/profile`);
+      console.log(`${new Date().toISOString()} Profile API response`, {
+        status: res.status,
+        data: res.data,
+      });
       setProfile(res.data);
       setProfilePicture(res.data.avatar_url || null);
       setFormData({
@@ -85,51 +157,80 @@ const Profile = () => {
         phone_number: res.data.phone_number || "",
       });
     } catch (err) {
-      const message = err.response?.data?.error || err.message;
-      setError("Failed to fetch profile data: " + message);
+      console.error(`${new Date().toISOString()} Fetch profile error`, {
+        message: err.message,
+        status: err.response?.status,
+        data: err.response?.data,
+      });
+      const message =
+        err.response?.data?.error || `Failed to load profile: ${err.message}`;
+      if (err.response?.status === 401) {
+        setError("Session expired. Please log in again.");
+        logout();
+        navigate("/login", { replace: true });
+      } else {
+        setError(message);
+      }
     } finally {
       setLoading(false);
       isFetching.current = false;
     }
-  }, [api, token, subdomain]);
-
-  // Fetch profile only once on mount or when token/subdomain changes
-  useEffect(() => {
-    fetchProfile();
-  }, [fetchProfile]);
+  }, [api, subdomain, logout, navigate]);
 
   // Handle avatar upload
-  const handleUploadSuccess = async (file) => {
-    if (!file || !currentUser || !token || !subdomain) return;
+  const handleUploadSuccess = useCallback(
+    async (file) => {
+      if (!file || !api || !checkAuth()) return;
 
-    setUploading(true);
-    const formData = new FormData();
-    formData.append("user[avatar]", file);
+      setUploading(true);
+      const formData = new FormData();
+      formData.append("user[avatar]", file);
 
-    try {
-      const response = await api.patch(
-        `/organizations/${subdomain}/users/${currentUser.id}`,
-        formData
-      );
+      try {
+        console.log(`${new Date().toISOString()} Uploading profile picture`, {
+          userId: currentUser.id,
+        });
+        const response = await api.patch(
+          `/organizations/${subdomain}/users/${currentUser.id}`,
+          formData
+        );
+        console.log(
+          `${new Date().toISOString()} Profile picture upload response`,
+          {
+            status: response.status,
+            data: response.data,
+          }
+        );
 
-      const newAvatarUrl = response.data.avatar_url;
-      if (newAvatarUrl) {
-        setProfilePicture(newAvatarUrl);
-        setProfile((prev) => ({ ...prev, avatar_url: newAvatarUrl }));
-        updateUser({ avatar_url: newAvatarUrl });
-        alert("Profile picture updated successfully!");
+        const newAvatarUrl = response.data.avatar_url;
+        if (newAvatarUrl) {
+          setProfilePicture(newAvatarUrl);
+          setProfile((prev) => ({ ...prev, avatar_url: newAvatarUrl }));
+          updateUser({ avatar_url: newAvatarUrl });
+          alert("Profile picture updated successfully!");
+        }
+      } catch (err) {
+        console.error(
+          `${new Date().toISOString()} Error uploading profile picture`,
+          {
+            message: err.message,
+            status: err.response?.status,
+            data: err.response?.data,
+          }
+        );
+        const message = err.response?.data?.error || "Upload failed.";
+        alert(message);
+      } finally {
+        setUploading(false);
       }
-    } catch (err) {
-      console.error("Error uploading profile picture:", err);
-      const message = err.response?.data?.error || "Upload failed.";
-      alert(message);
-    } finally {
-      setUploading(false);
-    }
-  };
+    },
+    [api, currentUser, subdomain, updateUser, checkAuth]
+  );
 
   // Change password
-  const handleChangePassword = async () => {
+  const handleChangePassword = useCallback(async () => {
+    if (!api || !checkAuth()) return;
+
     if (!newPassword || !confirmPassword) {
       alert("Please enter both new password and confirmation.");
       return;
@@ -141,50 +242,164 @@ const Profile = () => {
     }
 
     try {
+      console.log(`${new Date().toISOString()} Changing password`);
       await api.post("/password/update", {
         new_password: newPassword,
         confirm_password: confirmPassword,
       });
+      console.log(`${new Date().toISOString()} Password changed successfully`);
       alert("Password changed successfully!");
       setNewPassword("");
       setConfirmPassword("");
       setActiveTab("profile");
     } catch (err) {
+      console.error(`${new Date().toISOString()} Change password error`, {
+        message: err.message,
+        status: err.response?.status,
+        data: err.response?.data,
+      });
       const message = err.response?.data?.error || "Failed to change password.";
       alert(message);
     }
-  };
+  }, [api, newPassword, confirmPassword, checkAuth]);
 
   // Update profile
-  const handleUpdateProfile = async () => {
+  const handleUpdateProfile = useCallback(async () => {
+    if (!api || !checkAuth()) return;
+
     if (!formData.full_name || !formData.phone_number) {
       alert("Please fill in all required fields.");
       return;
     }
 
     try {
+      console.log(`${new Date().toISOString()} Updating profile`, { formData });
       const response = await api.patch(
         `/organizations/${subdomain}/users/${currentUser.id}`,
         { user: formData }
       );
+      console.log(`${new Date().toISOString()} Profile update response`, {
+        status: response.status,
+        data: response.data,
+      });
       setProfile((prev) => ({ ...prev, ...response.data }));
       updateUser(response.data);
       setEditMode(false);
       alert("Profile updated successfully!");
     } catch (err) {
+      console.error(`${new Date().toISOString()} Update profile error`, {
+        message: err.message,
+        status: err.response?.status,
+        data: err.response?.data,
+      });
       const message = err.response?.data?.error || "Failed to update profile.";
       alert(message);
     }
-  };
+  }, [api, formData, currentUser, subdomain, updateUser, checkAuth]);
 
-  const handleInputChange = (e) => {
+  const handleInputChange = useCallback((e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-  };
+  }, []);
 
-  if (loading) return <div className="p-4">Loading profile...</div>;
-  if (error) return <div className="p-4 text-red-500">{error}</div>;
-  if (!profile) return <div className="p-4">No profile data available.</div>;
+  useEffect(() => {
+    console.log(`${new Date().toISOString()} Starting auth check`);
+    if (checkAuth()) {
+      fetchProfile();
+    }
+  }, [checkAuth, fetchProfile]);
+
+  if (loading) {
+    return (
+      <div className="p-4 flex justify-center items-center h-64">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-2"></div>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 max-w-2xl mx-auto">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+          <h3 className="font-bold text-lg mb-2">Error</h3>
+          <p>{error}</p>
+          <div className="mt-3 space-x-2">
+            <button
+              onClick={() => {
+                console.log(`${new Date().toISOString()} Retrying auth check`);
+                setError(null);
+                setLoading(true);
+                checkAuth();
+              }}
+              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+            >
+              Retry
+            </button>
+            <button
+              onClick={() => {
+                console.log(`${new Date().toISOString()} Navigating to login`);
+                logout();
+                navigate("/login", { replace: true });
+              }}
+              className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+            >
+              Back to Login
+            </button>
+            <button
+              onClick={() => {
+                console.log(
+                  `${new Date().toISOString()} Navigating to dashboard`
+                );
+                navigate("/dashboard", { replace: true });
+              }}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Go to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="p-4 max-w-2xl mx-auto">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-yellow-700">
+          <h3 className="font-bold text-lg mb-2">No Profile Data</h3>
+          <p>No profile data available.</p>
+          <div className="mt-3 space-x-2">
+            <button
+              onClick={() => {
+                console.log(
+                  `${new Date().toISOString()} Retrying profile fetch`
+                );
+                setLoading(true);
+                fetchProfile();
+              }}
+              className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700"
+            >
+              Retry
+            </button>
+            <button
+              onClick={() => {
+                console.log(
+                  `${new Date().toISOString()} Navigating to dashboard`
+                );
+                navigate("/dashboard", { replace: true });
+              }}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Go to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const userData = profile || {};
   const isAdmin = ["system_admin", "domain_admin"].includes(userData.role);
@@ -217,7 +432,10 @@ const Profile = () => {
 
         <label
           className="flex items-center py-2 px-4 mb-2 bg-blue-700 hover:bg-blue-600 rounded cursor-pointer transition"
-          onClick={() => setActiveTab("profile")}
+          onClick={() => {
+            setActiveTab("profile");
+            setEditMode(false);
+          }}
         >
           <FaUser className="mr-2" /> My Profile
         </label>
@@ -229,7 +447,10 @@ const Profile = () => {
         </label>
         <label
           className="flex items-center py-2 px-4 mb-2 bg-blue-700 hover:bg-blue-600 rounded cursor-pointer transition"
-          onClick={() => setActiveTab("profile") && setEditMode(true)}
+          onClick={() => {
+            setActiveTab("profile");
+            setEditMode(true);
+          }}
         >
           <FaEdit className="mr-2" /> Edit Profile
         </label>
@@ -278,6 +499,7 @@ const Profile = () => {
               className="w-full p-2 border rounded mb-4"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
+              disabled={uploading}
             />
             <input
               type="password"
@@ -286,10 +508,12 @@ const Profile = () => {
               className="w-full p-2 border rounded mb-4"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
+              disabled={uploading}
             />
             <button
-              className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+              className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition disabled:bg-blue-400"
               onClick={handleChangePassword}
+              disabled={uploading}
             >
               Change Password
             </button>
@@ -306,6 +530,7 @@ const Profile = () => {
                   value={formData.full_name}
                   onChange={handleInputChange}
                   className="w-full p-2 border rounded"
+                  disabled={uploading}
                 />
               </div>
               <div className="flex flex-col items-start mb-2">
@@ -316,19 +541,22 @@ const Profile = () => {
                   value={formData.phone_number}
                   onChange={handleInputChange}
                   className="w-full p-2 border rounded"
+                  disabled={uploading}
                 />
               </div>
             </div>
             <div className="flex gap-2 mt-4">
               <button
-                className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+                className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition disabled:bg-blue-400"
                 onClick={handleUpdateProfile}
+                disabled={uploading}
               >
                 Save Changes
               </button>
               <button
-                className="w-full py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition"
+                className="w-full py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition disabled:bg-gray-400"
                 onClick={() => setEditMode(false)}
+                disabled={uploading}
               >
                 Cancel
               </button>
@@ -341,3 +569,4 @@ const Profile = () => {
 };
 
 export default Profile;
+// fix
