@@ -19,12 +19,22 @@ const Knowledgebase = () => {
   const [retryCount, setRetryCount] = useState(0);
   const maxRetries = 3;
   const isFetching = useRef(false);
+  const renderCount = useRef(0);
 
   // Memoize the API instance
   const api = useMemo(
     () => createApiInstance(token, subdomain),
     [token, subdomain]
   );
+
+  // Log render count for debugging
+  useEffect(() => {
+    renderCount.current += 1;
+    console.log(`${new Date().toISOString()} Knowledgebase rendered`, {
+      renderCount: renderCount.current,
+      path: window.location.pathname,
+    });
+  });
 
   // Fetch knowledgebase data
   const fetchKnowledgebase = useCallback(async () => {
@@ -72,8 +82,7 @@ const Knowledgebase = () => {
         data: err.response?.data,
         headers: err.response?.headers,
       });
-      let errorMsg =
-        err.response?.data?.error || "Failed to load knowledgebase";
+      let errorMsg = err.message || "Failed to load knowledgebase";
       if (err.response?.status === 401) {
         if (retryCount < maxRetries) {
           setRetryCount((prev) => prev + 1);
