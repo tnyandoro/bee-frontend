@@ -10,11 +10,11 @@ import createApiInstance from "../utils/api";
 import { useAuth } from "../contexts/authContext";
 
 const Knowledgebase = () => {
-  const { token, subdomain, currentUser, logout } = useAuth();
+  const { token, subdomain, currentUser, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [knowledgeData, setKnowledgeData] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Start false to show static data
   const [error, setError] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
   const maxRetries = 3;
@@ -27,12 +27,18 @@ const Knowledgebase = () => {
     [token, subdomain]
   );
 
-  // Log render count for debugging
+  // Log renders and auth state
   useEffect(() => {
     renderCount.current += 1;
     console.log(`${new Date().toISOString()} Knowledgebase rendered`, {
       renderCount: renderCount.current,
       path: window.location.pathname,
+      authState: {
+        token: !!token,
+        subdomain: !!subdomain,
+        currentUser: !!currentUser,
+        isAdmin,
+      },
     });
   });
 
@@ -50,9 +56,9 @@ const Knowledgebase = () => {
         token: !!token,
         subdomain: !!subdomain,
         currentUser: !!currentUser,
+        isAdmin,
       });
       setError("Please log in to view the knowledgebase.");
-      setLoading(false);
       logout();
       navigate("/login", { replace: true });
       return;
@@ -109,16 +115,66 @@ const Knowledgebase = () => {
       setLoading(false);
       isFetching.current = false;
     }
-  }, [api, token, subdomain, currentUser, retryCount, logout, navigate]);
+  }, [
+    api,
+    token,
+    subdomain,
+    currentUser,
+    isAdmin,
+    retryCount,
+    logout,
+    navigate,
+  ]);
+
+  // Check auth on mount, inspired by CreateTicketPage
+  const checkAuth = useCallback(() => {
+    if (isFetching.current) {
+      console.log(
+        `${new Date().toISOString()} Auth check in progress, skipping`
+      );
+      return;
+    }
+
+    isFetching.current = true;
+    if (!token || !subdomain || !currentUser) {
+      console.warn(`${new Date().toISOString()} Missing auth data`, {
+        token: !!token,
+        subdomain: !!subdomain,
+        currentUser: !!currentUser,
+        isAdmin,
+      });
+      setError("Please log in to view the knowledgebase.");
+      logout();
+      navigate("/login", { replace: true });
+    } else {
+      console.log(`${new Date().toISOString()} Auth check passed`, {
+        subdomain,
+        currentUser,
+        isAdmin,
+      });
+      setError(null);
+      fetchKnowledgebase();
+    }
+    isFetching.current = false;
+  }, [
+    token,
+    subdomain,
+    currentUser,
+    isAdmin,
+    logout,
+    navigate,
+    fetchKnowledgebase,
+  ]);
 
   useEffect(() => {
     console.log(`${new Date().toISOString()} Initializing Knowledgebase`, {
       token: !!token,
       subdomain: !!subdomain,
       currentUser: !!currentUser,
+      isAdmin,
     });
-    fetchKnowledgebase();
-  }, [fetchKnowledgebase]);
+    checkAuth();
+  }, [checkAuth]);
 
   // Filter data based on search term
   const filteredData = useMemo(
@@ -137,60 +193,171 @@ const Knowledgebase = () => {
     [knowledgeData, searchTerm]
   );
 
-  if (loading) {
+  // Always render static data, inspired by IncidentOverview
+  const renderStaticContent = () => (
+    <section className="mb-8 bg-white shadow-lg p-6 rounded-lg">
+      <h2 className="text-2xl font-bold mb-4 text-gray-800">
+        Service Level Targets
+      </h2>
+      <p className="mb-2 text-gray-600">
+        Last Modified on 09/04/2024 3:29 pm EDT
+      </p>
+      <p className="text-gray-700">
+        Our service level targets provide a framework for service expectations.
+        Resolver aims to deliver consistent support, balancing issue severity
+        with response time.
+      </p>
+      <p className="text-gray-700">
+        The problem’s severity determines the support team’s response speed and
+        method.
+      </p>
+
+      <h3 className="text-xl font-semibold mt-6 text-gray-800">
+        Severity Level Definitions
+      </h3>
+      <ul className="list-disc list-inside mt-2 text-gray-700">
+        <li>
+          <strong>Urgent:</strong> Time-critical application failure or
+          data-exposing security issue; system unusable with no workaround.
+        </li>
+        <li>
+          <strong>High:</strong> Significant impairment to key business
+          processes with no workaround.
+        </li>
+        <li>
+          <strong>Normal:</strong> General questions or minor issues; business
+          processes unaffected.
+        </li>
+        <li>
+          <strong>Low:</strong> Non-production updates or minor issues with no
+          production impact.
+        </li>
+      </ul>
+      <p className="mt-2 text-gray-600">
+        Max severity for non-production issues is Normal.
+      </p>
+
+      <h3 className="text-xl font-semibold mt-6 text-gray-800">
+        Response Time Targets
+      </h3>
+      <div className="overflow-x-auto">
+        <table className="min-w-full border-collapse border border-gray-300 mt-2">
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="border px-4 py-2 text-left text-gray-800">
+                Severity Level
+              </th>
+              <th className="border px-4 py-2 text-left text-gray-800">
+                Level of Effort
+              </th>
+              <th className="border px-4 py-2 text-left text-gray-800">
+                Initial Response
+              </th>
+              <th className="border px-4 py-2 text-left text-gray-800">
+                Status Updates
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="hover:bg-gray-50">
+              <td className="border px-4 py-2">Urgent</td>
+              <td className="border px-4 py-2">Continuous efforts, 24/7</td>
+              <td className="border px-4 py-2">1 hour</td>
+              <td className="border px-4 py-2">Every 4 hours, 24/7</td>
+            </tr>
+            <tr className="hover:bg-gray-50">
+              <td className="border px-4 py-2">High</td>
+              <td className="border px-4 py-2">
+                Continuous efforts, business hours
+              </td>
+              <td className="border px-4 py-2">2 hours</td>
+              <td className="border px-4 py-2">Within 1 workday</td>
+            </tr>
+            <tr className="hover:bg-gray-50">
+              <td className="border px-4 py-2">Normal</td>
+              <td className="border px-4 py-2">
+                Reasonable efforts, business hours
+              </td>
+              <td className="border px-4 py-2">4 hours</td>
+              <td className="border px-4 py-2">
+                Within 5 days of workaround or fix
+              </td>
+            </tr>
+            <tr className="hover:bg-gray-50">
+              <td className="border px-4 py-2">Low</td>
+              <td className="border px-4 py-2">
+                Reasonable efforts, business hours
+              </td>
+              <td className="border px-4 py-2">1 business day</td>
+              <td className="border px-4 py-2">In future release notes</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+
+  if (error) {
     return (
-      <div className="p-4 flex justify-center items-center h-64">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-2"></div>
-          <p>
-            Loading knowledgebase... First load may take up to 30s if server is
-            idle.
-          </p>
+      <div className="container mx-auto mt-28 p-4">
+        {renderStaticContent()}
+        <div className="p-4 max-w-2xl mx-auto">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+            <h3 className="font-bold text-lg mb-2">Error</h3>
+            <p>{error}</p>
+            <div className="mt-3 space-x-2">
+              <button
+                onClick={() => {
+                  console.log(`${new Date().toISOString()} Retrying fetch`);
+                  setError(null);
+                  setLoading(true);
+                  fetchKnowledgebase();
+                }}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+              >
+                Retry
+              </button>
+              <button
+                onClick={() => {
+                  console.log(
+                    `${new Date().toISOString()} Navigating to login`
+                  );
+                  logout();
+                  navigate("/login", { replace: true });
+                }}
+                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+              >
+                Back to Login
+              </button>
+              <button
+                onClick={() => {
+                  console.log(
+                    `${new Date().toISOString()} Navigating to dashboard`
+                  );
+                  navigate("/dashboard", { replace: true });
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Go to Dashboard
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
-  if (error) {
+  if (loading) {
     return (
-      <div className="p-4 max-w-2xl mx-auto">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-          <h3 className="font-bold text-lg mb-2">Error</h3>
-          <p>{error}</p>
-          <div className="mt-3 space-x-2">
-            <button
-              onClick={() => {
-                console.log(`${new Date().toISOString()} Retrying fetch`);
-                setError(null);
-                setLoading(true);
-                setRetryCount(0);
-                fetchKnowledgebase();
-              }}
-              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-            >
-              Retry
-            </button>
-            <button
-              onClick={() => {
-                console.log(`${new Date().toISOString()} Navigating to login`);
-                logout();
-                navigate("/login", { replace: true });
-              }}
-              className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
-            >
-              Back to Login
-            </button>
-            <button
-              onClick={() => {
-                console.log(
-                  `${new Date().toISOString()} Navigating to dashboard`
-                );
-                navigate("/dashboard", { replace: true });
-              }}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              Go to Dashboard
-            </button>
+      <div className="container mx-auto mt-28 p-4">
+        {renderStaticContent()}
+        <div className="p-4 flex justify-center items-center h-64">
+          <div className="text-center">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-2"></div>
+            <p>
+              Loading knowledgebase... First load may take up to 30s if server
+              is idle.
+            </p>
           </div>
         </div>
       </div>
@@ -199,109 +366,7 @@ const Knowledgebase = () => {
 
   return (
     <div className="container mx-auto mt-28 p-4">
-      {/* Service Level Targets Section */}
-      <section className="mb-8 bg-white shadow-lg p-6 rounded-lg">
-        <h2 className="text-2xl font-bold mb-4 text-gray-800">
-          Service Level Targets
-        </h2>
-        <p className="mb-2 text-gray-600">
-          Last Modified on 09/04/2024 3:29 pm EDT
-        </p>
-        <p className="text-gray-700">
-          Our service level targets provide a framework for service
-          expectations. Resolver aims to deliver consistent support, balancing
-          issue severity with response time.
-        </p>
-        <p className="text-gray-700">
-          The problem’s severity determines the support team’s response speed
-          and method.
-        </p>
-
-        <h3 className="text-xl font-semibold mt-6 text-gray-800">
-          Severity Level Definitions
-        </h3>
-        <ul className="list-disc list-inside mt-2 text-gray-700">
-          <li>
-            <strong>Urgent:</strong> Time-critical application failure or
-            data-exposing security issue; system unusable with no workaround.
-          </li>
-          <li>
-            <strong>High:</strong> Significant impairment to key business
-            processes with no workaround.
-          </li>
-          <li>
-            <strong>Normal:</strong> General questions or minor issues; business
-            processes unaffected.
-          </li>
-          <li>
-            <strong>Low:</strong> Non-production updates or minor issues with no
-            production impact.
-          </li>
-        </ul>
-        <p className="mt-2 text-gray-600">
-          Max severity for non-production issues is Normal.
-        </p>
-
-        <h3 className="text-xl font-semibold mt-6 text-gray-800">
-          Response Time Targets
-        </h3>
-        <div className="overflow-x-auto">
-          <table className="min-w-full border-collapse border border-gray-300 mt-2">
-            <thead>
-              <tr className="bg-gray-100">
-                <th className="border px-4 py-2 text-left text-gray-800">
-                  Severity Level
-                </th>
-                <th className="border px-4 py-2 text-left text-gray-800">
-                  Level of Effort
-                </th>
-                <th className="border px-4 py-2 text-left text-gray-800">
-                  Initial Response
-                </th>
-                <th className="border px-4 py-2 text-left text-gray-800">
-                  Status Updates
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="hover:bg-gray-50">
-                <td className="border px-4 py-2">Urgent</td>
-                <td className="border px-4 py-2">Continuous efforts, 24/7</td>
-                <td className="border px-4 py-2">1 hour</td>
-                <td className="border px-4 py-2">Every 4 hours, 24/7</td>
-              </tr>
-              <tr className="hover:bg-gray-50">
-                <td className="border px-4 py-2">High</td>
-                <td className="border px-4 py-2">
-                  Continuous efforts, business hours
-                </td>
-                <td className="border px-4 py-2">2 hours</td>
-                <td className="border px-4 py-2">Within 1 workday</td>
-              </tr>
-              <tr className="hover:bg-gray-50">
-                <td className="border px-4 py-2">Normal</td>
-                <td className="border px-4 py-2">
-                  Reasonable efforts, business hours
-                </td>
-                <td className="border px-4 py-2">4 hours</td>
-                <td className="border px-4 py-2">
-                  Within 5 days of workaround or fix
-                </td>
-              </tr>
-              <tr className="hover:bg-gray-50">
-                <td className="border px-4 py-2">Low</td>
-                <td className="border px-4 py-2">
-                  Reasonable efforts, business hours
-                </td>
-                <td className="border px-4 py-2">1 business day</td>
-                <td className="border px-4 py-2">In future release notes</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {/* Search Bar */}
+      {renderStaticContent()}
       <div className="flex justify-center mb-6">
         <input
           type="text"
@@ -317,8 +382,6 @@ const Knowledgebase = () => {
           }}
         />
       </div>
-
-      {/* Knowledgebase Table */}
       <div className="bg-white shadow-lg p-6 rounded-lg">
         <h2 className="text-2xl font-bold mb-4 text-gray-800">Known Issues</h2>
         {filteredData.length === 0 ? (
