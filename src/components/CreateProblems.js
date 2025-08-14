@@ -1,11 +1,17 @@
-import React, { useState, useEffect, useCallback } from "react";
-import axios from "axios";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import useAuth from "../hooks/useAuth";
-import apiBaseUrl from "../config";
+import createApiInstance from "../utils/api";
 
 const CreateProblems = () => {
-  const { token, subdomain } = useAuth();
+  const { token, subdomain, currentUser, logout, isAdmin } = useAuth();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -30,36 +36,116 @@ const CreateProblems = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const navigate = useNavigate();
+  const isFetching = useRef(false);
 
-  const baseUrl = subdomain ? `${apiBaseUrl}/organizations/${subdomain}` : null;
+  // Memoize the API instance
+  const api = useMemo(
+    () => createApiInstance(token, subdomain),
+    [token, subdomain]
+  );
 
-  const fetchProblems = useCallback(async () => {
-    if (!token || !baseUrl) {
-      setError("Authentication required. Please log in.");
-      navigate("/login");
+  // Log renders
+  const renderCount = useRef(0);
+  useEffect(() => {
+    renderCount.current += 1;
+    console.log(`${new Date().toISOString()} CreateProblems rendered`, {
+      renderCount: renderCount.current,
+      path: window.location.pathname,
+      authState: {
+        token: !!token,
+        subdomain: !!subdomain,
+        currentUser: !!currentUser,
+        isAdmin,
+      },
+    });
+  });
+
+  // Check auth, inspired by CreateTicketPage
+  const checkAuth = useCallback(() => {
+    if (isFetching.current) {
+      console.log(
+        `${new Date().toISOString()} Auth check in progress, skipping`
+      );
       return;
     }
 
-    try {
-      setLoading(true);
-      const config = { headers: { Authorization: `Bearer ${token}` } };
+    isFetching.current = true;
+    if (!token || !subdomain || !currentUser) {
+      console.warn(`${new Date().toISOString()} Missing auth data`, {
+        token: !!token,
+        subdomain: !!subdomain,
+        currentUser: !!currentUser,
+        isAdmin,
+      });
+      setError("Please log in to create a problem.");
+      logout();
+      navigate("/login", { replace: true });
+    } else {
+      console.log(`${new Date().toISOString()} Auth check passed`, {
+        subdomain,
+        currentUser,
+        isAdmin,
+      });
+      setError(null);
+    }
+    isFetching.current = false;
+  }, [token, subdomain, currentUser, isAdmin, logout, navigate]);
 
+  // Fetch tickets, teams, and users
+  const fetchProblems = useCallback(async () => {
+    if (isFetching.current) {
+      console.log(
+        `${new Date().toISOString()} Fetch already in progress, skipping`
+      );
+      return;
+    }
+
+    if (!token || !subdomain || !currentUser) {
+      console.warn(`${new Date().toISOString()} Missing auth data`, {
+        token: !!token,
+        subdomain: !!subdomain,
+        currentUser: !!currentUser,
+        isAdmin,
+      });
+      setError("Please log in to create a problem.");
+      logout();
+      navigate("/login", { replace: true });
+      return;
+    }
+
+    isFetching.current = true;
+    setLoading(true);
+    setError(null);
+
+    try {
+      console.log(`${new Date().toISOString()} Fetching problems data`, {
+        urls: [
+          `/organizations/${subdomain}/tickets`,
+          `/organizations/${subdomain}/teams`,
+          `/organizations/${subdomain}/users`,
+        ],
+      });
       const [ticketsResponse, teamsResponse, usersResponse] = await Promise.all(
         [
-          axios.get(`${baseUrl}/tickets?page=1`, config),
-          axios.get(`${baseUrl}/teams`, config),
-          axios.get(`${baseUrl}/users`, config),
+          api.get(`/organizations/${subdomain}/tickets?page=1`),
+          api.get(`/organizations/${subdomain}/teams`),
+          api.get(`/organizations/${subdomain}/users`),
         ]
       );
 
-      const allTickets = Array.isArray(ticketsResponse.data.tickets)
-        ? ticketsResponse.data.tickets
-        : Array.isArray(ticketsResponse.data)
-        ? ticketsResponse.data
-        : [];
-      setTickets(allTickets);
+      console.log(`${new Date().toISOString()} Problems API response`, {
+        ticketsStatus: ticketsResponse.status,
+        teamsStatus: teamsResponse.status,
+        usersStatus: usersResponse.status,
+      });
 
+      setTickets(
+        Array.isArray(ticketsResponse.data.tickets)
+          ? ticketsResponse.data.tickets
+          : Array.isArray(ticketsResponse.data)
+          ? ticketsResponse.data
+          : []
+      );
       setTeams(
         Array.isArray(teamsResponse.data)
           ? teamsResponse.data
@@ -71,114 +157,159 @@ const CreateProblems = () => {
           : usersResponse.data.users || []
       );
     } catch (err) {
-      const status = err.response?.status;
-      const errorMessage = err.response?.data?.error || err.message;
-      setError(
-        `Failed to load data: ${errorMessage} ${
-          status ? `(Status: ${status})` : ""
-        }`
-      );
-      if (status === 401) {
-        localStorage.removeItem("authToken");
-        navigate("/login");
+      console.error(`${new Date().toISOString()} Fetch problems error`, {
+        message: err.message,
+        status: err.response?.status,
+        data: err.response?.data,
+      });
+      let errorMsg =
+        err.response?.data?.error || `Failed to load data: ${err.message}`;
+      if (err.response?.status === 401) {
+        errorMsg = "Session expired. Please log in again.";
+        logout();
+        navigate("/login", { replace: true });
       }
+      setError(errorMsg);
     } finally {
       setLoading(false);
+      isFetching.current = false;
     }
-  }, [token, baseUrl, navigate]);
+  }, [api, token, subdomain, currentUser, isAdmin, logout, navigate]);
 
   useEffect(() => {
-    fetchProblems();
-  }, [fetchProblems]);
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    if (name === "related_incident_id" && value) {
-      const ticket = tickets.find((t) => t.id === parseInt(value));
-      if (ticket) {
-        setFormData((prev) => ({
-          ...prev,
-          title: `Problem related to ${ticket.title}`,
-          description: ticket.description || "",
-          team_id: ticket.team_id?.toString() || "",
-          assignee_id: ticket.assignee_id?.toString() || "",
-        }));
-      }
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError(null);
-    setShowSuccessModal(false);
-
-    if (!token || !baseUrl) {
-      setError("Authentication required. Please log in.");
-      navigate("/login");
-      return;
-    }
-
-    const ticketData = {
-      problem: {
-        ...formData,
-        priority: parseInt(formData.priority, 10),
-        team_id: formData.team_id || null,
-        assignee_id: formData.assignee_id || null,
-        related_incident_id: formData.related_incident_id || null,
-      },
-    };
-
-    try {
-      setLoading(true);
-      const config = { headers: { Authorization: `Bearer ${token}` } };
-      await axios.post(
-        `${apiBaseUrl}/organizations/${subdomain}/problems`,
-        ticketData,
-        config
-      );
-      // await axios.post(`${baseUrl}/problems`, { problem: formData }, config);
-
-      setShowSuccessModal(true);
-      resetForm();
+    console.log(`${new Date().toISOString()} Initializing CreateProblems`, {
+      token: !!token,
+      subdomain: !!subdomain,
+      currentUser: !!currentUser,
+      isAdmin,
+    });
+    checkAuth();
+    if (!error) {
       fetchProblems();
-    } catch (err) {
-      setError(
-        `Failed to submit problem: ${err.response?.data?.error || err.message}`
-      );
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [checkAuth, fetchProblems, error]);
 
-  const handleResolve = async (ticketId) => {
-    try {
-      setLoading(true);
-      await axios.put(
-        `${baseUrl}/tickets/${ticketId}`,
-        { ticket: { status: "resolved" } },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
+  const handleChange = useCallback(
+    (e) => {
+      const { name, value } = e.target;
+      setFormData((prev) => ({ ...prev, [name]: value }));
+      if (name === "related_incident_id" && value) {
+        const ticket = tickets.find((t) => t.id === parseInt(value));
+        if (ticket) {
+          setFormData((prev) => ({
+            ...prev,
+            title: `Problem related to ${ticket.title}`,
+            description: ticket.description || "",
+            team_id: ticket.team_id?.toString() || "",
+            assignee_id: ticket.assignee_id?.toString() || "",
+          }));
         }
-      );
-      setShowSuccessModal(true);
-      fetchProblems();
-      setTimeout(() => setShowSuccessModal(false), 3000);
-    } catch (err) {
-      setError(
-        `Failed to resolve problem: ${err.response?.data?.error || err.message}`
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+      }
+    },
+    [tickets]
+  );
 
-  const handleEdit = (ticket) => {
+  const handleSubmit = useCallback(
+    async (e) => {
+      e.preventDefault();
+      if (!token || !subdomain || !currentUser) {
+        setError("Authentication required. Please log in.");
+        logout();
+        navigate("/login", { replace: true });
+        return;
+      }
+
+      setError(null);
+      setShowSuccessModal(false);
+
+      const ticketData = {
+        problem: {
+          ...formData,
+          priority: parseInt(formData.priority, 10),
+          team_id: formData.team_id || null,
+          assignee_id: formData.assignee_id || null,
+          related_incident_id: formData.related_incident_id || null,
+        },
+      };
+
+      try {
+        setLoading(true);
+        console.log(`${new Date().toISOString()} Submitting problem`, {
+          ticketData,
+        });
+        await api.post(`/organizations/${subdomain}/problems`, ticketData);
+        console.log(
+          `${new Date().toISOString()} Problem submitted successfully`
+        );
+        setShowSuccessModal(true);
+        resetForm();
+        fetchProblems();
+      } catch (err) {
+        console.error(`${new Date().toISOString()} Submit problem error`, {
+          message: err.message,
+          status: err.response?.status,
+          data: err.response?.data,
+        });
+        setError(
+          `Failed to submit problem: ${
+            err.response?.data?.error || err.message
+          }`
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [
+      api,
+      token,
+      subdomain,
+      currentUser,
+      formData,
+      fetchProblems,
+      logout,
+      navigate,
+    ]
+  );
+
+  const handleResolve = useCallback(
+    async (ticketId) => {
+      try {
+        setLoading(true);
+        console.log(`${new Date().toISOString()} Resolving problem`, {
+          ticketId,
+        });
+        await api.put(`/organizations/${subdomain}/tickets/${ticketId}`, {
+          ticket: { status: "resolved" },
+        });
+        console.log(
+          `${new Date().toISOString()} Problem resolved successfully`
+        );
+        setShowSuccessModal(true);
+        fetchProblems();
+        setTimeout(() => setShowSuccessModal(false), 3000);
+      } catch (err) {
+        console.error(`${new Date().toISOString()} Resolve problem error`, {
+          message: err.message,
+          status: err.response?.status,
+          data: err.response?.data,
+        });
+        setError(
+          `Failed to resolve problem: ${
+            err.response?.data?.error || err.message
+          }`
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [api, subdomain, fetchProblems]
+  );
+
+  const handleEdit = useCallback((ticket) => {
+    console.log(`${new Date().toISOString()} Editing problem`, {
+      ticketId: ticket.id,
+    });
     setFormData({
-      ...formData,
       title: ticket.title || "",
       description: ticket.description || "",
       urgency: ticket.urgency || "low",
@@ -195,9 +326,9 @@ const CreateProblems = () => {
       assignee_id: ticket.assignee_id?.toString() || "",
       related_incident_id: ticket.related_incident_id?.toString() || "",
     });
-  };
+  }, []);
 
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     setFormData({
       title: "",
       description: "",
@@ -217,17 +348,73 @@ const CreateProblems = () => {
       related_incident_id: "",
     });
     setError(null);
-  };
+  }, []);
 
-  if (!baseUrl) {
+  const problems = useMemo(
+    () =>
+      tickets
+        .filter((ticket) => ticket.ticket_type === "Problem")
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at)),
+    [tickets]
+  );
+
+  if (error) {
     return (
-      <p className="text-red-500">Authentication required. Please log in.</p>
+      <div className="p-4 max-w-2xl mx-auto">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+          <h3 className="font-bold text-lg mb-2">Error</h3>
+          <p>{error}</p>
+          <div className="mt-3 space-x-2">
+            <button
+              onClick={() => {
+                console.log(`${new Date().toISOString()} Retrying fetch`);
+                setError(null);
+                setLoading(true);
+                fetchProblems();
+              }}
+              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+            >
+              Retry
+            </button>
+            <button
+              onClick={() => {
+                console.log(`${new Date().toISOString()} Navigating to login`);
+                logout();
+                navigate("/login", { replace: true });
+              }}
+              className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+            >
+              Back to Login
+            </button>
+            <button
+              onClick={() => {
+                console.log(
+                  `${new Date().toISOString()} Navigating to dashboard`
+                );
+                navigate("/dashboard", { replace: true });
+              }}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Go to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
     );
   }
 
-  const problems = tickets
-    .filter((ticket) => ticket.ticket_type === "Problem")
-    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  if (loading) {
+    return (
+      <div className="p-4 flex justify-center items-center h-64">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-2"></div>
+          <p>
+            Loading problems... First load may take up to 30s if server is idle.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-gray-200 container mx-auto p-1 relative">
@@ -239,9 +426,6 @@ const CreateProblems = () => {
             service or system.
           </p>
         </div>
-
-        {loading && <p className="text-blue-700">Loading...</p>}
-        {error && <p className="text-red-500 mb-4">{error}</p>}
 
         <form
           className="problem-form shadow-md rounded-lg p-4 bg-white"
@@ -460,7 +644,12 @@ const CreateProblems = () => {
             <button
               type="button"
               className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500 transition duration-300 disabled:bg-gray-300"
-              onClick={() => navigate("/dashboard")}
+              onClick={() => {
+                console.log(
+                  `${new Date().toISOString()} Navigating to dashboard`
+                );
+                navigate("/dashboard", { replace: true });
+              }}
               disabled={loading}
             >
               Cancel
