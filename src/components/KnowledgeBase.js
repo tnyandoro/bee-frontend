@@ -112,16 +112,20 @@ const Knowledgebase = () => {
   }, [fetchKnowledgebase]);
 
   // Filter data based on search term
-  const filteredData = knowledgeData.filter((item) =>
-    [
-      "issue",
-      "description",
-      "troubleshootingSteps",
-      "assignedGroup",
-      "resolutionSteps",
-    ].some((key) =>
-      item[key]?.toLowerCase?.().includes(searchTerm.toLowerCase())
-    )
+  const filteredData = useMemo(
+    () =>
+      knowledgeData.filter((item) =>
+        [
+          "issue",
+          "description",
+          "troubleshootingSteps",
+          "assignedGroup",
+          "resolutionSteps",
+        ].some((key) =>
+          item[key]?.toLowerCase?.().includes(searchTerm.toLowerCase())
+        )
+      ),
+    [knowledgeData, searchTerm]
   );
 
   if (loading) {
@@ -166,6 +170,17 @@ const Knowledgebase = () => {
               className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
             >
               Back to Login
+            </button>
+            <button
+              onClick={() => {
+                console.log(
+                  `${new Date().toISOString()} Navigating to dashboard`
+                );
+                navigate("/dashboard", { replace: true });
+              }}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Go to Dashboard
             </button>
           </div>
         </div>
