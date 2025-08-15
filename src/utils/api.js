@@ -1,32 +1,28 @@
 import axios from "axios";
 
-const createApiInstance = (token, subdomain) => {
-  if (!token) {
-    console.error("No authentication token provided for API instance");
-    throw new Error("Authentication token is required");
-  }
-
+const getBaseUrl = () => {
   const isDev = process.env.NODE_ENV === "development";
 
-  // Use HTTPS in production; relative URL in development for flexibility
   let baseURL = isDev
-    ? "/api/v1" // Relative path for dev proxy
+    ? "/api/v1" // Local proxy in dev
     : process.env.REACT_APP_API_BASE_URL ||
       "https://itsmapi.greensoftsolutions.net/api/v1";
 
-  // Ensure no trailing slash
-  if (baseURL.endsWith("/")) {
-    baseURL = baseURL.slice(0, -1);
-  }
+  // Remove trailing slash
+  return baseURL.endsWith("/") ? baseURL.slice(0, -1) : baseURL;
+};
 
-  console.log("Creating API instance:", { baseURL, subdomain }); // No token in logs
+const createApiInstance = (token = null, subdomain = null) => {
+  const baseURL = getBaseUrl();
+
+  console.log("Creating API instance:", { baseURL, subdomain }); // safe log
 
   const instance = axios.create({
     baseURL,
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      "X-Organization-Subdomain": subdomain,
+      ...(token && { Authorization: `Bearer ${token}` }),
+      ...(subdomain && { "X-Organization-Subdomain": subdomain }),
     },
     timeout: 60000,
     withCredentials: true,
@@ -43,7 +39,6 @@ const createApiInstance = (token, subdomain) => {
       switch (error.response?.status) {
         case 401:
           console.error("Authentication error:", errorMessage);
-          // Trigger logout or redirect to login in auth context
           window.dispatchEvent(new CustomEvent("auth:unauthorized"));
           return Promise.reject(
             new Error("Session expired. Please log in again.")
@@ -72,4 +67,3 @@ const createApiInstance = (token, subdomain) => {
 };
 
 export default createApiInstance;
-// fix
