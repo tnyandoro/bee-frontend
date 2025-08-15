@@ -11,7 +11,8 @@ const useAuth = () => {
   const [error, setError] = useState(null);
 
   const API_BASE =
-    process.env.REACT_APP_API_BASE_URL || "itsmapi.greensoftsolutions.net";
+    process.env.REACT_APP_API_BASE_URL ||
+    "https:itsmapi.greensoftsolutions.net";
 
   const updateAuth = useCallback((newToken, newSubdomain) => {
     const cleanToken = newToken || null;

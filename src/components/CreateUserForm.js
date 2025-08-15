@@ -86,7 +86,7 @@ const CreateUserForm = ({ onClose }) => {
     setStatus({ loading: true, error: null, success: false });
 
     try {
-      const url = `itsmapi.greensoftsolutions.net/api/v1/organizations/${subdomain}/users`;
+      const url = `https:itsmapi.greensoftsolutions.net/api/v1/organizations/${subdomain}/users`;
       const formDataToSend = new FormData();
 
       // Append form data

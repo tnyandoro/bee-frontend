@@ -12,7 +12,7 @@ const createApiInstance = (token, subdomain) => {
   let baseURL = isDev
     ? "/api/v1" // Relative path for dev proxy
     : process.env.REACT_APP_API_BASE_URL ||
-      "itsmapi.greensoftsolutions.net/api/v1";
+      "https:https:itsmapi.greensoftsolutions.net/api/v1";
 
   // Ensure no trailing slash
   if (baseURL.endsWith("/")) {
@@ -29,7 +29,7 @@ const createApiInstance = (token, subdomain) => {
       "X-Organization-Subdomain": subdomain,
     },
     timeout: 60000,
-    withCredentials: true, // Keep for CORS with credentials, verify backend CORS
+    withCredentials: true,
   });
 
   instance.interceptors.response.use(
