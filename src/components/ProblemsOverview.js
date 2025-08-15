@@ -23,7 +23,7 @@ const ProblemsOverview = () => {
 
   const baseUrl = isLocalhost
     ? `http://${subdomain || "subdomain"}.lvh.me:3000/api/v1`
-    : `https:itsmapi.greensoftsolutions.net/api/v1`;
+    : `https://itsmapi.greensoftsolutions.net/api/v1`;
 
   const fetchProblems = useCallback(async () => {
     if (!token || !subdomain) {

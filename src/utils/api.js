@@ -12,7 +12,7 @@ const createApiInstance = (token, subdomain) => {
   let baseURL = isDev
     ? "/api/v1" // Relative path for dev proxy
     : process.env.REACT_APP_API_BASE_URL ||
-      "https:https:itsmapi.greensoftsolutions.net/api/v1";
+      "https://itsmapi.greensoftsolutions.net/api/v1";
 
   // Ensure no trailing slash
   if (baseURL.endsWith("/")) {

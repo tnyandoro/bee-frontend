@@ -12,7 +12,7 @@ const useAuth = () => {
 
   const API_BASE =
     process.env.REACT_APP_API_BASE_URL ||
-    "https:itsmapi.greensoftsolutions.net";
+    "https://itsmapi.greensoftsolutions.net";
 
   const updateAuth = useCallback((newToken, newSubdomain) => {
     const cleanToken = newToken || null;

@@ -39,7 +39,7 @@ const Settings = () => {
 
     try {
       const response = await axios.get(
-        `https:itsmapi.greensoftsolutions.net/api/v1/organizations/${subdomain}/settings`,
+        `https://itsmapi.greensoftsolutions.net/api/v1/organizations/${subdomain}/settings`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -62,7 +62,7 @@ const Settings = () => {
     setSaving(true);
     try {
       const response = await axios.put(
-        `https:itsmapi.greensoftsolutions.net/api/v1/organizations/${subdomain}/settings`,
+        `https://itsmapi.greensoftsolutions.net/api/v1/organizations/${subdomain}/settings`,
         { key, value },
         {
           headers: {
@@ -139,7 +139,7 @@ const Settings = () => {
                 try {
                   setSaving(true);
                   const response = await axios.post(
-                    `https:itsmapi.greensoftsolutions.net/api/v1/organizations/${subdomain}/upload_logo`,
+                    `https://itsmapi.greensoftsolutions.net/api/v1/organizations/${subdomain}/upload_logo`,
                     formData,
                     {
                       headers: {

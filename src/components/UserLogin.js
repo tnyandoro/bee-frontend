@@ -53,7 +53,7 @@ const UserLogin = (props) => {
       // Make API call to the correct endpoint
       // const response = await axios.post('https://gss-itsm-platform-api-27vo.onrender.com/api/v1/auth/login', {
       const response = await axios.post(
-        "https://www.https:itsmapi.greensoftsolutions.net/api/v1/auth/login",
+        "https://itsmapi.greensoftsolutions.net/api/v1/auth/login",
         {
           email,
           password,

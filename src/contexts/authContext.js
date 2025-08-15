@@ -32,7 +32,7 @@ const getApiBaseUrl = () => {
     process.env.REACT_APP_API_BASE_URL ||
     (process.env.NODE_ENV === "development"
       ? "/api/v1"
-      : "https:itsmapi.greensoftsolutions.net/api/v1")
+      : "https://itsmapi.greensoftsolutions.net/api/v1")
   );
 };
 
