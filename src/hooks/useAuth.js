@@ -11,8 +11,7 @@ const useAuth = () => {
   const [error, setError] = useState(null);
 
   const API_BASE =
-    process.env.REACT_APP_API_BASE_URL ||
-    "https://itsm-lb-223501087.us-east-1.elb.amazonaws.com:3000/";
+    process.env.REACT_APP_API_BASE_URL || "itsmapi.greensoftsolutions.net";
 
   const updateAuth = useCallback((newToken, newSubdomain) => {
     const cleanToken = newToken || null;

@@ -39,7 +39,7 @@ const Settings = () => {
 
     try {
       const response = await axios.get(
-        `https://itsm-lb-223501087.us-east-1.elb.amazonaws.com:3000//api/v1/organizations/${subdomain}/settings`,
+        `itsmapi.greensoftsolutions.net/api/v1/organizations/${subdomain}/settings`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -62,7 +62,7 @@ const Settings = () => {
     setSaving(true);
     try {
       const response = await axios.put(
-        `https://itsm-lb-223501087.us-east-1.elb.amazonaws.com:3000//api/v1/organizations/${subdomain}/settings`,
+        `itsmapi.greensoftsolutions.net/api/v1/organizations/${subdomain}/settings`,
         { key, value },
         {
           headers: {
@@ -139,7 +139,7 @@ const Settings = () => {
                 try {
                   setSaving(true);
                   const response = await axios.post(
-                    `https://itsm-lb-223501087.us-east-1.elb.amazonaws.com:3000//api/v1/organizations/${subdomain}/upload_logo`,
+                    `itsmapi.greensoftsolutions.net/api/v1/organizations/${subdomain}/upload_logo`,
                     formData,
                     {
                       headers: {
