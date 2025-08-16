@@ -21,33 +21,25 @@ export const useAuth = () => {
     Cookies.get("subdomain") ||
     (process.env.NODE_ENV === "development" ? "demo" : null);
 
-  return {
-    ...context,
-    subdomain: fallbackSubdomain,
-  };
+  return { ...context, subdomain: fallbackSubdomain };
 };
 
-const getApiBaseUrl = () => {
-  return (
-    process.env.REACT_APP_API_BASE_URL ||
-    (process.env.NODE_ENV === "development"
-      ? "/api/v1"
-      : "https://itsm-api.onrender.com/api/v1")
-  );
-};
+// API base URL
+const getApiBaseUrl = () =>
+  process.env.REACT_APP_API_BASE_URL ||
+  (process.env.NODE_ENV === "development"
+    ? "/api/v1"
+    : "https://itsm-api.onrender.com/api/v1");
 
-// safer sanitize input
+// sanitize input
 const sanitizeInput = (input, isEmail = false) => {
   if (!input || typeof input !== "string") return "";
+  const value = input.toLowerCase().trim();
   if (isEmail) {
-    const sanitized = input.toLowerCase().trim();
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(sanitized) ? sanitized : "";
+    return emailRegex.test(value) ? value : "";
   }
-  return input
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9-_]/g, "");
+  return value.replace(/[^a-z0-9-_]/g, "");
 };
 
 export const AuthProvider = ({ children }) => {
@@ -60,23 +52,22 @@ export const AuthProvider = ({ children }) => {
     error: null,
   });
 
+  // Read cookies
   const getAuthTokens = useCallback(() => {
-    try {
-      const token = Cookies.get("authToken") || "";
-      const subdomain = sanitizeInput(Cookies.get("subdomain") || "");
-      const email = Cookies.get("email") || "";
-      const role = Cookies.get("role") || "";
-      const userId = Cookies.get("userId") || "";
-      return { token, subdomain, email, role, userId };
-    } catch {
-      return { token: "", subdomain: "", email: "", role: "", userId: "" };
-    }
+    return {
+      token: Cookies.get("authToken") || "",
+      subdomain: sanitizeInput(Cookies.get("subdomain") || ""),
+      email: Cookies.get("email") || "",
+      role: Cookies.get("role") || "",
+      userId: Cookies.get("userId") || "",
+    };
   }, []);
 
+  // Logout function
   const logout = useCallback(() => {
-    ["authToken", "subdomain", "email", "role", "userId"].forEach((name) => {
-      Cookies.remove(name, { path: "/", secure: true, sameSite: "strict" });
-    });
+    ["authToken", "subdomain", "email", "role", "userId"].forEach((name) =>
+      Cookies.remove(name, { path: "/", secure: true, sameSite: "strict" })
+    );
     localStorage.removeItem("authToken");
     localStorage.removeItem("subdomain");
     localStorage.removeItem("role");
@@ -92,15 +83,14 @@ export const AuthProvider = ({ children }) => {
     window.dispatchEvent(new CustomEvent("auth:unauthorized"));
   }, []);
 
+  // Verify auth / fetch profile
   const verifyAuth = useCallback(
     async (token, subdomain) => {
       const sanitizedSubdomain = sanitizeInput(subdomain);
-      if (!token || !sanitizedSubdomain) {
+      if (!sanitizedSubdomain) {
         setState((prev) => ({
           ...prev,
-          error: !token
-            ? "Authentication token is required"
-            : "Organization subdomain is required",
+          error: "Organization subdomain is required",
           loading: false,
         }));
         return false;
@@ -109,51 +99,59 @@ export const AuthProvider = ({ children }) => {
       try {
         setState((prev) => ({ ...prev, loading: true, error: null }));
         const apiBase = getApiBaseUrl();
+
         const response = await axios.get(
           `${apiBase}/organizations/${sanitizedSubdomain}/profile`,
           {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
+            headers: token
+              ? {
+                  Authorization: `Bearer ${token}`,
+                  "Content-Type": "application/json",
+                }
+              : { "Content-Type": "application/json" },
             withCredentials: true,
           }
         );
 
-        const { current_user: user, organization } = response.data;
+        const user = response.data.current_user || null;
+        const organization = response.data.organization || null;
 
-        const sanitizedUser = {
-          id: user?.id,
-          email: user?.email,
-          role: user?.role,
-          name: user?.name,
-          username: user?.username,
-          team_id: user?.team_id,
-          department_id: user?.department_id,
-        };
+        const sanitizedUser = user
+          ? {
+              id: user.id,
+              email: user.email,
+              role: user.role,
+              name: user.name,
+              username: user.username,
+              team_id: user.team_id,
+              department_id: user.department_id,
+            }
+          : null;
 
-        ["authToken", "subdomain", "email", "role", "userId"].forEach(
-          (name) => {
-            const value = {
-              authToken: token,
-              subdomain: sanitizedSubdomain,
-              email: sanitizedUser.email,
-              role: sanitizedUser.role,
-              userId: sanitizedUser.id,
-            }[name];
-            Cookies.set(name, value, {
-              secure: true,
-              sameSite: "strict",
-              expires: 1,
-            });
-          }
-        );
+        if (sanitizedUser) {
+          ["authToken", "subdomain", "email", "role", "userId"].forEach(
+            (name) => {
+              const value = {
+                authToken: token,
+                subdomain: sanitizedSubdomain,
+                email: sanitizedUser.email,
+                role: sanitizedUser.role,
+                userId: sanitizedUser.id,
+              }[name];
+              Cookies.set(name, value, {
+                secure: true,
+                sameSite: "strict",
+                expires: 1,
+              });
+            }
+          );
+        }
 
         setState({
           currentUser: sanitizedUser,
           organization,
           subdomain: sanitizedSubdomain,
-          token,
+          token: token || null,
           loading: false,
           error: null,
         });
@@ -166,13 +164,14 @@ export const AuthProvider = ({ children }) => {
             ? "Organization not found"
             : "Authentication failed";
         setState((prev) => ({ ...prev, error: message, loading: false }));
-        logout();
+        if (token) logout();
         return false;
       }
     },
     [logout]
   );
 
+  // Login function
   const login = useCallback(
     async (email, password, domain) => {
       const sanitizedEmail = sanitizeInput(email, true);
@@ -191,7 +190,7 @@ export const AuthProvider = ({ children }) => {
           { email: sanitizedEmail, password, subdomain: sanitizedSubdomain },
           { withCredentials: true }
         );
-        const { auth_token, user } = response.data;
+        const { auth_token } = response.data;
         await verifyAuth(auth_token, sanitizedSubdomain);
         return true;
       } catch (error) {
@@ -203,12 +202,14 @@ export const AuthProvider = ({ children }) => {
     [verifyAuth]
   );
 
+  // Auto verify on mount
   useEffect(() => {
     const { token, subdomain } = getAuthTokens();
-    if (token && subdomain) verifyAuth(token, subdomain);
+    if (subdomain) verifyAuth(token, subdomain);
     else setState((prev) => ({ ...prev, loading: false, subdomain }));
   }, [getAuthTokens, verifyAuth]);
 
+  // Listen to logout events
   useEffect(() => {
     const handleUnauthorized = () => logout();
     window.addEventListener("auth:unauthorized", handleUnauthorized);
