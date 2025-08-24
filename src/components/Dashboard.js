@@ -23,12 +23,7 @@ const mockData = {
       resolved: 8,
       closed: 12,
     },
-    tickets_by_priority: {
-      p1: 2,
-      p2: 5,
-      p3: 8,
-      p4: 11,
-    },
+    tickets_by_priority: { p1: 2, p2: 5, p3: 8, p4: 11 },
     top_assignees: [
       { name: "User A", tickets: 10 },
       { name: "User B", tickets: 7 },
@@ -87,7 +82,7 @@ const metricColors = {
 };
 
 const Dashboard = () => {
-  const { currentUser, token, subdomain, error: authError } = useAuth();
+  const { currentUser, token, subdomain: contextSubdomain } = useAuth();
   const navigate = useNavigate();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -95,15 +90,21 @@ const Dashboard = () => {
   const [retryCount, setRetryCount] = useState(0);
   const isFetching = useRef(false);
 
+  const subdomain = contextSubdomain || "default"; // fallback if missing
+
   const fetchDashboard = useCallback(async () => {
-    if (!subdomain || !token) {
+    if (!token) {
+      setError("Authentication token is missing. Please log in again.");
+      setLoading(false);
+      navigate("/login");
+      return;
+    }
+
+    if (!subdomain) {
       setError(
-        !subdomain
-          ? "Organization subdomain is missing. Please ensure you're logged into the correct organization."
-          : "Authentication token is missing. Please log in again."
+        "Organization subdomain is missing. Please ensure you're logged into the correct organization."
       );
       setLoading(false);
-      if (!token) navigate("/login");
       return;
     }
 
@@ -121,29 +122,27 @@ const Dashboard = () => {
     try {
       const api = createApiInstance(token, subdomain);
       const response = await api.get(`/organizations/${subdomain}/dashboard`);
-      console.log(`${new Date().toISOString()} Full API response:`, response);
+      console.log(
+        `${new Date().toISOString()} Dashboard API response:`,
+        response.data
+      );
 
       const data = response.data.data || response.data;
 
       // Normalize organization object
-      if (data.organization) {
-        if (typeof data.organization === "string") {
-          data.organization = { name: data.organization };
-        } else if (!data.organization.name) {
-          data.organization.name = "Organization";
-        }
+      if (data.organization && typeof data.organization === "string") {
+        data.organization = { name: data.organization };
+      } else if (data.organization && !data.organization.name) {
+        data.organization.name = "Organization";
       }
 
-      console.log(
-        `${new Date().toISOString()} Processed data:`,
-        JSON.stringify(data, null, 2)
-      );
       setDashboardData(data);
       setError("");
       setRetryCount(0);
     } catch (err) {
       console.error(`${new Date().toISOString()} Dashboard fetch failed:`, err);
       let errorMsg = "Failed to load dashboard.";
+
       if (err.code === "ECONNABORTED" || err.message.includes("timeout")) {
         errorMsg = "Server is waking up (may take up to 30s). Please retry.";
       } else if (err.response?.status === 401) {
@@ -156,7 +155,7 @@ const Dashboard = () => {
       const isDev = process.env.NODE_ENV === "development";
       if (isDev) {
         console.warn(
-          `${new Date().toISOString()} Using mock data in development due to error`
+          `${new Date().toISOString()} Using mock data in development`
         );
         setDashboardData(mockData);
       } else if (retryCount < maxRetries) {
@@ -191,9 +190,8 @@ const Dashboard = () => {
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-2"></div>
           <p>
-            Loading dashboard data... First load may take up to 30s if server is
-            idle.
-            {retryCount > 0 ? ` (Retry ${retryCount}/${maxRetries})` : ""}
+            Loading dashboard data...{" "}
+            {retryCount > 0 ? `(Retry ${retryCount}/${maxRetries})` : ""}
           </p>
         </div>
       </div>
