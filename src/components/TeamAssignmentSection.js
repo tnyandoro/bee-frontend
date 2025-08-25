@@ -22,16 +22,17 @@ const TeamAssignmentSection = ({
           onChange={handleChange}
           className="w-full border px-3 py-2 rounded-md bg-white"
           required
-          disabled={!hasTeams}
+          disabled={!hasTeams || loading}
         >
           <option value="">Select a Team</option>
-          {teams.map((team) => (
-            <option key={team.id} value={String(team.id)}>
-              {team.name}
-            </option>
-          ))}
+          {hasTeams &&
+            teams.map((team) => (
+              <option key={team?.id} value={String(team?.id)}>
+                {team?.name || "Unnamed Team"}
+              </option>
+            ))}
         </select>
-        {!hasTeams && (
+        {!hasTeams && !loading && (
           <p className="text-sm text-red-500 mt-1">No teams available.</p>
         )}
       </div>
@@ -44,16 +45,17 @@ const TeamAssignmentSection = ({
           value={String(formData.assignee_id || "")}
           onChange={handleChange}
           className="w-full border px-3 py-2 rounded-md bg-white"
-          disabled={!teamSelected || !hasTeamUsers}
+          disabled={!teamSelected || !hasTeamUsers || loading}
         >
           <option value="">Select an Assignee</option>
-          {teamUsers.map((user) => (
-            <option key={user.id} value={String(user.id)}>
-              {user.name || user.username}
-            </option>
-          ))}
+          {hasTeamUsers &&
+            teamUsers.map((user) => (
+              <option key={user?.id} value={String(user?.id)}>
+                {user?.name || user?.username || "Unnamed User"}
+              </option>
+            ))}
         </select>
-        {teamSelected && !hasTeamUsers && (
+        {teamSelected && !hasTeamUsers && !loading && (
           <p className="text-sm text-yellow-500 mt-1">
             No users assigned to this team.
           </p>

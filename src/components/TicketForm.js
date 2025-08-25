@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
-import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import apiBaseUrl from "../config";
+import toast from "react-hot-toast";
 
 // Subcomponents
 import TicketMetaSection from "../components/TicketMetaSection";
@@ -10,7 +9,8 @@ import TeamAssignmentSection from "../components/TeamAssignmentSection";
 import CallerDetailsSection from "../components/CallerDetailsSection";
 import DescriptionSection from "../components/DescriptionSection";
 import FormActions from "../components/FormActions";
-import toast from "react-hot-toast";
+
+import createApiInstance from "../utils/api";
 
 const TicketForm = ({ organization, token }) => {
   const navigate = useNavigate();
@@ -64,28 +64,28 @@ const TicketForm = ({ organization, token }) => {
     assignee_id: "",
   });
 
-  const baseUrl = apiBaseUrl;
-  const ticketsUrl = organization?.subdomain
-    ? `${baseUrl}/organizations/${organization.subdomain}/tickets`
-    : null;
+  // API instance
+  const api = createApiInstance(token, organization?.subdomain);
 
+  // Fetch profile
   const fetchProfile = useCallback(async () => {
-    if (!token || !organization?.subdomain) {
-      toast.setError("Missing organization or authentication token.");
-      setSuccess(true);
-      return;
-    }
+    if (!token || !organization?.subdomain) return;
 
     setProfileLoading(true);
     try {
-      const response = await axios.get(
-        `${baseUrl}/organizations/${organization.subdomain}/profile`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+      const response = await api.get(
+        `/organizations/${organization.subdomain}/profile`
       );
 
-      const user = response.data.user;
+      const user = response.data?.user;
+
+      if (!user) {
+        setError("Failed to fetch profile: User not found");
+        toast.error("Failed to fetch profile: User not found");
+        setCurrentUser(null);
+        return;
+      }
+
       setCurrentUser(user);
 
       setFormData((prev) => ({
@@ -96,70 +96,66 @@ const TicketForm = ({ organization, token }) => {
         callerContact: user.phone_number || "",
       }));
 
+      // Only allow specific roles to create tickets
       if (
         !["admin", "team_leader", "super_user", "domain_admin"].includes(
           user.role
         )
       ) {
-        setError(
-          "Only admins, team leaders, or super users can create tickets."
-        );
+        const roleError =
+          "Only admins, team leaders, or super users can create tickets.";
+        setError(roleError);
+        toast.error(roleError);
         setCurrentUser(null);
       }
     } catch (err) {
-      setError(
-        `Failed to fetch profile: ${err.response?.status} - ${
-          err.response?.data?.error || err.message
-        }`
-      );
+      const msg =
+        err?.response?.data?.error || err.message || "Failed to fetch profile.";
+      setError(msg);
+      toast.error(msg);
+      setCurrentUser(null);
     } finally {
       setProfileLoading(false);
     }
-  }, [token, baseUrl, organization?.subdomain]);
+  }, [api, token, organization?.subdomain]);
 
+  // Fetch teams
   const fetchTeams = useCallback(async () => {
     if (!token || !organization?.subdomain) return;
+
     setTeamsLoading(true);
     try {
-      const response = await axios.get(
-        `${baseUrl}/organizations/${organization.subdomain}/teams`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+      const response = await api.get(
+        `/organizations/${organization.subdomain}/teams`
       );
       setTeams(response.data || []);
     } catch (err) {
-      setError(
-        `Failed to fetch teams: ${err.response?.data?.error || err.message}`
-      );
+      setError(err.message || "Failed to fetch teams.");
+      toast.error(err.message || "Failed to fetch teams.");
     } finally {
       setTeamsLoading(false);
     }
-  }, [token, baseUrl, organization?.subdomain]);
+  }, [api, token, organization?.subdomain]);
 
+  // Fetch team users when team changes
   const fetchTeamUsers = useCallback(async () => {
     if (!token || !organization?.subdomain || !formData.team_id) return;
 
     setTeamUsersLoading(true);
     try {
-      const response = await axios.get(
-        `${baseUrl}/organizations/${organization.subdomain}/teams/${formData.team_id}/users`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+      const response = await api.get(
+        `/organizations/${organization.subdomain}/teams/${formData.team_id}/users`
       );
       setTeamUsers(response.data || []);
     } catch (err) {
-      setError(
-        `Failed to fetch team users: ${
-          err.response?.data?.error || err.message
-        }`
-      );
+      setError(err.message || "Failed to fetch team users.");
+      toast.error(err.message || "Failed to fetch team users.");
     } finally {
       setTeamUsersLoading(false);
     }
-  }, [token, baseUrl, organization?.subdomain, formData.team_id]);
+  }, [api, token, organization?.subdomain, formData.team_id]);
 
+  // Fetch profile and teams on mount
   useEffect(() => {
     if (!token) {
       navigate("/login");
@@ -169,10 +165,12 @@ const TicketForm = ({ organization, token }) => {
     }
   }, [token, fetchProfile, fetchTeams, navigate]);
 
+  // Fetch team users when team_id changes
   useEffect(() => {
     fetchTeamUsers();
   }, [formData.team_id, fetchTeamUsers]);
 
+  // Form change handler
   const handleChange = (e) => {
     const { name, value } = e.target;
 
@@ -208,9 +206,10 @@ const TicketForm = ({ organization, token }) => {
     setFormData((prev) => ({ ...prev, priority: matrix[key] || "p4" }));
   };
 
+  // Submit ticket
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!token || !ticketsUrl || !currentUser) return;
+    if (!token || !organization?.subdomain || !currentUser) return;
 
     const required = [
       "subject",
@@ -225,8 +224,9 @@ const TicketForm = ({ organization, token }) => {
     const missing = required.filter((field) => !formData[field]);
 
     if (missing.length) {
-      toast.error(`Missing required fields: ${missing.join(", ")}`);
-      setError(`Missing required fields: ${missing.join(", ")}`);
+      const msg = `Missing required fields: ${missing.join(", ")}`;
+      toast.error(msg);
+      setError(msg);
       return;
     }
 
@@ -234,8 +234,9 @@ const TicketForm = ({ organization, token }) => {
       formData.assignee_id &&
       !teamUsers.some((u) => u.id === parseInt(formData.assignee_id))
     ) {
-      toast.error("Selected assignee is not a member of the team.");
-      setError("Selected assignee is not a member of the team.");
+      const msg = "Selected assignee is not a member of the team.";
+      toast.error(msg);
+      setError(msg);
       return;
     }
 
@@ -263,12 +264,13 @@ const TicketForm = ({ organization, token }) => {
 
     try {
       setLoading(true);
-      const response = await axios.post(ticketsUrl, payload, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "multipart/form-data",
-        },
-      });
+      const response = await api.post(
+        `/organizations/${organization.subdomain}/tickets`,
+        payload,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        }
+      );
 
       setSuccess(true);
       navigate("/incident-overview", {
@@ -303,6 +305,7 @@ const TicketForm = ({ organization, token }) => {
 
       <form onSubmit={handleSubmit} encType="multipart/form-data">
         <TicketMetaSection formData={formData} currentUser={currentUser} />
+
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium">Reported Date</label>
