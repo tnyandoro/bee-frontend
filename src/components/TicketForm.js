@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 
@@ -14,6 +20,7 @@ import createApiInstance from "../utils/api";
 
 const TicketForm = ({ organization, token }) => {
   const navigate = useNavigate();
+
   const [attachment, setAttachment] = useState(null);
   const [teams, setTeams] = useState([]);
   const [teamUsers, setTeamUsers] = useState([]);
@@ -25,6 +32,8 @@ const TicketForm = ({ organization, token }) => {
   const [profileLoading, setProfileLoading] = useState(true);
   const [teamsLoading, setTeamsLoading] = useState(false);
   const [teamUsersLoading, setTeamUsersLoading] = useState(false);
+
+  const profileFetchedRef = useRef(false);
 
   const generateTicketNumber = (ticketType) => {
     const prefix =
@@ -64,30 +73,42 @@ const TicketForm = ({ organization, token }) => {
     assignee_id: "",
   });
 
-  // API instance
-  const api = createApiInstance(token, organization?.subdomain);
+  // Memoize API instance, only if token & subdomain exist
+  const api = useMemo(() => {
+    if (!token || !organization?.subdomain) return null;
+    console.log("Creating API instance", {
+      token,
+      subdomain: organization.subdomain,
+    });
+    return createApiInstance(token, organization.subdomain);
+  }, [token, organization?.subdomain]);
 
   // Fetch profile
   const fetchProfile = useCallback(async () => {
-    if (!token || !organization?.subdomain) return;
+    if (!api || profileFetchedRef.current) return;
 
     setProfileLoading(true);
     try {
+      console.log("Fetching profile...");
       const response = await api.get(
         `/organizations/${organization.subdomain}/profile`
       );
 
-      const user = response.data?.user;
+      // Rails returns current_user, not user
+      const user = response.data?.current_user;
+      if (!user) throw new Error("User not found");
 
-      if (!user) {
-        setError("Failed to fetch profile: User not found");
-        toast.error("Failed to fetch profile: User not found");
-        setCurrentUser(null);
-        return;
+      if (
+        !["admin", "team_leader", "super_user", "domain_admin"].includes(
+          user.role
+        )
+      ) {
+        throw new Error(
+          "Only admins, team leaders, or super users can create tickets."
+        );
       }
 
       setCurrentUser(user);
-
       setFormData((prev) => ({
         ...prev,
         callerName: user.name || "",
@@ -96,18 +117,8 @@ const TicketForm = ({ organization, token }) => {
         callerContact: user.phone_number || "",
       }));
 
-      // Only allow specific roles to create tickets
-      if (
-        !["admin", "team_leader", "super_user", "domain_admin"].includes(
-          user.role
-        )
-      ) {
-        const roleError =
-          "Only admins, team leaders, or super users can create tickets.";
-        setError(roleError);
-        toast.error(roleError);
-        setCurrentUser(null);
-      }
+      profileFetchedRef.current = true;
+      console.log("Profile fetched successfully", user);
     } catch (err) {
       const msg =
         err?.response?.data?.error || err.message || "Failed to fetch profile.";
@@ -117,29 +128,30 @@ const TicketForm = ({ organization, token }) => {
     } finally {
       setProfileLoading(false);
     }
-  }, [api, token, organization?.subdomain]);
+  }, [api, organization?.subdomain]);
 
   // Fetch teams
   const fetchTeams = useCallback(async () => {
-    if (!token || !organization?.subdomain) return;
-
+    if (!api) return;
     setTeamsLoading(true);
     try {
       const response = await api.get(
         `/organizations/${organization.subdomain}/teams`
       );
       setTeams(response.data || []);
+      console.log("Teams fetched:", response.data);
     } catch (err) {
-      setError(err.message || "Failed to fetch teams.");
-      toast.error(err.message || "Failed to fetch teams.");
+      const msg = err.message || "Failed to fetch teams.";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setTeamsLoading(false);
     }
-  }, [api, token, organization?.subdomain]);
+  }, [api, organization?.subdomain]);
 
-  // Fetch team users when team changes
+  // Fetch team users
   const fetchTeamUsers = useCallback(async () => {
-    if (!token || !organization?.subdomain || !formData.team_id) return;
+    if (!api || !formData.team_id) return;
 
     setTeamUsersLoading(true);
     try {
@@ -148,32 +160,34 @@ const TicketForm = ({ organization, token }) => {
       );
       setTeamUsers(response.data || []);
     } catch (err) {
-      setError(err.message || "Failed to fetch team users.");
-      toast.error(err.message || "Failed to fetch team users.");
+      const msg = err.message || "Failed to fetch team users.";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setTeamUsersLoading(false);
     }
-  }, [api, token, organization?.subdomain, formData.team_id]);
+  }, [api, formData.team_id, organization?.subdomain]);
 
-  // Fetch profile and teams on mount
+  // Wait for token & organization before fetching
   useEffect(() => {
     if (!token) {
       navigate("/login");
-    } else {
-      fetchProfile();
-      fetchTeams();
+      return;
     }
-  }, [token, fetchProfile, fetchTeams, navigate]);
+    if (!organization?.subdomain || !api) return;
 
-  // Fetch team users when team_id changes
+    fetchProfile();
+    fetchTeams();
+  }, [token, organization, api, fetchProfile, fetchTeams, navigate]);
+
+  // Fetch team users whenever team_id changes
   useEffect(() => {
     fetchTeamUsers();
   }, [formData.team_id, fetchTeamUsers]);
 
-  // Form change handler
+  // Handle form change and priority
   const handleChange = (e) => {
     const { name, value } = e.target;
-
     const updated = {
       ...formData,
       [name]: name.includes("_id") ? String(value) : value,
@@ -182,12 +196,9 @@ const TicketForm = ({ organization, token }) => {
         ? { ticketNumber: generateTicketNumber(value) }
         : {}),
     };
-
     setFormData(updated);
 
-    if (["urgency", "impact"].includes(name)) {
-      calculatePriority(updated);
-    }
+    if (["urgency", "impact"].includes(name)) calculatePriority(updated);
   };
 
   const calculatePriority = (data) => {
@@ -206,10 +217,9 @@ const TicketForm = ({ organization, token }) => {
     setFormData((prev) => ({ ...prev, priority: matrix[key] || "p4" }));
   };
 
-  // Submit ticket
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!token || !organization?.subdomain || !currentUser) return;
+    if (!api || !currentUser) return;
 
     const required = [
       "subject",
@@ -222,7 +232,6 @@ const TicketForm = ({ organization, token }) => {
       "team_id",
     ];
     const missing = required.filter((field) => !formData[field]);
-
     if (missing.length) {
       const msg = `Missing required fields: ${missing.join(", ")}`;
       toast.error(msg);
@@ -305,7 +314,6 @@ const TicketForm = ({ organization, token }) => {
 
       <form onSubmit={handleSubmit} encType="multipart/form-data">
         <TicketMetaSection formData={formData} currentUser={currentUser} />
-
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium">Reported Date</label>
@@ -336,7 +344,6 @@ const TicketForm = ({ organization, token }) => {
           handleChange={handleChange}
           loading={loading}
         />
-
         <TeamAssignmentSection
           formData={formData}
           teams={teams}
@@ -345,13 +352,11 @@ const TicketForm = ({ organization, token }) => {
           loadingTeams={teamsLoading}
           loadingUsers={teamUsersLoading}
         />
-
         <CallerDetailsSection
           formData={formData}
           handleChange={handleChange}
           loading={loading}
         />
-
         <DescriptionSection
           formData={formData}
           handleChange={handleChange}
@@ -359,7 +364,6 @@ const TicketForm = ({ organization, token }) => {
           setAttachment={setAttachment}
           loading={loading}
         />
-
         <FormActions loading={loading} />
       </form>
     </div>
