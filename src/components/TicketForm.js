@@ -52,6 +52,17 @@ const TicketForm = ({ organization, token }) => {
     return `${prefix}${randomString}`;
   };
 
+  // Convert Date to local datetime for input
+  const toLocalDateTimeInput = (date = new Date()) => {
+    const pad = (num) => String(num).padStart(2, "0");
+    const year = date.getFullYear();
+    const month = pad(date.getMonth() + 1);
+    const day = pad(date.getDate());
+    const hours = pad(date.getHours());
+    const minutes = pad(date.getMinutes());
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
   const [formData, setFormData] = useState({
     ticketNumber: generateTicketNumber("Incident"),
     ticketStatus: "Open",
@@ -62,7 +73,7 @@ const TicketForm = ({ organization, token }) => {
     callerLocation: "",
     subject: "",
     description: "",
-    reportedDate: new Date().toISOString().slice(0, 16),
+    reportedDate: toLocalDateTimeInput(), // local time
     relatedRecord: "",
     ticket_type: "Incident",
     category: "Technical",
@@ -73,28 +84,19 @@ const TicketForm = ({ organization, token }) => {
     assignee_id: "",
   });
 
-  // Memoize API instance, only if token & subdomain exist
   const api = useMemo(() => {
     if (!token || !organization?.subdomain) return null;
-    console.log("Creating API instance", {
-      token,
-      subdomain: organization.subdomain,
-    });
     return createApiInstance(token, organization.subdomain);
   }, [token, organization?.subdomain]);
 
-  // Fetch profile
   const fetchProfile = useCallback(async () => {
     if (!api || profileFetchedRef.current) return;
 
     setProfileLoading(true);
     try {
-      console.log("Fetching profile...");
       const response = await api.get(
         `/organizations/${organization.subdomain}/profile`
       );
-
-      // Rails returns current_user, not user
       const user = response.data?.current_user;
       if (!user) throw new Error("User not found");
 
@@ -118,7 +120,6 @@ const TicketForm = ({ organization, token }) => {
       }));
 
       profileFetchedRef.current = true;
-      console.log("Profile fetched successfully", user);
     } catch (err) {
       const msg =
         err?.response?.data?.error || err.message || "Failed to fetch profile.";
@@ -130,7 +131,6 @@ const TicketForm = ({ organization, token }) => {
     }
   }, [api, organization?.subdomain]);
 
-  // Fetch teams
   const fetchTeams = useCallback(async () => {
     if (!api) return;
     setTeamsLoading(true);
@@ -139,7 +139,6 @@ const TicketForm = ({ organization, token }) => {
         `/organizations/${organization.subdomain}/teams`
       );
       setTeams(response.data || []);
-      console.log("Teams fetched:", response.data);
     } catch (err) {
       const msg = err.message || "Failed to fetch teams.";
       setError(msg);
@@ -149,7 +148,6 @@ const TicketForm = ({ organization, token }) => {
     }
   }, [api, organization?.subdomain]);
 
-  // Fetch team users
   const fetchTeamUsers = useCallback(async () => {
     if (!api || !formData.team_id) return;
 
@@ -168,7 +166,6 @@ const TicketForm = ({ organization, token }) => {
     }
   }, [api, formData.team_id, organization?.subdomain]);
 
-  // Wait for token & organization before fetching
   useEffect(() => {
     if (!token) {
       navigate("/login");
@@ -180,14 +177,13 @@ const TicketForm = ({ organization, token }) => {
     fetchTeams();
   }, [token, organization, api, fetchProfile, fetchTeams, navigate]);
 
-  // Fetch team users whenever team_id changes
   useEffect(() => {
     fetchTeamUsers();
   }, [formData.team_id, fetchTeamUsers]);
 
-  // Handle form change and priority
   const handleChange = (e) => {
     const { name, value } = e.target;
+
     const updated = {
       ...formData,
       [name]: name.includes("_id") ? String(value) : value,
@@ -196,6 +192,7 @@ const TicketForm = ({ organization, token }) => {
         ? { ticketNumber: generateTicketNumber(value) }
         : {}),
     };
+
     setFormData(updated);
 
     if (["urgency", "impact"].includes(name)) calculatePriority(updated);
@@ -250,25 +247,32 @@ const TicketForm = ({ organization, token }) => {
     }
 
     const payload = new FormData();
-    payload.append("ticket[title]", formData.subject);
-    payload.append("ticket[description]", formData.description);
-    payload.append("ticket[ticket_type]", formData.ticket_type);
-    payload.append("ticket[urgency]", formData.urgency);
-    payload.append("ticket[impact]", formData.impact);
-    payload.append("ticket[priority]", formData.priority);
-    payload.append("ticket[team_id]", formData.team_id);
-    payload.append("ticket[assignee_id]", formData.assignee_id || "");
-    payload.append("ticket[ticket_number]", formData.ticketNumber);
-    payload.append("ticket[reported_at]", formData.reportedDate);
-    payload.append("ticket[caller_name]", formData.callerName);
-    payload.append("ticket[caller_surname]", formData.callerSurname);
-    payload.append("ticket[caller_email]", formData.callerEmail);
-    payload.append("ticket[caller_phone]", formData.callerContact);
-    payload.append("ticket[customer]", formData.callerLocation);
-    payload.append("ticket[source]", "Web");
-    payload.append("ticket[category]", formData.category);
-    payload.append("ticket[creator_id]", currentUser.id);
-    payload.append("ticket[requester_id]", currentUser.id);
+
+    // Convert local datetime to UTC for backend
+    const reportedAtUTC = new Date(formData.reportedDate).toISOString();
+
+    Object.entries({
+      title: formData.subject,
+      description: formData.description,
+      ticket_type: formData.ticket_type,
+      urgency: formData.urgency,
+      impact: formData.impact,
+      priority: formData.priority,
+      team_id: formData.team_id,
+      assignee_id: formData.assignee_id || "",
+      ticket_number: formData.ticketNumber,
+      reported_at: reportedAtUTC, // send UTC
+      caller_name: formData.callerName,
+      caller_surname: formData.callerSurname,
+      caller_email: formData.callerEmail,
+      caller_phone: formData.callerContact,
+      customer: formData.callerLocation,
+      source: "Web",
+      category: formData.category,
+      creator_id: currentUser.id,
+      requester_id: currentUser.id,
+    }).forEach(([key, val]) => payload.append(`ticket[${key}]`, val));
+
     if (attachment) payload.append("ticket[attachment]", attachment);
 
     try {
@@ -286,7 +290,7 @@ const TicketForm = ({ organization, token }) => {
         state: { newTicket: response.data, refresh: true },
       });
     } catch (err) {
-      let msg = "Failed to create ticket";
+      let msg = err.response?.data?.error || "Failed to create ticket";
       if (err.response?.data?.errors) {
         const errors = err.response.data.errors;
         if (Array.isArray(errors)) msg = errors.join(", ");
@@ -294,7 +298,7 @@ const TicketForm = ({ organization, token }) => {
           msg = Object.entries(errors)
             .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`)
             .join("; ");
-      } else if (err.response?.data?.error) msg = err.response.data.error;
+      }
       toast.error(msg);
       setError(msg);
     } finally {
@@ -314,6 +318,7 @@ const TicketForm = ({ organization, token }) => {
 
       <form onSubmit={handleSubmit} encType="multipart/form-data">
         <TicketMetaSection formData={formData} currentUser={currentUser} />
+
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium">Reported Date</label>
