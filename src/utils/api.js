@@ -16,7 +16,7 @@ const createApiInstance = (token, subdomain) => {
   const baseURL = isDev
     ? "http://localhost:3000/api/v1" // Dev: Rails backend
     : process.env.REACT_APP_API_BASE_URL ||
-      "https://itsm-api.onrender.com/api/v1";
+      "https://itsm-api-w8vr.onrender.com/"; //update the api url here
 
   console.log("Creating API instance:", { baseURL, subdomain }); // No token in logs
 
