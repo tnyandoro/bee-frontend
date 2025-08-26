@@ -2,24 +2,18 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../contexts/authContext";
 import { toast } from "react-toastify";
-import Cookies from "js-cookie";
 import logor from "../assets/logor.png";
 import bg from "../assets/main_bg.png";
 import splashLogo from "../assets/splash_logo.png";
 
 const Login = ({ loginType = "User" }) => {
-  const { login } = useAuth();
+  const { login, currentUser } = useAuth();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
     subdomain: "",
   });
-  const [errors, setErrors] = useState({
-    subdomain: "",
-    email: "",
-    password: "",
-    general: "",
-  });
+  const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
@@ -32,18 +26,16 @@ const Login = ({ loginType = "User" }) => {
   }, []);
 
   useEffect(() => {
-    const token = Cookies.get("authToken");
-    if (token) {
-      handleExistingSessionRedirect();
+    if (currentUser) {
+      redirectAfterLogin(currentUser.role);
     }
-  }, [navigate]);
+  }, [currentUser]);
 
-  const sanitizeSubdomain = (input) => {
-    return input
+  const sanitizeSubdomain = (input) =>
+    input
       .toLowerCase()
       .replace(/[^a-z0-9-]/g, "")
       .trim();
-  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -53,49 +45,28 @@ const Login = ({ loginType = "User" }) => {
     }));
   };
 
-  const handleExistingSessionRedirect = () => {
-    const storedSubdomain = Cookies.get("subdomain");
-    const storedRole = Cookies.get("role");
-    console.log("Existing session detected:", { storedSubdomain, storedRole });
-
-    if (storedSubdomain && storedRole) {
-      if (storedRole === "system_admin" || storedRole === "domain_admin") {
-        navigate("/dashboard");
-      } else {
-        navigate("/user/dashboard");
-      }
-    }
-  };
-
   const validateForm = () => {
-    const newErrors = {
-      subdomain: "",
-      email: "",
-      password: "",
-      general: "",
-    };
-
-    if (!formData.subdomain.trim()) {
+    const newErrors = {};
+    if (!formData.subdomain)
       newErrors.subdomain = "Organization subdomain is required";
-    } else if (!/^[a-z0-9-]{3,}$/.test(formData.subdomain)) {
+    else if (!/^[a-z0-9-]{3,}$/.test(formData.subdomain))
       newErrors.subdomain =
         "Invalid subdomain format (min 3 chars, alphanumeric or hyphens)";
-    }
-
-    if (!formData.email.trim()) {
-      newErrors.email = "Email is required";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    if (!formData.email) newErrors.email = "Email is required";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))
       newErrors.email = "Invalid email format";
-    }
-
-    if (!formData.password.trim()) {
-      newErrors.password = "Password is required";
-    } else if (formData.password.length < 6) {
+    if (!formData.password) newErrors.password = "Password is required";
+    else if (formData.password.length < 6)
       newErrors.password = "Password must be at least 6 characters";
-    }
 
     setErrors(newErrors);
-    return !Object.values(newErrors).some((error) => error);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const redirectAfterLogin = (role) => {
+    if (role === "system_admin" || role === "domain_admin")
+      navigate("/dashboard");
+    else navigate("/user/dashboard");
   };
 
   const handleLogin = async (e) => {
@@ -103,55 +74,32 @@ const Login = ({ loginType = "User" }) => {
     if (!validateForm()) return;
 
     setIsLoading(true);
-    setErrors((prev) => ({ ...prev, general: "" }));
+    setErrors({});
 
     try {
-      console.log("Submitting login with:", formData); // Debug log
-      await login(formData.email, formData.password, formData.subdomain);
-
-      toast.success("You have successfully logged in", {
-        position: "top-right",
-        autoClose: 6000,
-        hideProgressBar: true,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-        theme: "light",
-      });
-
-      const storedRole = Cookies.get("role");
-      if (!storedRole) {
-        console.warn("Role missing after login, defaulting to user dashboard");
-        navigate("/user/dashboard");
-      } else if (
-        storedRole === "system_admin" ||
-        storedRole === "domain_admin"
-      ) {
-        navigate("/dashboard");
-      } else {
-        navigate("/user/dashboard");
+      const success = await login(
+        formData.email,
+        formData.password,
+        formData.subdomain
+      );
+      if (success) {
+        toast.success("You have successfully logged in", {
+          position: "top-right",
+          autoClose: 6000,
+          hideProgressBar: true,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          theme: "light",
+        });
+        // navigation happens automatically in useEffect when currentUser updates
       }
     } catch (error) {
-      console.error("Login error:", error.message, error);
-      let errorMessage = "Login failed. Please try again";
-
-      if (error.message.includes("timeout")) {
-        errorMessage = "Request timed out. Please try again";
-      } else if (error.message.includes("Organization not found")) {
-        errorMessage = "Organization not found";
-      } else if (error.message.includes("Invalid credentials")) {
-        errorMessage = "Invalid email or password";
-      } else if (error.message.includes("Invalid role")) {
-        errorMessage = "User role is invalid or missing";
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-
+      console.error("Login error:", error);
       setErrors({
-        subdomain: errorMessage.includes("Organization") ? errorMessage : "",
-        email: errorMessage.includes("credentials") ? errorMessage : "",
-        password: errorMessage.includes("credentials") ? errorMessage : "",
-        general: errorMessage,
+        general:
+          error.message ||
+          "Login failed. Please check your credentials and try again.",
       });
     } finally {
       setIsLoading(false);

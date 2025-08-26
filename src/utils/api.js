@@ -6,44 +6,44 @@ const createApiInstance = (token, subdomain) => {
     throw new Error("Authentication token is required");
   }
 
+  if (!subdomain) {
+    console.warn("No subdomain provided. API requests may fail.");
+  }
+
   const isDev = process.env.NODE_ENV === "development";
 
-  // Use HTTPS in production; relative URL in development for flexibility
-  let baseURL = isDev
-    ? "/api/v1" // Relative path for dev proxy
+  // Base URL configuration
+  const baseURL = isDev
+    ? "http://localhost:3000/api/v1" // Dev: Rails backend
     : process.env.REACT_APP_API_BASE_URL ||
       "https://itsm-api.onrender.com/api/v1";
-
-  // Ensure no trailing slash
-  if (baseURL.endsWith("/")) {
-    baseURL = baseURL.slice(0, -1);
-  }
 
   console.log("Creating API instance:", { baseURL, subdomain }); // No token in logs
 
   const instance = axios.create({
-    baseURL,
+    baseURL: baseURL.endsWith("/") ? baseURL.slice(0, -1) : baseURL,
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
       "X-Organization-Subdomain": subdomain,
     },
     timeout: 60000,
-    withCredentials: true, // Keep for CORS with credentials, verify backend CORS
+    withCredentials: true, // For CORS with credentials
   });
 
+  // Response interceptor for unified error handling
   instance.interceptors.response.use(
     (response) => response,
     (error) => {
+      const status = error.response?.status;
       const errorMessage =
         error.response?.data?.message ||
         error.response?.data?.error ||
         "An unexpected error occurred";
 
-      switch (error.response?.status) {
+      switch (status) {
         case 401:
           console.error("Authentication error:", errorMessage);
-          // Trigger logout or redirect to login in auth context
           window.dispatchEvent(new CustomEvent("auth:unauthorized"));
           return Promise.reject(
             new Error("Session expired. Please log in again.")
@@ -72,4 +72,3 @@ const createApiInstance = (token, subdomain) => {
 };
 
 export default createApiInstance;
-// fix

@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { X } from "lucide-react";
 
 const CreateUserForm = ({ onClose }) => {
-  const { token, subdomain } = useAuth(); // Removed unused currentUser
+  const { token, subdomain } = useAuth();
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
@@ -21,7 +21,7 @@ const CreateUserForm = ({ onClose }) => {
     avatar: null,
   });
 
-  const [roleOptions, setRoleOptions] = useState([
+  const [roleOptions] = useState([
     { value: "call_center_agent", label: "Call Center Agent" },
     { value: "service_desk_agent", label: "Service Desk Agent" },
     { value: "service_desk_tl", label: "Service Desk Team Leader" },
@@ -57,9 +57,7 @@ const CreateUserForm = ({ onClose }) => {
   // Cleanup preview URL
   useEffect(() => {
     return () => {
-      if (avatarPreview) {
-        URL.revokeObjectURL(avatarPreview);
-      }
+      if (avatarPreview) URL.revokeObjectURL(avatarPreview);
     };
   }, [avatarPreview]);
 
@@ -86,16 +84,14 @@ const CreateUserForm = ({ onClose }) => {
     setStatus({ loading: true, error: null, success: false });
 
     try {
-      const url = `https://itsm-api.onrender.com/api/v1/organizations/${subdomain}/users`;
+      const apiBaseUrl = process.env.REACT_APP_API_BASE_URL; // use .env for dev/prod
+      const url = `${apiBaseUrl}/api/v1/organizations/${subdomain}/users`;
+
       const formDataToSend = new FormData();
-
-      // Append form data
       Object.entries(formData).forEach(([key, value]) => {
-        if (value !== null && value !== "") {
+        if (value !== null && value !== "")
           formDataToSend.append(`user[${key}]`, value);
-        }
       });
-
       formDataToSend.append("organization_subdomain", subdomain);
 
       await axios.post(url, formDataToSend, {
@@ -107,7 +103,7 @@ const CreateUserForm = ({ onClose }) => {
 
       setStatus({ loading: false, success: true, error: null });
 
-      // Reset form after success
+      // Reset form
       setFormData({
         name: "",
         last_name: "",
@@ -122,7 +118,6 @@ const CreateUserForm = ({ onClose }) => {
       });
       setAvatarPreview(null);
 
-      // Close after delay
       setTimeout(() => onClose?.(), 1500);
     } catch (error) {
       const errorMessage =
@@ -132,7 +127,6 @@ const CreateUserForm = ({ onClose }) => {
     }
   };
 
-  // Compute full name for preview
   const fullNamePreview =
     `${formData.name} ${formData.last_name}`.trim() || "Full Name Preview";
 
@@ -156,7 +150,6 @@ const CreateUserForm = ({ onClose }) => {
             {status.error}
           </div>
         )}
-
         {status.success && (
           <div className="mb-4 p-3 bg-green-50 text-green-700 border border-green-200 rounded">
             User created successfully!
@@ -178,7 +171,6 @@ const CreateUserForm = ({ onClose }) => {
                 className="w-full border border-gray-300 rounded px-3 py-2"
               />
             </div>
-
             {/* Last Name */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -192,7 +184,6 @@ const CreateUserForm = ({ onClose }) => {
                 className="w-full border border-gray-300 rounded px-3 py-2"
               />
             </div>
-
             {/* Full Name Preview */}
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -205,7 +196,6 @@ const CreateUserForm = ({ onClose }) => {
                 className="w-full border border-gray-300 rounded px-3 py-2 bg-gray-100 text-gray-500 cursor-not-allowed"
               />
             </div>
-
             {/* Email */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -220,7 +210,6 @@ const CreateUserForm = ({ onClose }) => {
                 className="w-full border border-gray-300 rounded px-3 py-2"
               />
             </div>
-
             {/* Username */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -234,7 +223,6 @@ const CreateUserForm = ({ onClose }) => {
                 className="w-full border border-gray-300 rounded px-3 py-2"
               />
             </div>
-
             {/* Phone Number */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -247,7 +235,6 @@ const CreateUserForm = ({ onClose }) => {
                 className="w-full border border-gray-300 rounded px-3 py-2"
               />
             </div>
-
             {/* Position */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -260,7 +247,6 @@ const CreateUserForm = ({ onClose }) => {
                 className="w-full border border-gray-300 rounded px-3 py-2"
               />
             </div>
-
             {/* Role */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -280,7 +266,6 @@ const CreateUserForm = ({ onClose }) => {
                 ))}
               </select>
             </div>
-
             {/* Password */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -295,7 +280,6 @@ const CreateUserForm = ({ onClose }) => {
                 className="w-full border border-gray-300 rounded px-3 py-2"
               />
             </div>
-
             {/* Confirm Password */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -322,12 +306,7 @@ const CreateUserForm = ({ onClose }) => {
               name="avatar"
               accept="image/*"
               onChange={handleChange}
-              className="w-full text-sm text-gray-500
-                file:mr-4 file:py-2 file:px-4
-                file:rounded file:border-0
-                file:text-sm file:font-semibold
-                file:bg-blue-50 file:text-blue-700
-                hover:file:bg-blue-100"
+              className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
             />
             {avatarPreview && (
               <div className="mt-3 flex items-center">
