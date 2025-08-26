@@ -81,6 +81,8 @@ const metricColors = {
   blue: "border-blue-200 bg-blue-50 text-blue-700",
 };
 
+// No transformation needed - Rails API now provides charts data directly
+
 const Dashboard = () => {
   const { currentUser, token, subdomain: contextSubdomain } = useAuth();
   const navigate = useNavigate();
@@ -127,16 +129,20 @@ const Dashboard = () => {
         response.data
       );
 
-      const data = response.data.data || response.data;
+      const rawData = response.data.data || response.data;
 
       // Normalize organization object
-      if (data.organization && typeof data.organization === "string") {
-        data.organization = { name: data.organization };
-      } else if (data.organization && !data.organization.name) {
-        data.organization.name = "Organization";
+      if (rawData.organization && typeof rawData.organization === "string") {
+        rawData.organization = { name: rawData.organization };
+      } else if (rawData.organization && !rawData.organization.name) {
+        rawData.organization.name = "Organization";
       }
 
-      setDashboardData(data);
+      // Transform the data to include charts
+      const transformedData = transformDashboardData(rawData);
+      console.log("Transformed dashboard data:", transformedData);
+
+      setDashboardData(transformedData);
       setError("");
       setRetryCount(0);
     } catch (err) {
@@ -355,64 +361,72 @@ const Dashboard = () => {
                 </tr>
               </thead>
               <tbody className="text-sm">
-                {recent_tickets.map((t) => (
-                  <tr key={t.id} className="border-b hover:bg-gray-50">
-                    <td className="px-4 py-2 font-medium text-indigo-600 truncate max-w-xs">
-                      {t.title || "Untitled"}
-                    </td>
-                    <td className="px-4 py-2">
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs ${
-                          {
-                            open: "bg-yellow-100 text-yellow-800",
-                            assigned: "bg-blue-100 text-blue-800",
-                            escalated: "bg-purple-100 text-purple-800",
-                            resolved: "bg-green-100 text-green-800",
-                            closed: "bg-gray-100 text-gray-800",
-                            suspended: "bg-orange-100 text-orange-800",
-                            pending: "bg-gray-200 text-gray-800",
-                          }[t.status] || "bg-gray-100 text-gray-800"
-                        }`}
-                      >
-                        {t.status || "Unknown"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2">
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs ${
-                          {
-                            p1: "bg-red-100 text-red-800",
-                            p2: "bg-orange-100 text-orange-800",
-                            p3: "bg-yellow-100 text-yellow-800",
-                            p4: "bg-green-100 text-green-800",
-                          }[t.priority] || "bg-gray-100 text-gray-800"
-                        }`}
-                      >
-                        {t.priority || "Unknown"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2">{t.assignee || "Unassigned"}</td>
-                    <td className="px-4 py-2">{t.reporter || "Unknown"}</td>
-                    <td className="px-4 py-2 text-gray-500">
-                      {t.created_at
-                        ? new Date(t.created_at).toLocaleDateString()
-                        : "N/A"}
-                    </td>
-                    <td className="px-4 py-2">
-                      {t.sla_breached ? (
-                        <span className="text-red-600 text-xs">
-                          ❌ Breached
+                {recent_tickets.map((t) => {
+                  // Clean up priority for display
+                  let displayPriority = t.priority;
+                  // Priority should now come clean from the API (p1, p2, p3, p4)
+
+                  return (
+                    <tr key={t.id} className="border-b hover:bg-gray-50">
+                      <td className="px-4 py-2 font-medium text-indigo-600 truncate max-w-xs">
+                        {t.title || "Untitled"}
+                      </td>
+                      <td className="px-4 py-2">
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs ${
+                            {
+                              open: "bg-yellow-100 text-yellow-800",
+                              assigned: "bg-blue-100 text-blue-800",
+                              escalated: "bg-purple-100 text-purple-800",
+                              resolved: "bg-green-100 text-green-800",
+                              closed: "bg-gray-100 text-gray-800",
+                              suspended: "bg-orange-100 text-orange-800",
+                              pending: "bg-gray-200 text-gray-800",
+                            }[t.status] || "bg-gray-100 text-gray-800"
+                          }`}
+                        >
+                          {t.status || "Unknown"}
                         </span>
-                      ) : t.breaching_sla ? (
-                        <span className="text-yellow-600 text-xs">
-                          ⚠️ Breaching
+                      </td>
+                      <td className="px-4 py-2">
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs ${
+                            {
+                              p1: "bg-red-100 text-red-800",
+                              p2: "bg-orange-100 text-orange-800",
+                              p3: "bg-yellow-100 text-yellow-800",
+                              p4: "bg-green-100 text-green-800",
+                            }[displayPriority] || "bg-gray-100 text-gray-800"
+                          }`}
+                        >
+                          {displayPriority || "Unknown"}
                         </span>
-                      ) : (
-                        <span className="text-green-600 text-xs">✅ OK</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-4 py-2">
+                        {t.assignee || "Unassigned"}
+                      </td>
+                      <td className="px-4 py-2">{t.reporter || "Unknown"}</td>
+                      <td className="px-4 py-2 text-gray-500">
+                        {t.created_at
+                          ? new Date(t.created_at).toLocaleDateString()
+                          : "N/A"}
+                      </td>
+                      <td className="px-4 py-2">
+                        {t.sla_breached ? (
+                          <span className="text-red-600 text-xs">
+                            ❌ Breached
+                          </span>
+                        ) : t.breaching_sla ? (
+                          <span className="text-yellow-600 text-xs">
+                            ⚠️ Breaching
+                          </span>
+                        ) : (
+                          <span className="text-green-600 text-xs">✅ OK</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
