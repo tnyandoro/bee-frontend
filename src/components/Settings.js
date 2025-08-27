@@ -39,7 +39,7 @@ const Settings = () => {
 
     try {
       const response = await axios.get(
-        `https://itsm-api.onrender.com/api/v1/organizations/${subdomain}/settings`,
+        `https://itsm-api-w8vr.onrender.com/api/v1/organizations/${subdomain}/settings`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -62,7 +62,7 @@ const Settings = () => {
     setSaving(true);
     try {
       const response = await axios.put(
-        `https://itsm-api.onrender.com/api/v1/organizations/${subdomain}/settings`,
+        `https://itsm-api-w8vr.onrender.com/api/v1/organizations/${subdomain}/settings`,
         { key, value },
         {
           headers: {
@@ -139,7 +139,7 @@ const Settings = () => {
                 try {
                   setSaving(true);
                   const response = await axios.post(
-                    `https://itsm-api.onrender.com/api/v1/organizations/${subdomain}/upload_logo`,
+                    `https://itsm-api-w8vr.onrender.com/api/v1/organizations/${subdomain}/upload_logo`,
                     formData,
                     {
                       headers: {

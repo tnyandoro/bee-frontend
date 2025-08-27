@@ -11,7 +11,7 @@ const useAuth = () => {
   const [error, setError] = useState(null);
 
   const API_BASE =
-    process.env.REACT_APP_API_BASE_URL || "https://itsm-api.onrender.com";
+    process.env.REACT_APP_API_BASE_URL || "https://itsm-api-w8vr.onrender.com";
 
   const updateAuth = useCallback((newToken, newSubdomain) => {
     const cleanToken = newToken || null;
