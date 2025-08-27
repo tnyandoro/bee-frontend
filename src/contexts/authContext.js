@@ -29,7 +29,7 @@ const getApiBaseUrl = () => {
     process.env.REACT_APP_API_BASE_URL ||
     (process.env.NODE_ENV === "development"
       ? "http://lvh.me:3000/api/v1"
-      : "https://itsm-api.onrender.com/api/v1"); // fixed
+      : "https://itsm-api-w8vr.onrender.com/api/v1");
   if (!base.endsWith("/api/v1")) base = `${base}/api/v1`;
   return base;
 };
@@ -65,7 +65,9 @@ export const AuthProvider = ({ children }) => {
     []
   );
 
+  // FIXED: Define logout outside of verifyAuth dependencies
   const logout = useCallback(() => {
+    console.log("Logging out user");
     ["authToken", "subdomain", "email", "role", "userId"].forEach((name) =>
       Cookies.remove(name, { path: "/", secure: true, sameSite: "strict" })
     );
@@ -81,7 +83,6 @@ export const AuthProvider = ({ children }) => {
       loading: false,
       error: null,
     });
-    window.dispatchEvent(new CustomEvent("auth:unauthorized"));
   }, []);
 
   const verifyAuth = useCallback(
@@ -100,7 +101,11 @@ export const AuthProvider = ({ children }) => {
         setState((prev) => ({ ...prev, loading: true, error: null }));
         const apiBase = getApiBaseUrl();
 
-        // ✅ Use organization-level profile route
+        console.log(
+          `Verifying auth: ${apiBase}/organizations/${sanitizedSubdomain}/profile`
+        );
+        console.log(`Token present: ${!!token}`);
+
         const response = await axios.get(
           `${apiBase}/organizations/${sanitizedSubdomain}/profile`,
           {
@@ -114,6 +119,11 @@ export const AuthProvider = ({ children }) => {
 
         const user = response.data.current_user || null;
         const organization = response.data.organization || null;
+
+        console.log("Auth verification successful:", {
+          user: !!user,
+          organization: !!organization,
+        });
 
         const sanitizedUser = user
           ? {
@@ -157,6 +167,7 @@ export const AuthProvider = ({ children }) => {
 
         return true;
       } catch (error) {
+        console.error("Auth verification failed:", error);
         const status = error.response?.status;
         const message =
           status === 401
@@ -167,11 +178,14 @@ export const AuthProvider = ({ children }) => {
 
         setState((prev) => ({ ...prev, error: message, loading: false }));
 
-        if (status === 401) logout(); // only logout on 401
+        // FIXED: Don't call logout directly, dispatch event instead
+        if (status === 401) {
+          window.dispatchEvent(new CustomEvent("auth:unauthorized"));
+        }
         return false;
       }
     },
-    [logout]
+    [] // FIXED: Removed logout from dependencies to prevent circular calls
   );
 
   const login = useCallback(
@@ -187,6 +201,10 @@ export const AuthProvider = ({ children }) => {
 
       try {
         const apiBase = getApiBaseUrl();
+        console.log(
+          `Login attempt: ${apiBase}/login for ${sanitizedEmail}@${sanitizedSubdomain}`
+        );
+
         const response = await axios.post(
           `${apiBase}/login`,
           {
@@ -198,12 +216,13 @@ export const AuthProvider = ({ children }) => {
         );
 
         const { auth_token } = response.data;
-        console.log("Login successful, token:", auth_token);
+        console.log("Login successful, token received");
 
         await verifyAuth(auth_token, sanitizedSubdomain);
 
         return true;
       } catch (error) {
+        console.error("Login failed:", error);
         const message = error.response?.data?.message || "Login failed";
         setState((prev) => ({ ...prev, error: message, loading: false }));
         throw new Error(message);
@@ -212,14 +231,25 @@ export const AuthProvider = ({ children }) => {
     [verifyAuth]
   );
 
+  // FIXED: Only run auth check once on mount, with proper cleanup
   useEffect(() => {
+    console.log("AuthProvider initializing...");
     const { token, subdomain } = getAuthTokens();
-    if (subdomain) verifyAuth(token, subdomain);
-    else setState((prev) => ({ ...prev, loading: false, subdomain }));
-  }, [getAuthTokens, verifyAuth]);
+    if (token && subdomain) {
+      console.log("Found existing tokens, verifying auth...");
+      verifyAuth(token, subdomain);
+    } else {
+      console.log("No existing tokens found");
+      setState((prev) => ({ ...prev, loading: false }));
+    }
+  }, []); // Empty dependency array - only run once
 
+  // Handle unauthorized events
   useEffect(() => {
-    const handleUnauthorized = () => logout();
+    const handleUnauthorized = () => {
+      console.log("Handling unauthorized event");
+      logout();
+    };
     window.addEventListener("auth:unauthorized", handleUnauthorized);
     return () =>
       window.removeEventListener("auth:unauthorized", handleUnauthorized);
