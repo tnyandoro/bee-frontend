@@ -81,8 +81,6 @@ const metricColors = {
   blue: "border-blue-200 bg-blue-50 text-blue-700",
 };
 
-// No transformation needed - Rails API now provides charts data directly
-
 const Dashboard = () => {
   const { currentUser, token, subdomain: contextSubdomain } = useAuth();
   const navigate = useNavigate();
@@ -138,11 +136,10 @@ const Dashboard = () => {
         rawData.organization.name = "Organization";
       }
 
-      // Transform the data to include charts
-      const transformedData = transformDashboardData(rawData);
-      console.log("Transformed dashboard data:", transformedData);
+      // Use the data directly since Rails API now provides charts data directly
+      console.log("Dashboard data:", rawData);
 
-      setDashboardData(transformedData);
+      setDashboardData(rawData);
       setError("");
       setRetryCount(0);
     } catch (err) {
