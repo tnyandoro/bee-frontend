@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import apiBaseUrl from "../config";
+import createApiInstance from "../utils/api";
 
 const ResolveTicket = ({
   ticket,
@@ -71,41 +71,32 @@ const ResolveTicket = ({
     console.log("Submitting resolve payload:", payload);
 
     try {
-      let response = await fetch(
-        `${apiBaseUrl}/organizations/${subdomain}/tickets/${ticket.ticket_number}/resolve`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${authToken}`,
-          },
-          body: JSON.stringify(payload),
-        }
-      );
+      // Create API instance
+      const api = createApiInstance(authToken, subdomain);
 
-      if (!response.ok && response.status === 404) {
-        console.log("Falling back to PUT request");
-        response = await fetch(
-          `${apiBaseUrl}/organizations/${subdomain}/tickets/${ticket.ticket_number}`,
-          {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${authToken}`,
-            },
-            body: JSON.stringify(payload),
-          }
+      let response;
+      try {
+        // First attempt - POST to resolve endpoint
+        response = await api.post(
+          `/organizations/${subdomain}/tickets/${ticket.ticket_number}/resolve`,
+          payload
         );
+      } catch (resolveError) {
+        // Fallback - PUT to update endpoint if resolve endpoint fails
+        if (resolveError.response?.status === 404) {
+          console.log("Falling back to PUT request");
+          response = await api.put(
+            `/organizations/${subdomain}/tickets/${ticket.ticket_number}`,
+            payload
+          );
+        } else {
+          throw resolveError;
+        }
       }
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        console.error("API error response:", data);
-        throw new Error(data.error || "Failed to resolve ticket");
-      }
-
+      console.log("Resolve response:", response.data);
       setSuccess("Ticket resolved successfully");
+
       setTimeout(() => {
         onSuccess();
       }, 1000);

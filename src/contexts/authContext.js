@@ -29,7 +29,7 @@ const getApiBaseUrl = () => {
     process.env.REACT_APP_API_BASE_URL ||
     (process.env.NODE_ENV === "development"
       ? "http://lvh.me:3000/api/v1"
-      : "https://itsm-api.onrender.com/api/v1");
+      : "https://itsm-api.onrender.com/api/v1"); // fixed
   if (!base.endsWith("/api/v1")) base = `${base}/api/v1`;
   return base;
 };
