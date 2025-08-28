@@ -70,7 +70,7 @@ const Incident = () => {
       });
 
       const fetchedTickets = Array.isArray(response.data.tickets)
-        ? response.data.tickets
+        ? response.data.tickets.filter((ticket) => ticket && ticket.id) // Filter out null/undefined tickets
         : [];
       setTickets(
         fetchedTickets.sort(
@@ -126,7 +126,10 @@ const Incident = () => {
         created_at: location.state.newTicket.reported_at || Date.now(),
       };
       setTickets((prevTickets) =>
-        [newTicket, ...prevTickets.filter((t) => t.id !== newTicket.id)].sort(
+        [
+          newTicket,
+          ...prevTickets.filter((t) => t && t.id !== newTicket.id),
+        ].sort(
           (a, b) =>
             new Date(b.reported_at || b.created_at) -
             new Date(a.reported_at || a.created_at)
@@ -169,13 +172,29 @@ const Incident = () => {
 
   const handleResolveSuccess = (updatedTicket) => {
     console.log("Incident: Resolve success", { updatedTicket });
+
+    // FIXED: Add defensive check for undefined updatedTicket
+    if (!updatedTicket) {
+      console.error("handleResolveSuccess called without ticket data");
+      // Just refresh the tickets list if no data provided
+      fetchTickets();
+      return;
+    }
+
     setTickets((prev) =>
-      prev.map((t) =>
-        (t.ticket_number || `INC-${t.id}`) ===
-        (updatedTicket.ticket_number || `INC-${updatedTicket.id}`)
-          ? updatedTicket
-          : t
-      )
+      prev
+        .filter((t) => t && t.id) // Remove any undefined/null tickets first
+        .map((t) => {
+          if (!t || !t.ticket_number) {
+            console.warn("Found invalid ticket in state:", t);
+            return t; // Keep as-is, will be filtered out later
+          }
+
+          return (t.ticket_number || `INC-${t.id}`) ===
+            (updatedTicket.ticket_number || `INC-${updatedTicket.id}`)
+            ? updatedTicket
+            : t;
+        })
     );
     setResolveTicket(null);
   };
@@ -205,7 +224,7 @@ const Incident = () => {
       );
       console.log("Incident: Ticket updated", { response: response.data });
       setTickets((prev) =>
-        prev.map((t) => (t.id === updatedTicket.id ? response.data.ticket : t))
+        prev.map((t) => (t && t.id === updatedTicket.id ? response.data : t))
       );
       setSelectedTicket(null);
     } catch (err) {
@@ -292,28 +311,31 @@ const Incident = () => {
     );
   };
 
-  const filteredTickets = tickets.filter((t) => {
-    const term = searchTerm.toLowerCase();
-    return [
-      t.ticket_number,
-      `INC-${t.id}`,
-      t.status,
-      t.customer,
-      t.title,
-      t.priority?.toString(),
-      t.team?.name,
-      t.assignee?.name,
-      t.assignee,
-      t.urgency,
-      t.impact,
-      t.source,
-      t.category,
-      t.caller_name,
-      t.caller_surname,
-      t.caller_email,
-      t.caller_phone,
-    ].some((field) => field?.toLowerCase?.().includes(term));
-  });
+  // FIXED: Filter out null/undefined tickets in filteredTickets
+  const filteredTickets = tickets
+    .filter((t) => t && t.id && t.ticket_number) // Ensure valid tickets
+    .filter((t) => {
+      const term = searchTerm.toLowerCase();
+      return [
+        t.ticket_number,
+        `INC-${t.id}`,
+        t.status,
+        t.customer,
+        t.title,
+        t.priority?.toString(),
+        t.team?.name,
+        t.assignee?.name,
+        t.assignee,
+        t.urgency,
+        t.impact,
+        t.source,
+        t.category,
+        t.caller_name,
+        t.caller_surname,
+        t.caller_email,
+        t.caller_phone,
+      ].some((field) => field?.toLowerCase?.().includes(term));
+    });
 
   const totalPages =
     pagination.total_pages ||
