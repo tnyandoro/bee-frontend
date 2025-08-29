@@ -1,8 +1,9 @@
+// src/components/AdminDashboard.js
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { X, RefreshCw } from "lucide-react";
 import CreateUserForm from "./CreateUserForm";
-import CreateTeamForm from "./CreateTeamForm";
+import TeamForm from "./TeamForm"; // Updated import
 import TeamList from "./TeamList";
 import UserList from "./UserList";
 import createApiInstance from "../utils/api";
@@ -21,7 +22,8 @@ const AdminDashboard = ({ organizationSubdomain }) => {
   const navigate = useNavigate();
 
   const [isCreateUserFormOpen, setIsCreateUserFormOpen] = useState(false);
-  const [isCreateTeamFormOpen, setIsCreateTeamFormOpen] = useState(false);
+  const [isTeamFormOpen, setIsTeamFormOpen] = useState(false);
+  const [selectedTeam, setSelectedTeam] = useState(null); // For editing
   const [showTeams, setShowTeams] = useState(false);
   const [showUsers, setShowUsers] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -122,7 +124,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
         setDashboardStats(null);
       } else {
         // Check if stats are all zeros (except total_members, which may be non-zero)
-        const { total_members, ...otherStats } = statsData.stats;
+        const { total_members, ...otherStats } = statsData.stats; // eslint-disable-line no-unused-vars
         const statsEmpty = Object.values(otherStats).every(
           (value) => value === 0
         );
@@ -219,6 +221,19 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     fetchDashboardStats();
   };
 
+  const handleOpenTeamForm = (team = null) => {
+    setSelectedTeam(team);
+    setIsTeamFormOpen(true);
+  };
+
+  const handleCloseTeamForm = () => {
+    setIsTeamFormOpen(false);
+    setSelectedTeam(null);
+    // Refetch teams and users after create/edit
+    fetchTeams();
+    fetchUsers();
+  };
+
   const stats = dashboardStats?.stats || {
     total_tickets: 0,
     open_tickets: 0,
@@ -262,7 +277,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
           Add User
         </button>
         <button
-          onClick={() => setIsCreateTeamFormOpen(true)}
+          onClick={() => handleOpenTeamForm()}
           className="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded shadow"
         >
           Add Team
@@ -360,19 +375,23 @@ const AdminDashboard = ({ organizationSubdomain }) => {
             </div>
           )}
 
-          {/* Create Team Modal */}
-          {isCreateTeamFormOpen && (
+          {/* Team Form Modal (for create/edit) */}
+          {isTeamFormOpen && (
             <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-[9999]">
               <div className="bg-white p-6 rounded-xl w-full max-w-md shadow-xl relative">
                 <button
-                  onClick={() => setIsCreateTeamFormOpen(false)}
+                  onClick={handleCloseTeamForm}
                   className="absolute top-3 right-3"
                 >
                   <X className="w-5 h-5 text-gray-600" />
                 </button>
-                <h3 className="text-xl font-semibold mb-4">Create Team</h3>
-                <CreateTeamForm
-                  onClose={() => setIsCreateTeamFormOpen(false)}
+                <h3 className="text-xl font-semibold mb-4">
+                  {selectedTeam ? "Edit Team" : "Create Team"}
+                </h3>
+                <TeamForm
+                  initialTeam={selectedTeam}
+                  onClose={handleCloseTeamForm}
+                  onTeamCreated={handleCloseTeamForm}
                 />
               </div>
             </div>
@@ -384,7 +403,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
               <h3 className="text-xl font-semibold text-gray-700 mb-2">
                 Teams
               </h3>
-              <TeamList teams={teams} />
+              <TeamList teams={teams} onEdit={handleOpenTeamForm} />
             </div>
           )}
 
