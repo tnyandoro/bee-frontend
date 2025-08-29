@@ -12,7 +12,14 @@ import ResolveTicket from "./ResolveTicket";
 import TicketDetailsPopup from "./TicketDetailsPopup";
 
 const Incident = () => {
-  const { currentUser, subdomain, token, authError, logout } = useAuth();
+  const {
+    currentUser,
+    subdomain,
+    token,
+    authError,
+    logout,
+    isLoading: authLoading,
+  } = useAuth();
   const [tickets, setTickets] = useState([]);
   const [pagination, setPagination] = useState({
     total_entries: 0,
@@ -35,6 +42,7 @@ const Incident = () => {
     subdomain,
     token,
     authError,
+    authLoading,
     path: location.pathname,
   });
 
@@ -44,11 +52,18 @@ const Incident = () => {
       return;
     }
 
+    // Don't attempt to fetch if auth is still loading
+    if (authLoading) {
+      console.log("Incident: Auth still loading, skipping fetch");
+      return;
+    }
+
     if (!token || !subdomain || !currentUser) {
       console.warn("Incident: Missing auth data", {
         token,
         subdomain,
         currentUser,
+        authLoading,
       });
       setError("Please log in to view incidents.");
       logout();
@@ -70,7 +85,7 @@ const Incident = () => {
       });
 
       const fetchedTickets = Array.isArray(response.data.tickets)
-        ? response.data.tickets.filter((ticket) => ticket && ticket.id) // Filter out null/undefined tickets
+        ? response.data.tickets.filter((ticket) => ticket && ticket.id)
         : [];
       setTickets(
         fetchedTickets.sort(
@@ -114,6 +129,7 @@ const Incident = () => {
     ticketsPerPage,
     logout,
     navigate,
+    authLoading,
   ]);
 
   useEffect(() => {
@@ -145,14 +161,22 @@ const Incident = () => {
   }, [location.state, fetchTickets]);
 
   useEffect(() => {
-    if (token && subdomain && currentUser && !isFetching.current) {
+    // Only attempt to fetch when auth is not loading
+    if (
+      !authLoading &&
+      token &&
+      subdomain &&
+      currentUser &&
+      !isFetching.current
+    ) {
       console.log("Incident: Starting fetchTickets");
       fetchTickets();
-    } else {
-      console.warn("Incident: Missing auth data, setting error", {
-        token,
-        subdomain,
-        currentUser,
+    } else if (!authLoading && (!token || !subdomain || !currentUser)) {
+      console.warn("Incident: Auth completed but missing data", {
+        token: !!token,
+        subdomain: !!subdomain,
+        currentUser: !!currentUser,
+        authLoading,
       });
       setError("Please log in to view incidents.");
     }
@@ -163,7 +187,20 @@ const Incident = () => {
     ticketsPerPage,
     fetchTickets,
     currentUser,
+    authLoading,
   ]);
+
+  // Show loading screen while authentication is loading
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-2"></div>
+          <p>Loading authentication...</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleResolve = (ticket) => {
     console.log("Incident: Resolve ticket", { ticketId: ticket.id });
@@ -173,21 +210,19 @@ const Incident = () => {
   const handleResolveSuccess = (updatedTicket) => {
     console.log("Incident: Resolve success", { updatedTicket });
 
-    // FIXED: Add defensive check for undefined updatedTicket
     if (!updatedTicket) {
       console.error("handleResolveSuccess called without ticket data");
-      // Just refresh the tickets list if no data provided
       fetchTickets();
       return;
     }
 
     setTickets((prev) =>
       prev
-        .filter((t) => t && t.id) // Remove any undefined/null tickets first
+        .filter((t) => t && t.id)
         .map((t) => {
           if (!t || !t.ticket_number) {
             console.warn("Found invalid ticket in state:", t);
-            return t; // Keep as-is, will be filtered out later
+            return t;
           }
 
           return (t.ticket_number || `INC-${t.id}`) ===
@@ -311,9 +346,8 @@ const Incident = () => {
     );
   };
 
-  // FIXED: Filter out null/undefined tickets in filteredTickets
   const filteredTickets = tickets
-    .filter((t) => t && t.id && t.ticket_number) // Ensure valid tickets
+    .filter((t) => t && t.id && t.ticket_number)
     .filter((t) => {
       const term = searchTerm.toLowerCase();
       return [
