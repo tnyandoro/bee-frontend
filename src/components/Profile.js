@@ -7,7 +7,7 @@ import React, {
 } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/authContext";
-import { FaUser, FaLock, FaArrowLeft, FaEdit } from "react-icons/fa";
+import { FaUser, FaLock, FaEdit } from "react-icons/fa";
 import createApiInstance from "../utils/api";
 
 // Profile Picture Uploader Component
@@ -51,7 +51,14 @@ const ProfilePictureUploader = ({ onUploadSuccess, uploading }) => {
 };
 
 const Profile = () => {
-  const { currentUser, token, subdomain, updateUser, logout } = useAuth();
+  const {
+    currentUser,
+    token,
+    subdomain,
+    updateUser,
+    logout,
+    loading: authLoading,
+  } = useAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [error, setError] = useState("");
@@ -66,8 +73,8 @@ const Profile = () => {
     full_name: "",
     phone_number: "",
   });
-  const isCheckingAuth = useRef(false);
   const isFetching = useRef(false);
+  const renderCount = useRef(0);
 
   // Memoize the API instance only after auth is verified
   const api = useMemo(() => {
@@ -75,64 +82,13 @@ const Profile = () => {
     return createApiInstance(token, subdomain);
   }, [token, subdomain, currentUser]);
 
-  // Log renders
-  const renderCount = useRef(0);
-  useEffect(() => {
-    renderCount.current += 1;
-    console.log(`${new Date().toISOString()} Profile rendered`, {
-      renderCount: renderCount.current,
-      path: window.location.pathname,
-      authState: {
-        token: !!token,
-        subdomain: !!subdomain,
-        currentUser: !!currentUser,
-      },
-    });
-  });
-
-  // Check auth, modeled after CreateTicketPage
-  const checkAuth = useCallback(() => {
-    if (isCheckingAuth.current) {
-      console.log(
-        `${new Date().toISOString()} Auth check already in progress, skipping`
-      );
-      return false;
-    }
-
-    isCheckingAuth.current = true;
-    setLoading(true);
-    setError(null);
-
-    if (!token || !subdomain || !currentUser) {
-      console.warn(`${new Date().toISOString()} Missing auth data`, {
-        token: !!token,
-        subdomain: !!subdomain,
-        currentUser: !!currentUser,
-      });
-      setError("Please log in to view your profile.");
-      logout();
-      navigate("/login", { replace: true });
-      isCheckingAuth.current = false;
-      setLoading(false);
-      return false;
-    }
-
-    console.log(`${new Date().toISOString()} Auth check passed`, {
-      subdomain,
-      currentUser,
-    });
-    setError(null);
-    isCheckingAuth.current = false;
-    setLoading(false);
-    return true;
-  }, [token, subdomain, currentUser, logout, navigate]);
-
-  // Fetch profile data
+  // Fetch profile data - Fixed API call to use current user endpoint
   const fetchProfile = useCallback(async () => {
-    if (isFetching.current || !api) {
+    if (isFetching.current || !api || !currentUser) {
       console.log(`${new Date().toISOString()} Fetch skipped`, {
         isFetching: isFetching.current,
         api: !!api,
+        currentUser: !!currentUser,
       });
       return;
     }
@@ -142,19 +98,29 @@ const Profile = () => {
     setError(null);
 
     try {
-      console.log(`${new Date().toISOString()} Fetching profile data`, {
-        url: `/organizations/${subdomain}/profile`,
-      });
+      console.log(
+        `${new Date().toISOString()} Fetching profile data for user`,
+        {
+          userId: currentUser.id,
+          url: `/organizations/${subdomain}/profile`,
+        }
+      );
+
+      // FIXED: Use the organization-scoped profile endpoint
       const res = await api.get(`/organizations/${subdomain}/profile`);
+
       console.log(`${new Date().toISOString()} Profile API response`, {
         status: res.status,
         data: res.data,
       });
-      setProfile(res.data);
-      setProfilePicture(res.data.avatar_url || null);
+
+      // Handle the nested response structure from ProfilesController
+      const userData = res.data.current_user || res.data;
+      setProfile(userData);
+      setProfilePicture(userData.avatar_url || null);
       setFormData({
-        full_name: res.data.full_name || "",
-        phone_number: res.data.phone_number || "",
+        full_name: userData.full_name || userData.name || "",
+        phone_number: userData.phone_number || "",
       });
     } catch (err) {
       console.error(`${new Date().toISOString()} Fetch profile error`, {
@@ -162,12 +128,16 @@ const Profile = () => {
         status: err.response?.status,
         data: err.response?.data,
       });
+
       const message =
         err.response?.data?.error || `Failed to load profile: ${err.message}`;
+
       if (err.response?.status === 401) {
         setError("Session expired. Please log in again.");
         logout();
         navigate("/login", { replace: true });
+      } else if (err.response?.status === 404) {
+        setError("Profile not found. Please contact support.");
       } else {
         setError(message);
       }
@@ -175,12 +145,12 @@ const Profile = () => {
       setLoading(false);
       isFetching.current = false;
     }
-  }, [api, subdomain, logout, navigate]);
+  }, [api, subdomain, currentUser, logout, navigate]);
 
   // Handle avatar upload
   const handleUploadSuccess = useCallback(
     async (file) => {
-      if (!file || !api || !checkAuth()) return;
+      if (!file || !api || !currentUser) return;
 
       setUploading(true);
       const formData = new FormData();
@@ -224,12 +194,12 @@ const Profile = () => {
         setUploading(false);
       }
     },
-    [api, currentUser, subdomain, updateUser, checkAuth]
+    [api, currentUser, subdomain, updateUser]
   );
 
-  // Change password
+  // Change password - Fixed API endpoint
   const handleChangePassword = useCallback(async () => {
-    if (!api || !checkAuth()) return;
+    if (!api || !currentUser) return;
 
     if (!newPassword || !confirmPassword) {
       alert("Please enter both new password and confirmation.");
@@ -243,6 +213,7 @@ const Profile = () => {
 
     try {
       console.log(`${new Date().toISOString()} Changing password`);
+      // FIXED: Use the global password update endpoint
       await api.post("/password/update", {
         new_password: newPassword,
         confirm_password: confirmPassword,
@@ -261,11 +232,11 @@ const Profile = () => {
       const message = err.response?.data?.error || "Failed to change password.";
       alert(message);
     }
-  }, [api, newPassword, confirmPassword, checkAuth]);
+  }, [api, newPassword, confirmPassword, currentUser]);
 
   // Update profile
   const handleUpdateProfile = useCallback(async () => {
-    if (!api || !checkAuth()) return;
+    if (!api || !currentUser) return;
 
     if (!formData.full_name || !formData.phone_number) {
       alert("Please fill in all required fields.");
@@ -295,26 +266,73 @@ const Profile = () => {
       const message = err.response?.data?.error || "Failed to update profile.";
       alert(message);
     }
-  }, [api, formData, currentUser, subdomain, updateUser, checkAuth]);
+  }, [api, formData, currentUser, subdomain, updateUser]);
 
   const handleInputChange = useCallback((e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   }, []);
 
+  // Log renders
   useEffect(() => {
-    console.log(`${new Date().toISOString()} Starting auth check`);
-    if (checkAuth()) {
+    renderCount.current += 1;
+    console.log(`${new Date().toISOString()} Profile rendered`, {
+      renderCount: renderCount.current,
+      path: window.location.pathname,
+      authState: {
+        token: !!token,
+        subdomain: !!subdomain,
+        currentUser: !!currentUser,
+        authLoading,
+      },
+    });
+  });
+
+  useEffect(() => {
+    if (!authLoading && currentUser && api) {
+      console.log(`${new Date().toISOString()} Starting profile fetch`);
       fetchProfile();
     }
-  }, [checkAuth, fetchProfile]);
+  }, [authLoading, currentUser, api, fetchProfile]);
+
+  // Show loading while auth is loading
+  if (authLoading) {
+    return (
+      <div className="p-4 flex justify-center items-center h-64">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-2"></div>
+          <p>Loading authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Check if user is authenticated
+  if (!authLoading && (!token || !subdomain || !currentUser)) {
+    return (
+      <div className="p-4 max-w-2xl mx-auto">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+          <h3 className="font-bold text-lg mb-2">Authentication Required</h3>
+          <p>Please log in to view your profile.</p>
+          <div className="mt-3 space-x-2">
+            <button
+              onClick={() => navigate("/login")}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Go to Login
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
       <div className="p-4 flex justify-center items-center h-64">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-2"></div>
-          <p>Loading...</p>
+          <p>Loading profile...</p>
         </div>
       </div>
     );
@@ -329,10 +347,12 @@ const Profile = () => {
           <div className="mt-3 space-x-2">
             <button
               onClick={() => {
-                console.log(`${new Date().toISOString()} Retrying auth check`);
+                console.log(
+                  `${new Date().toISOString()} Retrying profile fetch`
+                );
                 setError(null);
                 setLoading(true);
-                checkAuth();
+                fetchProfile();
               }}
               className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
             >
@@ -569,4 +589,3 @@ const Profile = () => {
 };
 
 export default Profile;
-// fix
