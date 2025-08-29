@@ -17,78 +17,167 @@ const Sidebar = ({ isLoggedIn }) => {
   const [selected, setSelected] = useState(null);
   const { currentUser: user } = useAuth();
 
-  const links = [
+  const allLinks = [
     {
       id: 1,
       name: "Admin Dashboard",
       path: "/admin-dashboard",
       icon: <Squares2X2Icon className="h-5 w-5" />,
+      allowedRoles: ["system_admin", "domain_admin", "team_leader"],
     },
     {
       id: 2,
       name: "Dashboard",
       path: "/dashboard",
       icon: <HomeIcon className="h-5 w-5" />,
+      allowedRoles: [
+        "system_admin",
+        "domain_admin",
+        "service_desk_agent",
+        "team_leader",
+        "level_1_2_support",
+        "level_3_support",
+        "incident_manager",
+        "problem_manager",
+        "problem_coordinator",
+        "change_manager",
+        "change_coordinator",
+        "department_manager",
+        "general_manager",
+      ],
     },
     {
       id: 3,
       name: "Create Ticket",
       path: "/create-ticket",
       icon: <TicketIcon className="h-5 w-5" />,
+      allowedRoles: [
+        "system_admin",
+        "domain_admin",
+        "incident_manager",
+        "team_leader",
+      ],
     },
     {
       id: 4,
       name: "Incidents",
       path: "/incident",
       icon: <TicketIcon className="h-5 w-5" />,
+      allowedRoles: [
+        "system_admin",
+        "domain_admin",
+        "service_desk_agent",
+        "incident_manager",
+      ],
     },
     {
       id: 5,
       name: "Overview",
       path: "/incident-overview",
       icon: <EyeIcon className="h-5 w-5" />,
+      allowedRoles: [
+        "system_admin",
+        "domain_admin",
+        "service_desk_agent",
+        "incident_manager",
+        "team_leader",
+      ],
     },
     {
       id: 6,
       name: "Knowledge Base",
       path: "/knowledge-base",
       icon: <BookOpenIcon className="h-5 w-5" />,
+      allowedRoles: [
+        "system_admin",
+        "domain_admin",
+        "service_desk_agent",
+        "team_leader",
+        "level_1_2_support",
+        "level_3_support",
+        "incident_manager",
+        "problem_manager",
+        "problem_coordinator",
+        "change_manager",
+        "change_coordinator",
+        "department_manager",
+        "general_manager",
+      ],
     },
     {
       id: 7,
       name: "Create Problems",
       path: "/create-problems",
       icon: <TicketIcon className="h-5 w-5" />,
+      allowedRoles: [
+        "system_admin",
+        "domain_admin",
+        "problem_manager",
+        "problem_coordinator",
+        "team_leader",
+      ],
     },
     {
       id: 8,
       name: "Problems",
       path: "/problems-overview",
       icon: <ExclamationTriangleIcon className="h-5 w-5" />,
+      allowedRoles: [
+        "system_admin",
+        "domain_admin",
+        "team_leader",
+        "problem_manager",
+        "problem_coordinator",
+      ],
     },
     {
       id: 9,
       name: "Settings",
       path: "/settings",
       icon: <CogIcon className="h-5 w-5" />,
+      allowedRoles: ["system_admin", "domain_admin"],
     },
     {
       id: 10,
       name: "My Profile",
       path: "/profile",
       icon: <UserIcon className="h-5 w-5" />,
+      allowedRoles: [
+        "system_admin",
+        "domain_admin",
+        "service_desk_agent",
+        "team_leader",
+        "level_1_2_support",
+        "level_3_support",
+        "incident_manager",
+        "problem_manager",
+        "problem_coordinator",
+        "change_manager",
+        "change_coordinator",
+        "department_manager",
+        "general_manager",
+      ],
     },
     {
       id: 11,
       name: "Create User",
       path: "/create-user",
       icon: <UserPlusIcon className="h-5 w-5" />,
+      allowedRoles: ["system_admin", "domain_admin"],
     },
   ];
+
+  // Filter links based on user role
+  const getFilteredLinks = () => {
+    if (!user || !user.role) return [];
+
+    return allLinks.filter((link) => link.allowedRoles.includes(user.role));
+  };
 
   if (!isLoggedIn) return null;
 
   const profilePicture = user?.profile_picture_url;
+  const filteredLinks = getFilteredLinks();
 
   return (
     <div className="fixed mt-28 mb-8 pb-16 left-0 h-full bg-white shadow-lg w-64 overflow-y-auto z-40">
@@ -109,11 +198,15 @@ const Sidebar = ({ isLoggedIn }) => {
           {user?.name || "User"}
         </p>
         <p className="text-xs text-gray-500">{user?.email}</p>
+        {/* Optional: Show user role for debugging */}
+        {process.env.NODE_ENV === "development" && (
+          <p className="text-xs text-blue-500 mt-1">{user?.role}</p>
+        )}
       </div>
 
       {/* Links */}
       <ul className="space-y-2 mt-4">
-        {links.map((link) => (
+        {filteredLinks.map((link) => (
           <li key={link.id}>
             <NavLink
               to={link.path}
