@@ -1,26 +1,11 @@
+// D:\projects\itsm\gss-itsm-frontend\src\components\TeamList.js
 import React, { useState, useEffect, useCallback } from "react";
 import PropTypes from "prop-types";
 import createApiInstance from "../utils/api";
 import { useAuth } from "../contexts/authContext";
 import { useNavigate } from "react-router-dom";
 
-// Mock teams data for fallback
-const mockTeams = [
-  {
-    id: "mock-1",
-    name: "Engineering",
-    user_ids: ["u1", "u2", "u3"],
-    created_at: "2024-06-01T10:00:00Z",
-  },
-  {
-    id: "mock-2",
-    name: "Support",
-    user_ids: ["u4", "u5"],
-    created_at: "2024-07-15T14:30:00Z",
-  },
-];
-
-const TeamList = ({ organizationSubdomain }) => {
+const TeamList = ({ organizationSubdomain, onEdit }) => {
   const { token, subdomain: authSubdomain, refreshToken, logout } = useAuth();
   const navigate = useNavigate();
   const [teams, setTeams] = useState([]);
@@ -65,13 +50,13 @@ const TeamList = ({ organizationSubdomain }) => {
         return "Session expired. Please log in again.";
       }
       if (error.response?.status === 404) {
-        return "Organization not found";
+        return "Organization or team not found";
       }
       return (
         error.response?.data?.error || error.message || "An error occurred"
       );
     },
-    [navigate, refreshToken, logout]
+    [navigate, refreshToken, logout] // fetchTeams removed; will be defined later
   );
 
   const fetchTeams = useCallback(async () => {
@@ -98,23 +83,17 @@ const TeamList = ({ organizationSubdomain }) => {
       setTeams(response.data || []);
       console.log("Fetched teams from API:", response.data);
     } catch (error) {
-      console.warn("API failed, using mock teams:", error);
-      setMessage("Using mock data due to API error.");
-      setTeams(mockTeams);
-      setIsError(false); // it's not fatal if mock loads
+      setMessage(handleApiError(error));
+      setIsError(true);
+      setTeams([]);
     } finally {
       setLoading(false);
     }
-  }, [token, getEffectiveSubdomain, navigate]);
+  }, [token, getEffectiveSubdomain, navigate, handleApiError]);
 
-  useEffect(() => {
-    if (getEffectiveSubdomain() && token) {
-      fetchTeams();
-    }
-  }, [fetchTeams, getEffectiveSubdomain, token]);
-
-  const handleDelete = async (teamId) => {
-    if (!window.confirm("Are you sure you want to delete this team?")) return;
+  const handleDeactivate = async (teamId) => {
+    if (!window.confirm("Are you sure you want to deactivate this team?"))
+      return;
     const activeSubdomain = getEffectiveSubdomain();
     if (!activeSubdomain) {
       setMessage("No organization subdomain available");
@@ -130,8 +109,10 @@ const TeamList = ({ organizationSubdomain }) => {
 
     try {
       const api = createApiInstance(token, activeSubdomain);
-      await api.delete(`/organizations/${activeSubdomain}/teams/${teamId}`);
-      setMessage("Team deleted successfully");
+      await api.patch(
+        `/organizations/${activeSubdomain}/teams/${teamId}/deactivate`
+      );
+      setMessage("Team deactivated successfully");
       setIsError(false);
       fetchTeams();
     } catch (error) {
@@ -139,6 +120,12 @@ const TeamList = ({ organizationSubdomain }) => {
       setIsError(true);
     }
   };
+
+  useEffect(() => {
+    if (getEffectiveSubdomain() && token) {
+      fetchTeams();
+    }
+  }, [fetchTeams, getEffectiveSubdomain, token]);
 
   if (loading) {
     return (
@@ -183,22 +170,22 @@ const TeamList = ({ organizationSubdomain }) => {
               teams.map((team) => (
                 <tr key={team.id} className="hover:bg-gray-50">
                   <td className="p-3 border">{team.name}</td>
-                  <td className="p-3 border">{team.user_ids?.length || 0}</td>
+                  <td className="p-3 border">{team.user_count || 0}</td>
                   <td className="p-3 border">
                     {new Date(team.created_at).toLocaleDateString()}
                   </td>
                   <td className="p-3 border">
                     <button
                       className="text-blue-500 hover:text-blue-700 mr-2"
-                      onClick={() => console.log("Edit team", team.id)}
+                      onClick={() => onEdit(team)}
                     >
                       Edit
                     </button>
                     <button
                       className="text-red-500 hover:text-red-700"
-                      onClick={() => handleDelete(team.id)}
+                      onClick={() => handleDeactivate(team.id)}
                     >
-                      Delete
+                      Deactivate
                     </button>
                   </td>
                 </tr>
@@ -206,7 +193,7 @@ const TeamList = ({ organizationSubdomain }) => {
             ) : (
               <tr>
                 <td colSpan="4" className="p-4 text-center text-gray-500">
-                  {!isError && "No teams available"}
+                  {!isError && "No active teams available"}
                 </td>
               </tr>
             )}
@@ -219,6 +206,7 @@ const TeamList = ({ organizationSubdomain }) => {
 
 TeamList.propTypes = {
   organizationSubdomain: PropTypes.string,
+  onEdit: PropTypes.func,
 };
 
 export default TeamList;

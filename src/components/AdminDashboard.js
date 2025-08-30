@@ -1,8 +1,9 @@
+// D:\projects\itsm\gss-itsm-frontend\src\components\AdminDashboard.js
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { X, RefreshCw } from "lucide-react";
 import CreateUserForm from "./CreateUserForm";
-import CreateTeamForm from "./CreateTeamForm";
+import TeamForm from "./TeamForm";
 import TeamList from "./TeamList";
 import UserList from "./UserList";
 import createApiInstance from "../utils/api";
@@ -21,24 +22,20 @@ const AdminDashboard = ({ organizationSubdomain }) => {
   const navigate = useNavigate();
 
   const [isCreateUserFormOpen, setIsCreateUserFormOpen] = useState(false);
-  const [isCreateTeamFormOpen, setIsCreateTeamFormOpen] = useState(false);
+  const [isTeamFormOpen, setIsTeamFormOpen] = useState(false);
+  const [selectedTeam, setSelectedTeam] = useState(null);
   const [showTeams, setShowTeams] = useState(false);
   const [showUsers, setShowUsers] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [users, setUsers] = useState([]);
-  const [teams, setTeams] = useState([]);
   const [dashboardStats, setDashboardStats] = useState(null);
 
-  // Create API instance once
   const api = useRef(null);
 
-  // Track fetching states
   const isFetchingStats = useRef(false);
-  const isFetchingTeams = useRef(false);
   const isFetchingUsers = useRef(false);
 
-  // Detect correct subdomain
   const getEffectiveSubdomain = useCallback(() => {
     if (organizationSubdomain && organizationSubdomain !== "undefined") {
       return organizationSubdomain;
@@ -49,7 +46,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     return process.env.NODE_ENV === "development" ? "demo" : null;
   }, [organizationSubdomain, authSubdomain]);
 
-  // Initialize API instance
   useEffect(() => {
     const activeSubdomain = getEffectiveSubdomain();
     if (activeSubdomain && token && !api.current) {
@@ -58,7 +54,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     }
   }, [token, getEffectiveSubdomain]);
 
-  // Handle token expiration
   const handleApiError = useCallback(
     (error) => {
       console.error("API error details:", {
@@ -95,7 +90,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     [navigate, refreshToken, logout, getEffectiveSubdomain]
   );
 
-  // Fetch dashboard stats
   const fetchDashboardStats = useCallback(async () => {
     const activeSubdomain = getEffectiveSubdomain();
     if (!activeSubdomain || !token || !api.current || isFetchingStats.current) {
@@ -121,9 +115,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
         setError("No stats data returned from the server.");
         setDashboardStats(null);
       } else {
-        // Check if stats are all zeros (except total_members, which may be non-zero)
-        const { total_members, ...otherStats } = statsData.stats;
-        const statsEmpty = Object.values(otherStats).every(
+        const statsEmpty = Object.values(statsData.stats).every(
           (value) => value === 0
         );
         if (statsEmpty && statsData.recent_tickets?.length > 0) {
@@ -144,32 +136,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     }
   }, [token, getEffectiveSubdomain, handleApiError]);
 
-  // Fetch teams
-  const fetchTeams = useCallback(async () => {
-    const activeSubdomain = getEffectiveSubdomain();
-    if (!activeSubdomain || !token || !api.current || isFetchingTeams.current) {
-      if (!activeSubdomain || !token) {
-        setError("Missing subdomain or token.");
-      }
-      return;
-    }
-
-    isFetchingTeams.current = true;
-    try {
-      const response = await api.current.get(
-        `/organizations/${activeSubdomain}/teams`
-      );
-      console.log("Teams response:", response.data);
-      setTeams(response.data);
-    } catch (err) {
-      const errorMessage = handleApiError(err);
-      setError(errorMessage);
-    } finally {
-      isFetchingTeams.current = false;
-    }
-  }, [token, getEffectiveSubdomain, handleApiError]);
-
-  // Fetch users
   const fetchUsers = useCallback(async () => {
     const activeSubdomain = getEffectiveSubdomain();
     if (!activeSubdomain || !token || !api.current || isFetchingUsers.current) {
@@ -194,7 +160,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     }
   }, [token, getEffectiveSubdomain, handleApiError]);
 
-  // Fetch data on mount or when token/subdomain changes
   useEffect(() => {
     if (token && getEffectiveSubdomain() && api.current) {
       console.log(
@@ -202,21 +167,25 @@ const AdminDashboard = ({ organizationSubdomain }) => {
         getEffectiveSubdomain()
       );
       fetchDashboardStats();
-      fetchTeams();
       fetchUsers();
     }
-  }, [
-    token,
-    getEffectiveSubdomain,
-    fetchDashboardStats,
-    fetchTeams,
-    fetchUsers,
-  ]);
+  }, [token, getEffectiveSubdomain, fetchDashboardStats, fetchUsers]);
 
   const retryDashboard = () => {
     setError("");
     setDashboardStats(null);
     fetchDashboardStats();
+  };
+
+  const handleOpenTeamForm = (team = null) => {
+    setSelectedTeam(team);
+    setIsTeamFormOpen(true);
+  };
+
+  const handleCloseTeamForm = () => {
+    setIsTeamFormOpen(false);
+    setSelectedTeam(null);
+    fetchUsers();
   };
 
   const stats = dashboardStats?.stats || {
@@ -262,7 +231,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
           Add User
         </button>
         <button
-          onClick={() => setIsCreateTeamFormOpen(true)}
+          onClick={() => handleOpenTeamForm()}
           className="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded shadow"
         >
           Add Team
@@ -287,7 +256,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
         </div>
       ) : dashboardStats ? (
         <>
-          {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-6">
             <StatCard
               title="Total Tickets"
@@ -339,10 +307,8 @@ const AdminDashboard = ({ organizationSubdomain }) => {
             />
           </div>
 
-          {/* Chart */}
           <TicketsBarChart stats={stats} />
 
-          {/* Create User Modal */}
           {isCreateUserFormOpen && (
             <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-[9999]">
               <div className="bg-white p-6 rounded-xl w-full max-w-md shadow-xl relative">
@@ -360,35 +326,39 @@ const AdminDashboard = ({ organizationSubdomain }) => {
             </div>
           )}
 
-          {/* Create Team Modal */}
-          {isCreateTeamFormOpen && (
+          {isTeamFormOpen && (
             <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-[9999]">
               <div className="bg-white p-6 rounded-xl w-full max-w-md shadow-xl relative">
                 <button
-                  onClick={() => setIsCreateTeamFormOpen(false)}
+                  onClick={handleCloseTeamForm}
                   className="absolute top-3 right-3"
                 >
                   <X className="w-5 h-5 text-gray-600" />
                 </button>
-                <h3 className="text-xl font-semibold mb-4">Create Team</h3>
-                <CreateTeamForm
-                  onClose={() => setIsCreateTeamFormOpen(false)}
+                <h3 className="text-xl font-semibold mb-4">
+                  {selectedTeam ? "Edit Team" : "Create Team"}
+                </h3>
+                <TeamForm
+                  initialTeam={selectedTeam}
+                  onClose={handleCloseTeamForm}
+                  onTeamCreated={handleCloseTeamForm}
                 />
               </div>
             </div>
           )}
 
-          {/* Team List */}
           {showTeams && (
             <div className="mt-6">
               <h3 className="text-xl font-semibold text-gray-700 mb-2">
                 Teams
               </h3>
-              <TeamList teams={teams} />
+              <TeamList
+                organizationSubdomain={getEffectiveSubdomain()}
+                onEdit={handleOpenTeamForm}
+              />
             </div>
           )}
 
-          {/* User List */}
           {showUsers && (
             <div className="mt-6">
               <h3 className="text-xl font-semibold text-gray-700 mb-2">
