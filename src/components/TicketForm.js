@@ -35,6 +35,12 @@ const TicketForm = ({ organization, token }) => {
 
   const profileFetchedRef = useRef(false);
 
+  // Initialize api first
+  const api = useMemo(() => {
+    if (!token || !organization?.subdomain) return null;
+    return createApiInstance(token, organization.subdomain);
+  }, [token, organization?.subdomain]);
+
   // Utility function to check if user can create tickets
   const canUserCreateTickets = (userRole) => {
     const ticketCreationRoles = [
@@ -60,22 +66,51 @@ const TicketForm = ({ organization, token }) => {
     return ticketCreationRoles.includes(userRole);
   };
 
-  const generateTicketNumber = (ticketType) => {
-    const prefix =
-      {
-        Incident: "INC",
-        Request: "REQ",
-        Problem: "PRB",
-        Other: "TKT",
-      }[ticketType] || "TKT";
+  // Generate sequential ticket number
+  const generateTicketNumber = useCallback(
+    async (ticketType) => {
+      const prefix =
+        {
+          Incident: "INC",
+          Request: "REQ",
+          Problem: "PRB",
+          Other: "TKT",
+        }[ticketType] || "TKT";
 
-    const randomString = Array(8)
-      .fill()
-      .map(() => Math.random().toString(36).charAt(2).toUpperCase())
-      .join("");
+      // Return default if api or subdomain is not available
+      if (!api || !organization?.subdomain) {
+        return `${prefix}0001`;
+      }
 
-    return `${prefix}${randomString}`;
-  };
+      try {
+        // Fetch the latest ticket for the given ticket type
+        const response = await api.get(
+          `/organizations/${organization.subdomain}/tickets`,
+          {
+            params: {
+              ticket_type: ticketType,
+              per_page: 1,
+              sort: "ticket_number:desc",
+            },
+          }
+        );
+
+        const latestTicket = response.data?.tickets?.[0];
+        if (!latestTicket || !latestTicket.ticket_number) {
+          return `${prefix}0001`;
+        }
+
+        // Extract the numeric part and increment
+        const match = latestTicket.ticket_number.match(/(\d+)$/);
+        const nextNumber = match ? parseInt(match[0], 10) + 1 : 1;
+        return `${prefix}${String(nextNumber).padStart(4, "0")}`;
+      } catch (err) {
+        console.error("Failed to fetch latest ticket number:", err);
+        return `${prefix}0001`; // Fallback to 0001 on error
+      }
+    },
+    [api, organization?.subdomain]
+  );
 
   // Convert Date to local datetime for input
   const toLocalDateTimeInput = (date = new Date()) => {
@@ -89,7 +124,7 @@ const TicketForm = ({ organization, token }) => {
   };
 
   const [formData, setFormData] = useState({
-    ticketNumber: generateTicketNumber("Incident"),
+    ticketNumber: "",
     ticketStatus: "Open",
     callerName: "",
     callerSurname: "",
@@ -98,7 +133,7 @@ const TicketForm = ({ organization, token }) => {
     callerLocation: "",
     subject: "",
     description: "",
-    reportedDate: toLocalDateTimeInput(), // local time
+    reportedDate: toLocalDateTimeInput(),
     relatedRecord: "",
     ticket_type: "Incident",
     category: "Technical",
@@ -108,11 +143,6 @@ const TicketForm = ({ organization, token }) => {
     team_id: "",
     assignee_id: "",
   });
-
-  const api = useMemo(() => {
-    if (!token || !organization?.subdomain) return null;
-    return createApiInstance(token, organization.subdomain);
-  }, [token, organization?.subdomain]);
 
   const fetchProfile = useCallback(async () => {
     if (!api || profileFetchedRef.current) return;
@@ -125,7 +155,6 @@ const TicketForm = ({ organization, token }) => {
       const user = response.data?.current_user;
       if (!user) throw new Error("User not found");
 
-      // Updated role check to include system_admin and domain_admin
       if (!canUserCreateTickets(user.role)) {
         throw new Error(
           "You don't have permission to create tickets. Please contact your administrator."
@@ -188,6 +217,23 @@ const TicketForm = ({ organization, token }) => {
     }
   }, [api, formData.team_id, organization?.subdomain]);
 
+  // Fetch initial ticket number when api is ready
+  useEffect(() => {
+    if (!api || !organization?.subdomain) return;
+
+    const setInitialTicketNumber = async () => {
+      const ticketNumber = await generateTicketNumber(formData.ticket_type);
+      setFormData((prev) => ({ ...prev, ticketNumber }));
+    };
+
+    setInitialTicketNumber();
+  }, [
+    api,
+    organization?.subdomain,
+    formData.ticket_type,
+    generateTicketNumber,
+  ]);
+
   useEffect(() => {
     if (!token) {
       navigate("/login");
@@ -203,22 +249,28 @@ const TicketForm = ({ organization, token }) => {
     fetchTeamUsers();
   }, [formData.team_id, fetchTeamUsers]);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
+  const handleChange = useCallback(
+    async (e) => {
+      const { name, value } = e.target;
 
-    const updated = {
-      ...formData,
-      [name]: name.includes("_id") ? String(value) : value,
-      ...(name === "team_id" ? { assignee_id: "" } : {}),
-      ...(name === "ticket_type"
-        ? { ticketNumber: generateTicketNumber(value) }
-        : {}),
-    };
+      let updated = {
+        ...formData,
+        [name]: name.includes("_id") ? String(value) : value,
+        ...(name === "team_id" ? { assignee_id: "" } : {}),
+      };
 
-    setFormData(updated);
+      // Regenerate ticket number if ticket_type changes
+      if (name === "ticket_type") {
+        const newTicketNumber = await generateTicketNumber(value);
+        updated = { ...updated, ticketNumber: newTicketNumber };
+      }
 
-    if (["urgency", "impact"].includes(name)) calculatePriority(updated);
-  };
+      setFormData(updated);
+
+      if (["urgency", "impact"].includes(name)) calculatePriority(updated);
+    },
+    [formData, generateTicketNumber]
+  );
 
   const calculatePriority = (data) => {
     const matrix = {
@@ -236,7 +288,6 @@ const TicketForm = ({ organization, token }) => {
     setFormData((prev) => ({ ...prev, priority: matrix[key] || "p4" }));
   };
 
-  // Validate if user can create specific ticket type
   const canCreateTicketType = (ticketType) => {
     if (!currentUser) return false;
 
@@ -245,7 +296,6 @@ const TicketForm = ({ organization, token }) => {
       case "Request":
         return canUserCreateTickets(currentUser.role);
       case "Problem":
-        // Only specific roles can create problems
         const problemRoles = [
           "system_admin",
           "domain_admin",
@@ -265,7 +315,6 @@ const TicketForm = ({ organization, token }) => {
     e.preventDefault();
     if (!api || !currentUser) return;
 
-    // Check if user can create this specific ticket type
     if (!canCreateTicketType(formData.ticket_type)) {
       const msg = `You don't have permission to create ${formData.ticket_type} tickets.`;
       toast.error(msg);
@@ -282,6 +331,7 @@ const TicketForm = ({ organization, token }) => {
       "callerContact",
       "callerLocation",
       "team_id",
+      "ticketNumber",
     ];
     const missing = required.filter((field) => !formData[field]);
     if (missing.length) {
@@ -303,7 +353,6 @@ const TicketForm = ({ organization, token }) => {
 
     const payload = new FormData();
 
-    // Convert local datetime to UTC for backend
     const reportedAtUTC = new Date(formData.reportedDate).toISOString();
 
     Object.entries({
@@ -316,7 +365,7 @@ const TicketForm = ({ organization, token }) => {
       team_id: formData.team_id,
       assignee_id: formData.assignee_id || "",
       ticket_number: formData.ticketNumber,
-      reported_at: reportedAtUTC, // send UTC
+      reported_at: reportedAtUTC,
       caller_name: formData.callerName,
       caller_surname: formData.callerSurname,
       caller_email: formData.callerEmail,
@@ -348,7 +397,6 @@ const TicketForm = ({ organization, token }) => {
     } catch (err) {
       let msg = err.response?.data?.error || "Failed to create ticket";
 
-      // Handle validation errors from backend
       if (err.response?.data?.errors) {
         const errors = err.response.data.errors;
         if (Array.isArray(errors)) {
@@ -360,9 +408,19 @@ const TicketForm = ({ organization, token }) => {
         }
       }
 
-      // Handle specific permission errors
       if (err.response?.status === 403) {
         msg = "You don't have permission to create this type of ticket.";
+      } else if (
+        err.response?.status === 422 &&
+        msg.includes("Ticket number")
+      ) {
+        // Retry with a new ticket number
+        const newTicketNumber = await generateTicketNumber(
+          formData.ticket_type
+        );
+        setFormData((prev) => ({ ...prev, ticketNumber: newTicketNumber }));
+        handleSubmit(e);
+        return;
       }
 
       toast.error(msg);
@@ -372,7 +430,6 @@ const TicketForm = ({ organization, token }) => {
     }
   };
 
-  // Show loading state while fetching profile
   if (profileLoading) {
     return (
       <div className="w-full px-2 sm:px-4 md:px-6 lg:px-8 py-6 bg-white shadow-md rounded-lg">
@@ -386,7 +443,6 @@ const TicketForm = ({ organization, token }) => {
     );
   }
 
-  // Show error if user doesn't have permission
   if (error && !currentUser) {
     return (
       <div className="w-full px-2 sm:px-4 md:px-6 lg:px-8 py-6 bg-white shadow-md rounded-lg">
@@ -423,7 +479,6 @@ const TicketForm = ({ organization, token }) => {
 
   return (
     <div className="w-full px-2 sm:px-4 md:px-6 lg:px-8 py-6 bg-white shadow-md rounded-lg">
-      {/* User Permission Info */}
       {currentUser && (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <div className="flex items-center">
