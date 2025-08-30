@@ -1,4 +1,4 @@
-// src/components/TeamList.js
+// D:\projects\itsm\gss-itsm-frontend\src\components\TeamList.js
 import React, { useState, useEffect, useCallback } from "react";
 import PropTypes from "prop-types";
 import createApiInstance from "../utils/api";
@@ -56,7 +56,7 @@ const TeamList = ({ organizationSubdomain, onEdit }) => {
         error.response?.data?.error || error.message || "An error occurred"
       );
     },
-    [navigate, refreshToken, logout, fetchTeams]
+    [navigate, refreshToken, logout] // fetchTeams removed; will be defined later
   );
 
   const fetchTeams = useCallback(async () => {
@@ -91,12 +91,6 @@ const TeamList = ({ organizationSubdomain, onEdit }) => {
     }
   }, [token, getEffectiveSubdomain, navigate, handleApiError]);
 
-  useEffect(() => {
-    if (getEffectiveSubdomain() && token) {
-      fetchTeams();
-    }
-  }, [fetchTeams, getEffectiveSubdomain, token]);
-
   const handleDeactivate = async (teamId) => {
     if (!window.confirm("Are you sure you want to deactivate this team?"))
       return;
@@ -126,6 +120,12 @@ const TeamList = ({ organizationSubdomain, onEdit }) => {
       setIsError(true);
     }
   };
+
+  useEffect(() => {
+    if (getEffectiveSubdomain() && token) {
+      fetchTeams();
+    }
+  }, [fetchTeams, getEffectiveSubdomain, token]);
 
   if (loading) {
     return (

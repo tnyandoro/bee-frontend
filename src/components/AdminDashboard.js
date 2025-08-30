@@ -1,4 +1,4 @@
-// src/components/AdminDashboard.js
+// D:\projects\itsm\gss-itsm-frontend\src\components\AdminDashboard.js
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { X, RefreshCw } from "lucide-react";
@@ -29,13 +29,11 @@ const AdminDashboard = ({ organizationSubdomain }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [users, setUsers] = useState([]);
-  const [teams, setTeams] = useState([]);
   const [dashboardStats, setDashboardStats] = useState(null);
 
   const api = useRef(null);
 
   const isFetchingStats = useRef(false);
-  const isFetchingTeams = useRef(false);
   const isFetchingUsers = useRef(false);
 
   const getEffectiveSubdomain = useCallback(() => {
@@ -138,30 +136,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     }
   }, [token, getEffectiveSubdomain, handleApiError]);
 
-  const fetchTeams = useCallback(async () => {
-    const activeSubdomain = getEffectiveSubdomain();
-    if (!activeSubdomain || !token || !api.current || isFetchingTeams.current) {
-      if (!activeSubdomain || !token) {
-        setError("Missing subdomain or token.");
-      }
-      return;
-    }
-
-    isFetchingTeams.current = true;
-    try {
-      const response = await api.current.get(
-        `/organizations/${activeSubdomain}/teams`
-      );
-      console.log("Teams response:", response.data);
-      setTeams(response.data);
-    } catch (err) {
-      const errorMessage = handleApiError(err);
-      setError(errorMessage);
-    } finally {
-      isFetchingTeams.current = false;
-    }
-  }, [token, getEffectiveSubdomain, handleApiError]);
-
   const fetchUsers = useCallback(async () => {
     const activeSubdomain = getEffectiveSubdomain();
     if (!activeSubdomain || !token || !api.current || isFetchingUsers.current) {
@@ -193,16 +167,9 @@ const AdminDashboard = ({ organizationSubdomain }) => {
         getEffectiveSubdomain()
       );
       fetchDashboardStats();
-      fetchTeams();
       fetchUsers();
     }
-  }, [
-    token,
-    getEffectiveSubdomain,
-    fetchDashboardStats,
-    fetchTeams,
-    fetchUsers,
-  ]);
+  }, [token, getEffectiveSubdomain, fetchDashboardStats, fetchUsers]);
 
   const retryDashboard = () => {
     setError("");
@@ -218,7 +185,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
   const handleCloseTeamForm = () => {
     setIsTeamFormOpen(false);
     setSelectedTeam(null);
-    fetchTeams();
     fetchUsers();
   };
 
