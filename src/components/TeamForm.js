@@ -29,7 +29,7 @@ const TeamForm = ({ initialTeam, onClose, onTeamCreated }) => {
       return (
         error.response?.data?.errors?.join(", ") ||
         error.response?.data?.error ||
-        error.message
+        "Failed to save team."
       );
     },
     [navigate]
@@ -47,12 +47,12 @@ const TeamForm = ({ initialTeam, onClose, onTeamCreated }) => {
 
   const validateForm = () => {
     if (!formData.name.trim()) {
-      setMessage("Please provide a team name.");
+      setMessage("Team name is required.");
       setIsError(true);
       return false;
     }
     if (formData.user_ids.length === 0) {
-      setMessage("Please select at least one user.");
+      setMessage("At least one team member is required.");
       setIsError(true);
       return false;
     }
@@ -71,7 +71,7 @@ const TeamForm = ({ initialTeam, onClose, onTeamCreated }) => {
           : [];
         setUsers(usersData);
         setMessage(
-          usersData.length ? "" : "No users found for this organization."
+          usersData.length ? "" : "No users found in this organization."
         );
       } catch (error) {
         setMessage(handleApiError(error));
@@ -104,7 +104,6 @@ const TeamForm = ({ initialTeam, onClose, onTeamCreated }) => {
 
     try {
       if (initialTeam) {
-        // Update team
         await api.put(`/organizations/${subdomain}/teams/${initialTeam.id}`, {
           team: {
             name: formData.name,
@@ -113,7 +112,6 @@ const TeamForm = ({ initialTeam, onClose, onTeamCreated }) => {
         });
         setMessage("✅ Team updated successfully!");
       } else {
-        // Create team
         await api.post(`/organizations/${subdomain}/teams`, {
           team: {
             name: formData.name,
@@ -121,8 +119,8 @@ const TeamForm = ({ initialTeam, onClose, onTeamCreated }) => {
           },
         });
         setMessage("✅ Team created successfully!");
+        setFormData({ name: "", user_ids: [] }); // Reset only on create
       }
-      setFormData({ name: "", user_ids: [] });
       onTeamCreated?.();
       onClose?.();
     } catch (error) {
@@ -174,7 +172,7 @@ const TeamForm = ({ initialTeam, onClose, onTeamCreated }) => {
 
         <div>
           <label className="block text-gray-700 mb-1 font-medium">
-            Assign Users
+            Team Members
           </label>
           <select
             multiple
