@@ -495,12 +495,12 @@ const Incident = () => {
                     >
                       Resolve
                     </button>
-                    <button
+                    {/* <button
                       onClick={() => handleEdit(ticket)}
                       className="bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600"
                     >
                       Edit
-                    </button>
+                    </button> */}
                     <button
                       onClick={() => handleDetails(ticket)}
                       className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600"

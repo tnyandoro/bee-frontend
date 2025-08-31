@@ -28,6 +28,7 @@ const TicketForm = ({ organization, token }) => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [ticketNumberLoading, setTicketNumberLoading] = useState(false);
 
   const [profileLoading, setProfileLoading] = useState(true);
   const [teamsLoading, setTeamsLoading] = useState(false);
@@ -66,23 +67,65 @@ const TicketForm = ({ organization, token }) => {
     return ticketCreationRoles.includes(userRole);
   };
 
-  // Generate sequential ticket number
+  // Check if ticket number is available
+  const checkTicketNumberAvailability = useCallback(
+    async (ticketNumber, ticketType) => {
+      if (!api || !organization?.subdomain) {
+        console.warn(
+          "API or subdomain not available, assuming ticket number available"
+        );
+        return true;
+      }
+      try {
+        const response = await api.get(
+          `/organizations/${organization.subdomain}/tickets`,
+          {
+            params: { ticket_number: ticketNumber, ticket_type: ticketType },
+          }
+        );
+        console.log(
+          `Checking ticket number ${ticketNumber} for ${ticketType}:`,
+          {
+            tickets: response.data.tickets,
+            pagination: response.data.pagination,
+          }
+        );
+        return response.data.tickets.length === 0;
+      } catch (err) {
+        console.error(`Error checking ticket number ${ticketNumber}:`, {
+          message: err.message,
+          status: err.response?.status,
+          data: err.response?.data,
+        });
+        toast.error(
+          "Failed to verify ticket number availability. Please try again."
+        );
+        return false; // Assume not available on error to force retry
+      }
+    },
+    [api, organization?.subdomain]
+  );
+
+  // Generate sequential ticket number with availability check
   const generateTicketNumber = useCallback(
     async (ticketType) => {
       const prefix =
         {
-          Incident: "INC",
-          Request: "REQ",
-          Problem: "PRB",
-          Other: "TKT",
+          Incident: "CIPC_INC",
+          Request: "CIPC_REQ",
+          Problem: "CIPC_PRB",
+          Other: "CIPC_TKT",
         }[ticketType] || "TKT";
 
-      // Return default if api or subdomain is not available
       if (!api || !organization?.subdomain) {
+        console.warn(
+          "API or subdomain not available, returning default ticket number"
+        );
         return `${prefix}0001`;
       }
 
       try {
+        setTicketNumberLoading(true);
         // Fetch the latest ticket for the given ticket type
         const response = await api.get(
           `/organizations/${organization.subdomain}/tickets`,
@@ -96,20 +139,52 @@ const TicketForm = ({ organization, token }) => {
         );
 
         const latestTicket = response.data?.tickets?.[0];
-        if (!latestTicket || !latestTicket.ticket_number) {
-          return `${prefix}0001`;
+        let nextNumber = 1;
+        if (latestTicket && latestTicket.ticket_number) {
+          const match = latestTicket.ticket_number.match(/(\d+)$/);
+          nextNumber = match ? parseInt(match[0], 10) + 1 : 1;
         }
 
-        // Extract the numeric part and increment
-        const match = latestTicket.ticket_number.match(/(\d+)$/);
-        const nextNumber = match ? parseInt(match[0], 10) + 1 : 1;
-        return `${prefix}${String(nextNumber).padStart(4, "0")}`;
+        let ticketNumber = `${prefix}${String(nextNumber).padStart(4, "0")}`;
+        let isAvailable = await checkTicketNumberAvailability(
+          ticketNumber,
+          ticketType
+        );
+
+        // Increment until a unique ticket number is found
+        let attempts = 0;
+        const maxAttempts = 10;
+        while (!isAvailable && attempts < maxAttempts) {
+          nextNumber += 1;
+          ticketNumber = `${prefix}${String(nextNumber).padStart(4, "0")}`;
+          isAvailable = await checkTicketNumberAvailability(
+            ticketNumber,
+            ticketType
+          );
+          attempts += 1;
+        }
+
+        if (!isAvailable) {
+          throw new Error(
+            "Unable to generate a unique ticket number after multiple attempts."
+          );
+        }
+
+        console.log(`Generated ticket number: ${ticketNumber}`);
+        return ticketNumber;
       } catch (err) {
-        console.error("Failed to fetch latest ticket number:", err);
-        return `${prefix}0001`; // Fallback to 0001 on error
+        console.error("Failed to generate ticket number:", {
+          message: err.message,
+          stack: err.stack,
+        });
+        setError(err.message || "Failed to generate ticket number.");
+        toast.error(err.message || "Failed to generate ticket number.");
+        return `${prefix}0001`; // Fallback
+      } finally {
+        setTicketNumberLoading(false);
       }
     },
-    [api, organization?.subdomain]
+    [api, organization?.subdomain, checkTicketNumberAvailability]
   );
 
   // Convert Date to local datetime for input
@@ -136,10 +211,10 @@ const TicketForm = ({ organization, token }) => {
     reportedDate: toLocalDateTimeInput(),
     relatedRecord: "",
     ticket_type: "Incident",
-    category: "Technical",
-    impact: "medium",
+    category: "Query",
+    impact: "high", // Set default to "high"
     urgency: "medium",
-    priority: "p3",
+    priority: "p2", // Default based on impact: high, urgency: medium
     team_id: "",
     assignee_id: "",
   });
@@ -222,8 +297,16 @@ const TicketForm = ({ organization, token }) => {
     if (!api || !organization?.subdomain) return;
 
     const setInitialTicketNumber = async () => {
-      const ticketNumber = await generateTicketNumber(formData.ticket_type);
-      setFormData((prev) => ({ ...prev, ticketNumber }));
+      setTicketNumberLoading(true);
+      try {
+        const ticketNumber = await generateTicketNumber(formData.ticket_type);
+        setFormData((prev) => ({ ...prev, ticketNumber }));
+      } catch (err) {
+        setError(err.message || "Failed to initialize ticket number.");
+        toast.error(err.message || "Failed to initialize ticket number.");
+      } finally {
+        setTicketNumberLoading(false);
+      }
     };
 
     setInitialTicketNumber();
@@ -261,13 +344,21 @@ const TicketForm = ({ organization, token }) => {
 
       // Regenerate ticket number if ticket_type changes
       if (name === "ticket_type") {
-        const newTicketNumber = await generateTicketNumber(value);
-        updated = { ...updated, ticketNumber: newTicketNumber };
+        setTicketNumberLoading(true);
+        try {
+          const newTicketNumber = await generateTicketNumber(value);
+          updated = { ...updated, ticketNumber: newTicketNumber };
+        } catch (err) {
+          setError(err.message || "Failed to generate ticket number.");
+          toast.error(err.message || "Failed to generate ticket number.");
+        } finally {
+          setTicketNumberLoading(false);
+        }
       }
 
       setFormData(updated);
 
-      if (["urgency", "impact"].includes(name)) calculatePriority(updated);
+      if (name === "urgency") calculatePriority(updated); // Only recalculate priority on urgency change
     },
     [formData, generateTicketNumber]
   );
@@ -284,7 +375,7 @@ const TicketForm = ({ organization, token }) => {
       low_medium: "p4",
       low_low: "p4",
     };
-    const key = `${data.urgency}_${data.impact}`;
+    const key = `${data.urgency}_high`; // Impact is fixed to "high"
     setFormData((prev) => ({ ...prev, priority: matrix[key] || "p4" }));
   };
 
@@ -311,14 +402,21 @@ const TicketForm = ({ organization, token }) => {
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e, retryCount = 0) => {
     e.preventDefault();
+    const MAX_RETRIES = 3;
+
     if (!api || !currentUser) return;
 
     if (!canCreateTicketType(formData.ticket_type)) {
       const msg = `You don't have permission to create ${formData.ticket_type} tickets.`;
       toast.error(msg);
       setError(msg);
+      return;
+    }
+
+    if (ticketNumberLoading) {
+      toast.error("Please wait, generating ticket number...");
       return;
     }
 
@@ -351,8 +449,37 @@ const TicketForm = ({ organization, token }) => {
       return;
     }
 
-    const payload = new FormData();
+    // Check ticket number availability before submission
+    const isTicketNumberAvailable = await checkTicketNumberAvailability(
+      formData.ticketNumber,
+      formData.ticket_type
+    );
+    if (!isTicketNumberAvailable) {
+      if (retryCount >= MAX_RETRIES) {
+        toast.error(
+          "Failed to generate a unique ticket number after multiple attempts."
+        );
+        setError("Failed to generate a unique ticket number.");
+        return;
+      }
+      toast.error("Ticket number is already taken, generating a new one...");
+      setTicketNumberLoading(true);
+      try {
+        const newTicketNumber = await generateTicketNumber(
+          formData.ticket_type
+        );
+        setFormData((prev) => ({ ...prev, ticketNumber: newTicketNumber }));
+        handleSubmit(e, retryCount + 1);
+      } catch (err) {
+        toast.error(err.message || "Failed to generate ticket number.");
+        setError(err.message || "Failed to generate ticket number.");
+      } finally {
+        setTicketNumberLoading(false);
+      }
+      return;
+    }
 
+    const payload = new FormData();
     const reportedAtUTC = new Date(formData.reportedDate).toISOString();
 
     Object.entries({
@@ -360,8 +487,8 @@ const TicketForm = ({ organization, token }) => {
       description: formData.description,
       ticket_type: formData.ticket_type,
       urgency: formData.urgency,
-      impact: formData.impact,
-      priority: formData.priority,
+      impact: formData.impact, // Include impact in payload
+      priority: formData.priority, // Include priority in payload
       team_id: formData.team_id,
       assignee_id: formData.assignee_id || "",
       ticket_number: formData.ticketNumber,
@@ -412,14 +539,32 @@ const TicketForm = ({ organization, token }) => {
         msg = "You don't have permission to create this type of ticket.";
       } else if (
         err.response?.status === 422 &&
-        msg.includes("Ticket number")
+        (msg.includes("Ticket number is already taken") ||
+          err.response?.data?.details?.ticket_number?.some(
+            (e) => e.error === "taken"
+          ))
       ) {
-        // Retry with a new ticket number
-        const newTicketNumber = await generateTicketNumber(
-          formData.ticket_type
-        );
-        setFormData((prev) => ({ ...prev, ticketNumber: newTicketNumber }));
-        handleSubmit(e);
+        if (retryCount >= MAX_RETRIES) {
+          toast.error(
+            "Failed to generate a unique ticket number after multiple attempts."
+          );
+          setError("Failed to generate a unique ticket number.");
+          return;
+        }
+        toast.error("Ticket number is already taken, generating a new one...");
+        setTicketNumberLoading(true);
+        try {
+          const newTicketNumber = await generateTicketNumber(
+            formData.ticket_type
+          );
+          setFormData((prev) => ({ ...prev, ticketNumber: newTicketNumber }));
+          handleSubmit(e, retryCount + 1);
+        } catch (err) {
+          toast.error(err.message || "Failed to generate ticket number.");
+          setError(err.message || "Failed to generate ticket number.");
+        } finally {
+          setTicketNumberLoading(false);
+        }
         return;
       }
 
@@ -430,13 +575,17 @@ const TicketForm = ({ organization, token }) => {
     }
   };
 
-  if (profileLoading) {
+  if (profileLoading || ticketNumberLoading) {
     return (
       <div className="w-full px-2 sm:px-4 md:px-6 lg:px-8 py-6 bg-white shadow-md rounded-lg">
         <div className="flex items-center justify-center py-8">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-700 mx-auto mb-4"></div>
-            <p className="text-blue-700">Loading user profile...</p>
+            <p className="text-blue-700">
+              {profileLoading
+                ? "Loading user profile..."
+                : "Generating ticket number..."}
+            </p>
           </div>
         </div>
       </div>
@@ -511,7 +660,7 @@ const TicketForm = ({ organization, token }) => {
         <p className="text-green-500 mb-4">Ticket submitted successfully!</p>
       )}
 
-      <form onSubmit={handleSubmit} encType="multipart/form-data">
+      <form onSubmit={(e) => handleSubmit(e, 0)} encType="multipart/form-data">
         <TicketMetaSection formData={formData} currentUser={currentUser} />
 
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -525,7 +674,7 @@ const TicketForm = ({ organization, token }) => {
               value={formData.reportedDate}
               onChange={handleChange}
               className="w-full border border-gray-300 px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              disabled={loading}
+              disabled={loading || ticketNumberLoading}
               required
             />
           </div>
@@ -539,7 +688,7 @@ const TicketForm = ({ organization, token }) => {
               value={formData.relatedRecord}
               onChange={handleChange}
               className="w-full border border-gray-300 px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              disabled={loading}
+              disabled={loading || ticketNumberLoading}
               placeholder="Enter related record number (optional)"
             />
           </div>
@@ -548,7 +697,7 @@ const TicketForm = ({ organization, token }) => {
         <TicketDetailsSection
           formData={formData}
           handleChange={handleChange}
-          loading={loading}
+          loading={loading || ticketNumberLoading}
           canCreateTicketType={canCreateTicketType}
         />
 
@@ -564,7 +713,7 @@ const TicketForm = ({ organization, token }) => {
         <CallerDetailsSection
           formData={formData}
           handleChange={handleChange}
-          loading={loading}
+          loading={loading || ticketNumberLoading}
         />
 
         <DescriptionSection
@@ -572,12 +721,17 @@ const TicketForm = ({ organization, token }) => {
           handleChange={handleChange}
           attachment={attachment}
           setAttachment={setAttachment}
-          loading={loading}
+          loading={loading || ticketNumberLoading}
         />
 
         <FormActions
-          loading={loading}
-          canSubmit={!!currentUser && canCreateTicketType(formData.ticket_type)}
+          loading={loading || ticketNumberLoading}
+          canSubmit={
+            !!currentUser &&
+            canCreateTicketType(formData.ticket_type) &&
+            !ticketNumberLoading &&
+            formData.ticketNumber
+          }
         />
       </form>
     </div>
