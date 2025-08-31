@@ -15,29 +15,53 @@ const TicketDetailsPopup = ({
   const [comments, setComments] = useState([]);
   const [teams, setTeams] = useState([]);
   const [teamUsers, setTeamUsers] = useState([]);
-  const [selectedTeamId, setSelectedTeamId] = useState(
-    selectedTicket?.team?.id || ""
-  );
-  const [selectedAssigneeId, setSelectedAssigneeId] = useState(
-    selectedTicket?.assignee_id || ""
-  );
+  const [selectedTeamId, setSelectedTeamId] = useState("");
+  const [selectedAssigneeId, setSelectedAssigneeId] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [teamsLoading, setTeamsLoading] = useState(false);
+  const [teamUsersLoading, setTeamUsersLoading] = useState(false);
 
-  // Move useEffect hooks to the top level
+  // Initial data fetch when popup opens
   useEffect(() => {
-    if (!selectedTicket) return; // Handle early return inside useEffect
+    if (!selectedTicket) return;
+
+    console.log("Fetching initial data for ticket:", selectedTicket.id);
     fetchComments();
     fetchTeams();
-  }, [selectedTicket?.id]); // Use optional chaining for safety
+  }, [selectedTicket?.id]);
 
+  // Initialize current team and assignee after teams are loaded
   useEffect(() => {
-    if (!selectedTicket || !selectedTeamId) {
-      setTeamUsers([]);
-      setSelectedAssigneeId("");
-      return; // Handle early return inside useEffect
+    if (teams.length > 0 && selectedTicket) {
+      // Set current team
+      const currentTeamId =
+        selectedTicket.team?.id || selectedTicket.team_id || "";
+      setSelectedTeamId(String(currentTeamId));
+
+      // Set current assignee
+      const currentAssigneeId =
+        selectedTicket.assignee?.id || selectedTicket.assignee_id || "";
+      setSelectedAssigneeId(String(currentAssigneeId));
+
+      console.log(
+        "Initialized current team:",
+        currentTeamId,
+        "assignee:",
+        currentAssigneeId
+      );
     }
+  }, [teams, selectedTicket]);
+
+  // Fetch team users when team changes
+  useEffect(() => {
+    if (!selectedTeamId) {
+      setTeamUsers([]);
+      return;
+    }
+
+    console.log("Team changed, fetching users for team:", selectedTeamId);
     fetchTeamUsers(selectedTeamId);
-  }, [selectedTeamId, selectedTicket]); // Include selectedTicket in dependencies
+  }, [selectedTeamId]);
 
   // fetchComments
   const fetchComments = async () => {
@@ -58,7 +82,9 @@ const TicketDetailsPopup = ({
   };
 
   const fetchTeams = async () => {
+    setTeamsLoading(true);
     try {
+      console.log("Fetching teams...");
       const response = await axios.get(
         `${apiBaseUrl}/api/v1/organizations/${subdomain}/teams`,
         {
@@ -68,16 +94,24 @@ const TicketDetailsPopup = ({
           },
         }
       );
-      setTeams(response.data.teams || []);
+      console.log("Teams response:", response.data);
+      setTeams(response.data.teams || response.data || []);
     } catch (err) {
       console.error("Fetch teams error:", err.response?.data || err.message);
+      alert("Failed to load teams. Please refresh and try again.");
+    } finally {
+      setTeamsLoading(false);
     }
   };
 
   const fetchTeamUsers = async (teamId) => {
+    setTeamUsersLoading(true);
     try {
+      console.log("Fetching users for team:", teamId);
+
+      // Use the /api/v1/ pattern since that's working in your Rails logs
       const response = await axios.get(
-        `${apiBaseUrl}/organizations/${subdomain}/teams/${teamId}/users`,
+        `${apiBaseUrl}/api/v1/organizations/${subdomain}/teams/${teamId}/users`,
         {
           headers: {
             Authorization: `Bearer ${authToken}`,
@@ -85,13 +119,23 @@ const TicketDetailsPopup = ({
           },
         }
       );
-      setTeamUsers(response.data.users || []);
+
+      console.log("Team users response:", response.data);
+
+      // Your Rails controller returns the array directly: render json: @users.map { |user| user_attributes(user) }
+      // So response.data should be the array of users
+      const users = response.data || [];
+      console.log("Setting team users:", users);
+      setTeamUsers(users);
     } catch (err) {
       console.error(
         "Fetch team users error:",
         err.response?.data || err.message
       );
       setTeamUsers([]);
+      alert("Failed to load team users. Please try selecting the team again.");
+    } finally {
+      setTeamUsersLoading(false);
     }
   };
 
@@ -156,12 +200,16 @@ const TicketDetailsPopup = ({
       const updateData = {
         ticket: {
           team_id: selectedTeamId,
-          ...(selectedAssigneeId && { assignee_id: selectedAssigneeId }),
+          // If no specific assignee is selected, clear the assignee_id to avoid validation issues
+          assignee_id: selectedAssigneeId || null,
         },
       };
 
+      console.log("Reassigning ticket with data:", updateData);
+
+      // Use the correct route format from your Rails routes
       const response = await axios.put(
-        `${apiBaseUrl}/organizations/${subdomain}/tickets/${selectedTicket.id}`,
+        `${apiBaseUrl}/api/v1/organizations/${subdomain}/tickets/${selectedTicket.id}`,
         updateData,
         {
           headers: {
@@ -172,11 +220,35 @@ const TicketDetailsPopup = ({
         }
       );
 
-      onUpdate(response.data.ticket);
+      console.log("Reassignment response:", response.data);
+      onUpdate(response.data.ticket || response.data);
       alert("Ticket reassigned successfully!");
     } catch (err) {
       console.error("Reassignment error:", err.response?.data || err.message);
-      alert("Failed to reassign ticket. Please try again.");
+      console.error("Full error object:", err);
+
+      let errorMessage = "Failed to reassign ticket. Please try again.";
+      if (err.response?.status === 404) {
+        errorMessage =
+          "Ticket update endpoint not found. Please check your API configuration.";
+      } else if (err.response?.status === 422) {
+        // Handle validation errors from Rails
+        const responseData = err.response.data;
+        console.log("422 Error details:", responseData);
+
+        if (responseData?.errors && Array.isArray(responseData.errors)) {
+          errorMessage = `Validation errors: ${responseData.errors.join(", ")}`;
+        } else if (responseData?.error) {
+          errorMessage = `Validation error: ${responseData.error}`;
+        } else {
+          errorMessage =
+            "Ticket update failed due to validation errors. Check the console for details.";
+        }
+      } else if (err.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      }
+
+      alert(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -280,7 +352,7 @@ const TicketDetailsPopup = ({
     return new Date(dateString).toLocaleString();
   };
 
-  if (!selectedTicket) return null; // Early return after hooks
+  if (!selectedTicket) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -397,18 +469,32 @@ const TicketDetailsPopup = ({
               <label className="font-semibold block mb-1">
                 Reassign to Team
               </label>
-              <select
-                value={selectedTeamId}
-                onChange={(e) => setSelectedTeamId(e.target.value)}
-                className="border p-2 w-full"
-              >
-                <option value="">Select Team</option>
-                {teams.map((team) => (
-                  <option key={team.id} value={team.id}>
-                    {team.name}
-                  </option>
-                ))}
-              </select>
+              {teamsLoading ? (
+                <div className="border p-2 w-full bg-gray-100 text-gray-500">
+                  Loading teams...
+                </div>
+              ) : (
+                <select
+                  value={selectedTeamId}
+                  onChange={(e) => {
+                    console.log("Team selected:", e.target.value);
+                    setSelectedTeamId(e.target.value);
+                  }}
+                  className="border p-2 w-full"
+                >
+                  <option value="">Select Team</option>
+                  {teams.map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {teams.length === 0 && !teamsLoading && (
+                <div className="text-red-500 text-sm mt-1">
+                  No teams available. Check your permissions.
+                </div>
+              )}
             </div>
 
             {/* Assignee Selection */}
@@ -417,18 +503,34 @@ const TicketDetailsPopup = ({
                 <label className="font-semibold block mb-1">
                   Assign to User
                 </label>
-                <select
-                  value={selectedAssigneeId}
-                  onChange={(e) => setSelectedAssigneeId(e.target.value)}
-                  className="border p-2 w-full"
-                >
-                  <option value="">Select Assignee (Optional)</option>
-                  {teamUsers.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.name} ({user.email})
-                    </option>
-                  ))}
-                </select>
+                {teamUsersLoading ? (
+                  <div className="border p-2 w-full bg-gray-100 text-gray-500">
+                    Loading team members...
+                  </div>
+                ) : (
+                  <select
+                    value={selectedAssigneeId}
+                    onChange={(e) => {
+                      console.log("Assignee selected:", e.target.value);
+                      setSelectedAssigneeId(e.target.value);
+                    }}
+                    className="border p-2 w-full"
+                  >
+                    <option value="">Select Assignee (Optional)</option>
+                    {teamUsers.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.name} ({user.email})
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {teamUsers.length === 0 &&
+                  !teamUsersLoading &&
+                  selectedTeamId && (
+                    <div className="text-orange-500 text-sm mt-1">
+                      No users found in this team.
+                    </div>
+                  )}
               </div>
             )}
 
@@ -442,6 +544,14 @@ const TicketDetailsPopup = ({
                 {isLoading ? "Reassigning..." : "Reassign Ticket"}
               </button>
             )}
+
+            {/* Debug Info (remove in production) */}
+            <div className="text-xs text-gray-500 mt-2 p-2 bg-gray-100 rounded">
+              <div>Teams loaded: {teams.length}</div>
+              <div>Selected team: {selectedTeamId}</div>
+              <div>Team users: {teamUsers.length}</div>
+              <div>Selected assignee: {selectedAssigneeId}</div>
+            </div>
           </div>
         </div>
 
@@ -516,8 +626,6 @@ const TicketDetailsPopup = ({
               </button>
             </div>
           </div>
-
-          {/* Journal Section */}
         </div>
 
         {/* Action Buttons */}
