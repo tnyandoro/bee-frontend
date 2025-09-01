@@ -67,7 +67,7 @@ const TicketDetailsPopup = ({
   const fetchComments = async () => {
     try {
       const response = await axios.get(
-        `${apiBaseUrl}/api/v1/organizations/${subdomain}/tickets/${selectedTicket.id}/comments`,
+        `${apiBaseUrl}/organizations/${subdomain}/tickets/${selectedTicket.id}/comments`,
         {
           headers: {
             Authorization: `Bearer ${authToken}`,
@@ -86,7 +86,7 @@ const TicketDetailsPopup = ({
     try {
       console.log("Fetching teams...");
       const response = await axios.get(
-        `${apiBaseUrl}/api/v1/organizations/${subdomain}/teams`,
+        `${apiBaseUrl}/organizations/${subdomain}/teams`,
         {
           headers: {
             Authorization: `Bearer ${authToken}`,
@@ -111,7 +111,7 @@ const TicketDetailsPopup = ({
 
       // Use the /api/v1/ pattern since that's working in your Rails logs
       const response = await axios.get(
-        `${apiBaseUrl}/api/v1/organizations/${subdomain}/teams/${teamId}/users`,
+        `${apiBaseUrl}/organizations/${subdomain}/teams/${teamId}/users`,
         {
           headers: {
             Authorization: `Bearer ${authToken}`,
@@ -171,7 +171,7 @@ const TicketDetailsPopup = ({
 
     try {
       const response = await axios.post(
-        `${apiBaseUrl}/api/v1/organizations/${subdomain}/tickets/${selectedTicket.id}/comments`,
+        `${apiBaseUrl}/v1/organizations/${subdomain}/tickets/${selectedTicket.id}/comments`,
         { comment: { content: newComment } },
         {
           headers: {
@@ -209,7 +209,7 @@ const TicketDetailsPopup = ({
 
       // Use the correct route format from your Rails routes
       const response = await axios.put(
-        `${apiBaseUrl}/api/v1/organizations/${subdomain}/tickets/${selectedTicket.id}`,
+        `${apiBaseUrl}/organizations/${subdomain}/tickets/${selectedTicket.id}`,
         updateData,
         {
           headers: {
