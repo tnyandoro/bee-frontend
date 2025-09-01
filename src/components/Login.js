@@ -4,7 +4,7 @@ import { useAuth } from "../contexts/authContext";
 import { toast } from "react-toastify";
 import logor from "../assets/logor.png";
 import bg from "../assets/main_bg.png";
-import splashLogo from "../assets/splash_logo.png";
+import splashLogo from "../assets/splash_logo.jpeg";
 
 const Login = ({ loginType = "User" }) => {
   const { login, currentUser } = useAuth();

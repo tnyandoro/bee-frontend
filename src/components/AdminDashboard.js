@@ -1,4 +1,3 @@
-// D:\projects\itsm\gss-itsm-frontend\src\components\AdminDashboard.js
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { X, RefreshCw } from "lucide-react";

@@ -1,4 +1,3 @@
-// src/components/TeamForm.js
 import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../contexts/authContext";
 import createApiInstance from "../utils/api";
