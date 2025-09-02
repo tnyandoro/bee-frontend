@@ -78,7 +78,7 @@ const TicketForm = ({ organization, token }) => {
       }
       try {
         const response = await api.get(
-          `/organizations/${organization.subdomain}/tickets`,
+          `/organizations/${organization.subdomain}/latest_ticket_number`,
           {
             params: { ticket_number: ticketNumber, ticket_type: ticketType },
           }
@@ -128,7 +128,7 @@ const TicketForm = ({ organization, token }) => {
         setTicketNumberLoading(true);
         // Fetch the latest ticket for the given ticket type
         const response = await api.get(
-          `/organizations/${organization.subdomain}/tickets`,
+          `/organizations/${organization.subdomain}/latest_ticket_number`,
           {
             params: {
               ticket_type: ticketType,
