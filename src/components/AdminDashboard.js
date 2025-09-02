@@ -1,11 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  CheckCircleIcon,
-  ExclamationCircleIcon,
-  XCircleIcon,
-  InformationCircleIcon,
-} from "@heroicons/react/24/solid";
 import { RefreshCw, X } from "lucide-react";
 import { Bar, Pie } from "react-chartjs-2";
 import {
@@ -24,7 +18,6 @@ import CreateUserForm from "./CreateUserForm";
 import TeamForm from "./TeamForm";
 import TeamList from "./TeamList";
 import UserList from "./UserList";
-import TicketDetailsPopup from "./TicketDetailsPopup";
 import createApiInstance from "../utils/api";
 import { useAuth } from "../contexts/authContext";
 
@@ -67,10 +60,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
   const [error, setError] = useState("");
   const [users, setUsers] = useState([]);
   const [dashboardStats, setDashboardStats] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [ticketsPerPage] = useState(10);
-  const [detailsTicket, setDetailsTicket] = useState(null);
 
   const api = useRef(null);
   const isFetchingStats = useRef(false);
@@ -213,57 +202,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     fetchUsers();
   };
 
-  const handleDetails = (ticket) => {
-    setDetailsTicket({
-      ticketNumber: ticket.id ? `INC-${ticket.id}` : "N/A",
-      status: ticket.status || "Unknown",
-      priority: ticket.priority || "p4",
-      callerName: ticket.reporter || "Unknown",
-      assignee: ticket.assignee || "Unassigned",
-      subject: ticket.title || "Untitled",
-      description: ticket.description || "No description",
-      reportedDate: ticket.created_at || "N/A",
-      slaStatus: ticket.sla_breached
-        ? "Breached"
-        : ticket.breaching_sla
-        ? "Breaching Soon"
-        : "On Time",
-      id: ticket.id,
-    });
-  };
-
-  const handleCloseDetails = () => {
-    setDetailsTicket(null);
-  };
-
-  const getStatusColor = (status) =>
-    ({
-      resolved: "bg-green-100 text-green-800",
-      pending: "bg-orange-100 text-orange-800",
-      closed: "bg-black text-white",
-      open: "bg-blue-100 text-blue-800",
-      assigned: "bg-yellow-100 text-yellow-800",
-      escalated: "bg-purple-100 text-purple-800",
-      suspended: "bg-gray-100 text-gray-800",
-    }[status?.toLowerCase()] || "bg-gray-100 text-gray-800");
-
-  const getStatusIcon = (status) => {
-    const s = status?.toLowerCase();
-    return (
-      {
-        resolved: <CheckCircleIcon className="h-5 w-5" />,
-        pending: <ExclamationCircleIcon className="h-5 w-5" />,
-        closed: <XCircleIcon className="h-5 w-5" />,
-        open: <InformationCircleIcon className="h-5 w-5" />,
-        assigned: <CheckCircleIcon className="h-5 w-5 text-yellow-500" />,
-        escalated: (
-          <ExclamationCircleIcon className="h-5 w-5 text-purple-500" />
-        ),
-        suspended: <XCircleIcon className="h-5 w-5 text-gray-500" />,
-      }[s] || <InformationCircleIcon className="h-5 w-5 text-gray-500" />
-    );
-  };
-
   const stats = dashboardStats?.stats || {
     total_tickets: 0,
     open_tickets: 0,
@@ -284,21 +222,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     on_time_rate_percent: 100,
     avg_resolution_hours: 0,
   };
-
-  const filteredTickets = (dashboardStats?.recent_tickets || [])
-    .filter((t) => t && t.id)
-    .filter((t) => {
-      const term = searchTerm.toLowerCase();
-      return [t.title, t.status, t.priority, t.assignee, t.reporter].some(
-        (field) => field?.toLowerCase?.().includes(term)
-      );
-    });
-
-  const totalPages = Math.ceil(filteredTickets.length / ticketsPerPage);
-  const paginatedTickets = filteredTickets.slice(
-    (currentPage - 1) * ticketsPerPage,
-    currentPage * ticketsPerPage
-  );
 
   const ticketChartData = {
     labels: [
@@ -503,86 +426,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-4 mb-6">
-            <h3 className="text-xl font-semibold mb-4">Recent Tickets</h3>
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search tickets"
-              className="w-full px-4 py-2 border rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-            {filteredTickets.length === 0 ? (
-              <p className="text-gray-500">No recent tickets found.</p>
-            ) : (
-              <>
-                <ul className="divide-y divide-gray-200">
-                  {paginatedTickets.map((ticket) => (
-                    <li key={ticket.id} className="py-2 px-4">
-                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center">
-                        <div>
-                          <h3 className="text-lg font-semibold">{`INC-${ticket.id}`}</h3>
-                          <p className="text-sm">
-                            {ticket.title || "Untitled"}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {ticket.created_at
-                              ? new Date(ticket.created_at).toLocaleString()
-                              : "N/A"}
-                          </p>
-                        </div>
-                        <div className="flex items-center space-x-2 mt-2 sm:mt-0">
-                          {getStatusIcon(ticket.status)}
-                          <span
-                            className={`px-2 py-1 text-xs font-medium rounded ${getStatusColor(
-                              ticket.status
-                            )}`}
-                          >
-                            {ticket.status || "Unknown"}
-                          </span>
-                          <span
-                            className={`px-2 py-1 text-xs font-medium rounded bg-gray-100 text-gray-800`}
-                          >
-                            {ticket.priority || "p4"}
-                          </span>
-                          <button
-                            onClick={() => handleDetails(ticket)}
-                            className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600"
-                          >
-                            Details
-                          </button>
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-                <div className="flex justify-between items-center mt-4">
-                  <button
-                    onClick={() =>
-                      setCurrentPage((prev) => Math.max(prev - 1, 1))
-                    }
-                    disabled={currentPage === 1}
-                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded disabled:opacity-50"
-                  >
-                    Prev
-                  </button>
-                  <span>
-                    Page {currentPage} of {totalPages}
-                  </span>
-                  <button
-                    onClick={() =>
-                      setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-                    }
-                    disabled={currentPage === totalPages}
-                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded disabled:opacity-50"
-                  >
-                    Next
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-
           {isCreateUserFormOpen && (
             <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-[9999]">
               <div className="bg-white p-6 rounded-xl w-full max-w-md shadow-xl relative">
@@ -655,23 +498,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
                 <UserList users={users} />
               </div>
             </div>
-          )}
-
-          {detailsTicket && (
-            <TicketDetailsPopup
-              selectedTicket={detailsTicket}
-              onClose={handleCloseDetails}
-              subdomain={getEffectiveSubdomain()}
-              authToken={token}
-              onUpdate={(updated) => {
-                setDashboardStats((prev) => ({
-                  ...prev,
-                  recent_tickets: prev.recent_tickets.map((t) =>
-                    t.id === updated.id ? { ...t, ...updated } : t
-                  ),
-                }));
-              }}
-            />
           )}
         </>
       ) : !error ? (
