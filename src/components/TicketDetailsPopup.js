@@ -171,7 +171,7 @@ const TicketDetailsPopup = ({
 
     try {
       const response = await axios.post(
-        `${apiBaseUrl}/v1/organizations/${subdomain}/tickets/${selectedTicket.id}/comments`,
+        `${apiBaseUrl}/organizations/${subdomain}/tickets/${selectedTicket.id}/comments`,
         { comment: { content: newComment } },
         {
           headers: {

@@ -85,7 +85,7 @@ const CreateUserForm = ({ onClose }) => {
 
     try {
       const apiBaseUrl = process.env.REACT_APP_API_BASE_URL; // use .env for dev/prod
-      const url = `${apiBaseUrl}/api/v1/organizations/${subdomain}/users`;
+      const url = `${apiBaseUrl}/organizations/${subdomain}/users`;
 
       const formDataToSend = new FormData();
       Object.entries(formData).forEach(([key, value]) => {
