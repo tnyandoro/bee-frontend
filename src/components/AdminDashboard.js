@@ -1,13 +1,45 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { X, RefreshCw } from "lucide-react";
+import {
+  CheckCircleIcon,
+  ExclamationCircleIcon,
+  XCircleIcon,
+  InformationCircleIcon,
+} from "@heroicons/react/24/solid";
+import { RefreshCw, X } from "lucide-react";
+import { Bar, Pie } from "react-chartjs-2";
+import {
+  Chart,
+  ArcElement,
+  PieController,
+  BarController,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+} from "chart.js";
 import CreateUserForm from "./CreateUserForm";
 import TeamForm from "./TeamForm";
 import TeamList from "./TeamList";
 import UserList from "./UserList";
+import TicketDetailsPopup from "./TicketDetailsPopup";
 import createApiInstance from "../utils/api";
 import { useAuth } from "../contexts/authContext";
-import TicketsBarChart from "./TicketsBarChart";
+
+// Register Chart.js components
+Chart.register(
+  ArcElement,
+  PieController,
+  BarController,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 const StatCard = ({ title, value, color, textColor }) => (
   <div className={`p-4 rounded shadow ${color} ${textColor}`}>
@@ -17,45 +49,53 @@ const StatCard = ({ title, value, color, textColor }) => (
 );
 
 const AdminDashboard = ({ organizationSubdomain }) => {
-  const { token, subdomain: authSubdomain, refreshToken, logout } = useAuth();
+  const {
+    token,
+    subdomain: authSubdomain,
+    refreshToken,
+    logout,
+    currentUser,
+  } = useAuth();
   const navigate = useNavigate();
 
   const [isCreateUserFormOpen, setIsCreateUserFormOpen] = useState(false);
   const [isTeamFormOpen, setIsTeamFormOpen] = useState(false);
+  const [isUserListOpen, setIsUserListOpen] = useState(false);
+  const [isTeamListOpen, setIsTeamListOpen] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState(null);
-  const [showTeams, setShowTeams] = useState(false);
-  const [showUsers, setShowUsers] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [users, setUsers] = useState([]);
   const [dashboardStats, setDashboardStats] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [ticketsPerPage] = useState(10);
+  const [detailsTicket, setDetailsTicket] = useState(null);
 
   const api = useRef(null);
-
   const isFetchingStats = useRef(false);
   const isFetchingUsers = useRef(false);
 
   const getEffectiveSubdomain = useCallback(() => {
-    if (organizationSubdomain && organizationSubdomain !== "undefined") {
-      return organizationSubdomain;
-    }
-    if (authSubdomain && authSubdomain !== "undefined") {
-      return authSubdomain;
-    }
-    return process.env.NODE_ENV === "development" ? "demo" : null;
+    return organizationSubdomain && organizationSubdomain !== "undefined"
+      ? organizationSubdomain
+      : authSubdomain && authSubdomain !== "undefined"
+      ? authSubdomain
+      : process.env.NODE_ENV === "development"
+      ? "demo"
+      : null;
   }, [organizationSubdomain, authSubdomain]);
 
   useEffect(() => {
     const activeSubdomain = getEffectiveSubdomain();
     if (activeSubdomain && token && !api.current) {
-      console.log("Initializing API instance:", { token, activeSubdomain });
       api.current = createApiInstance(token, activeSubdomain);
     }
   }, [token, getEffectiveSubdomain]);
 
   const handleApiError = useCallback(
     (error) => {
-      console.error("API error details:", {
+      console.error("API error:", {
         status: error.response?.status,
         data: error.response?.data,
         message: error.message,
@@ -92,9 +132,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
   const fetchDashboardStats = useCallback(async () => {
     const activeSubdomain = getEffectiveSubdomain();
     if (!activeSubdomain || !token || !api.current || isFetchingStats.current) {
-      if (!activeSubdomain || !token) {
-        setError("Missing subdomain or token.");
-      }
+      setError("Missing subdomain or token.");
       setLoading(false);
       return;
     }
@@ -107,10 +145,8 @@ const AdminDashboard = ({ organizationSubdomain }) => {
       const response = await api.current.get(
         `/organizations/${activeSubdomain}/dashboard`
       );
-      console.log("Dashboard stats response:", response.data);
       const statsData = response.data?.data;
       if (!statsData?.stats) {
-        console.warn("Dashboard stats missing in response:", response.data);
         setError("No stats data returned from the server.");
         setDashboardStats(null);
       } else {
@@ -118,7 +154,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
           (value) => value === 0
         );
         if (statsEmpty && statsData.recent_tickets?.length > 0) {
-          console.warn("Stats are empty despite recent tickets:", statsData);
           setError(
             "Ticket statistics are empty. Possible data issue in the database."
           );
@@ -126,8 +161,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
         setDashboardStats(statsData);
       }
     } catch (err) {
-      const errorMessage = handleApiError(err);
-      setError(errorMessage);
+      setError(handleApiError(err));
       setDashboardStats(null);
     } finally {
       setLoading(false);
@@ -138,9 +172,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
   const fetchUsers = useCallback(async () => {
     const activeSubdomain = getEffectiveSubdomain();
     if (!activeSubdomain || !token || !api.current || isFetchingUsers.current) {
-      if (!activeSubdomain || !token) {
-        setError("Missing subdomain or token.");
-      }
+      setError("Missing subdomain or token.");
       return;
     }
 
@@ -149,11 +181,9 @@ const AdminDashboard = ({ organizationSubdomain }) => {
       const response = await api.current.get(
         `/organizations/${activeSubdomain}/users`
       );
-      console.log("Users response:", response.data);
       setUsers(response.data.data || response.data);
     } catch (err) {
-      const errorMessage = handleApiError(err);
-      setError(errorMessage);
+      setError(handleApiError(err));
     } finally {
       isFetchingUsers.current = false;
     }
@@ -161,10 +191,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
 
   useEffect(() => {
     if (token && getEffectiveSubdomain() && api.current) {
-      console.log(
-        "Fetching dashboard data for subdomain:",
-        getEffectiveSubdomain()
-      );
       fetchDashboardStats();
       fetchUsers();
     }
@@ -187,6 +213,57 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     fetchUsers();
   };
 
+  const handleDetails = (ticket) => {
+    setDetailsTicket({
+      ticketNumber: ticket.id ? `INC-${ticket.id}` : "N/A",
+      status: ticket.status || "Unknown",
+      priority: ticket.priority || "p4",
+      callerName: ticket.reporter || "Unknown",
+      assignee: ticket.assignee || "Unassigned",
+      subject: ticket.title || "Untitled",
+      description: ticket.description || "No description",
+      reportedDate: ticket.created_at || "N/A",
+      slaStatus: ticket.sla_breached
+        ? "Breached"
+        : ticket.breaching_sla
+        ? "Breaching Soon"
+        : "On Time",
+      id: ticket.id,
+    });
+  };
+
+  const handleCloseDetails = () => {
+    setDetailsTicket(null);
+  };
+
+  const getStatusColor = (status) =>
+    ({
+      resolved: "bg-green-100 text-green-800",
+      pending: "bg-orange-100 text-orange-800",
+      closed: "bg-black text-white",
+      open: "bg-blue-100 text-blue-800",
+      assigned: "bg-yellow-100 text-yellow-800",
+      escalated: "bg-purple-100 text-purple-800",
+      suspended: "bg-gray-100 text-gray-800",
+    }[status?.toLowerCase()] || "bg-gray-100 text-gray-800");
+
+  const getStatusIcon = (status) => {
+    const s = status?.toLowerCase();
+    return (
+      {
+        resolved: <CheckCircleIcon className="h-5 w-5" />,
+        pending: <ExclamationCircleIcon className="h-5 w-5" />,
+        closed: <XCircleIcon className="h-5 w-5" />,
+        open: <InformationCircleIcon className="h-5 w-5" />,
+        assigned: <CheckCircleIcon className="h-5 w-5 text-yellow-500" />,
+        escalated: (
+          <ExclamationCircleIcon className="h-5 w-5 text-purple-500" />
+        ),
+        suspended: <XCircleIcon className="h-5 w-5 text-gray-500" />,
+      }[s] || <InformationCircleIcon className="h-5 w-5 text-gray-500" />
+    );
+  };
+
   const stats = dashboardStats?.stats || {
     total_tickets: 0,
     open_tickets: 0,
@@ -196,21 +273,110 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     closed_tickets: 0,
     total_problems: 0,
     total_members: 0,
+    high_priority_tickets: 0,
+    unresolved_tickets: 0,
+    resolution_rate_percent: 0,
   };
 
-  const capitalizedOrgName =
-    dashboardStats?.organization?.name?.toUpperCase() || "Organization";
+  const slaData = dashboardStats?.sla || {
+    breached: 0,
+    breaching_soon: 0,
+    on_time_rate_percent: 100,
+    avg_resolution_hours: 0,
+  };
+
+  const filteredTickets = (dashboardStats?.recent_tickets || [])
+    .filter((t) => t && t.id)
+    .filter((t) => {
+      const term = searchTerm.toLowerCase();
+      return [t.title, t.status, t.priority, t.assignee, t.reporter].some(
+        (field) => field?.toLowerCase?.().includes(term)
+      );
+    });
+
+  const totalPages = Math.ceil(filteredTickets.length / ticketsPerPage);
+  const paginatedTickets = filteredTickets.slice(
+    (currentPage - 1) * ticketsPerPage,
+    currentPage * ticketsPerPage
+  );
+
+  const ticketChartData = {
+    labels: [
+      "Total",
+      "Open",
+      "Assigned",
+      "Escalated",
+      "Resolved",
+      "Closed",
+      "Problems",
+      "Team Members",
+    ],
+    datasets: [
+      {
+        label: "Count",
+        data: [
+          stats.total_tickets,
+          stats.open_tickets,
+          stats.assigned_tickets,
+          stats.escalated_tickets,
+          stats.resolved_tickets,
+          stats.closed_tickets,
+          stats.total_problems,
+          stats.total_members,
+        ],
+        backgroundColor: "rgba(75, 192, 192, 0.6)",
+      },
+    ],
+  };
+
+  const slaPieData = {
+    labels: ["On Time", "Breached", "Breaching Soon"],
+    datasets: [
+      {
+        label: "SLA Performance",
+        data: [
+          stats.total_tickets - slaData.breached - slaData.breaching_soon,
+          slaData.breached,
+          slaData.breaching_soon,
+        ],
+        backgroundColor: ["#4caf50", "#f44336", "#ff9800"],
+      },
+    ],
+  };
+
+  const chartOptions = {
+    responsive: true,
+    plugins: {
+      legend: { position: "top" },
+      tooltip: {
+        callbacks: {
+          label: (context) =>
+            `${context.dataset.label}: ${context.raw} ${
+              context.raw !== 1 ? "tickets" : "ticket"
+            }`,
+        },
+      },
+    },
+  };
+
+  const pieOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { position: "top" } },
+  };
 
   return (
     <div className="mt-2 p-4 ml-4">
       <div className="bg-gray-200 shadow-xl rounded-lg mb-4 p-4">
         <h1 className="text-3xl font-semibold">
-          Welcome to the {capitalizedOrgName} Admin Dashboard
+          Welcome to the{" "}
+          {dashboardStats?.organization?.name?.toUpperCase() || "Organization"}{" "}
+          Admin Dashboard
         </h1>
       </div>
 
       {error && (
-        <div className="bg-red-100 text-red-700 p-3 rounded mb-4 flex justify-between items-center">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 mb-4 flex justify-between items-center">
           <span>{error}</span>
           <button
             onClick={retryDashboard}
@@ -236,16 +402,16 @@ const AdminDashboard = ({ organizationSubdomain }) => {
           Add Team
         </button>
         <button
-          onClick={() => setShowTeams((prev) => !prev)}
+          onClick={() => setIsTeamListOpen(true)}
           className="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded shadow"
         >
-          {showTeams ? "Hide Teams" : "Show Teams"}
+          Show Teams
         </button>
         <button
-          onClick={() => setShowUsers((prev) => !prev)}
+          onClick={() => setIsUserListOpen(true)}
           className="bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 px-4 rounded shadow"
         >
-          {showUsers ? "Hide Users" : "Show Users"}
+          Show Users
         </button>
       </div>
 
@@ -304,9 +470,118 @@ const AdminDashboard = ({ organizationSubdomain }) => {
               color="bg-teal-100"
               textColor="text-teal-800"
             />
+            <StatCard
+              title="High Priority Tickets"
+              value={stats.high_priority_tickets}
+              color="bg-red-200"
+              textColor="text-red-900"
+            />
+            <StatCard
+              title="Unresolved Tickets"
+              value={stats.unresolved_tickets}
+              color="bg-orange-100"
+              textColor="text-orange-800"
+            />
+            <StatCard
+              title="Resolution Rate"
+              value={`${stats.resolution_rate_percent}%`}
+              color="bg-blue-200"
+              textColor="text-blue-900"
+            />
           </div>
 
-          <TicketsBarChart stats={stats} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div className="bg-white rounded-lg shadow p-4">
+              <h3 className="text-lg font-semibold mb-2">Ticket Overview</h3>
+              <Bar data={ticketChartData} options={chartOptions} />
+            </div>
+            <div className="bg-white rounded-lg shadow p-4">
+              <h3 className="text-lg font-semibold mb-2">SLA Performance</h3>
+              <div className="h-64">
+                <Pie data={slaPieData} options={pieOptions} />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-4 mb-6">
+            <h3 className="text-xl font-semibold mb-4">Recent Tickets</h3>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search tickets"
+              className="w-full px-4 py-2 border rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            {filteredTickets.length === 0 ? (
+              <p className="text-gray-500">No recent tickets found.</p>
+            ) : (
+              <>
+                <ul className="divide-y divide-gray-200">
+                  {paginatedTickets.map((ticket) => (
+                    <li key={ticket.id} className="py-2 px-4">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center">
+                        <div>
+                          <h3 className="text-lg font-semibold">{`INC-${ticket.id}`}</h3>
+                          <p className="text-sm">
+                            {ticket.title || "Untitled"}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {ticket.created_at
+                              ? new Date(ticket.created_at).toLocaleString()
+                              : "N/A"}
+                          </p>
+                        </div>
+                        <div className="flex items-center space-x-2 mt-2 sm:mt-0">
+                          {getStatusIcon(ticket.status)}
+                          <span
+                            className={`px-2 py-1 text-xs font-medium rounded ${getStatusColor(
+                              ticket.status
+                            )}`}
+                          >
+                            {ticket.status || "Unknown"}
+                          </span>
+                          <span
+                            className={`px-2 py-1 text-xs font-medium rounded bg-gray-100 text-gray-800`}
+                          >
+                            {ticket.priority || "p4"}
+                          </span>
+                          <button
+                            onClick={() => handleDetails(ticket)}
+                            className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600"
+                          >
+                            Details
+                          </button>
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex justify-between items-center mt-4">
+                  <button
+                    onClick={() =>
+                      setCurrentPage((prev) => Math.max(prev - 1, 1))
+                    }
+                    disabled={currentPage === 1}
+                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded disabled:opacity-50"
+                  >
+                    Prev
+                  </button>
+                  <span>
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    onClick={() =>
+                      setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                    }
+                    disabled={currentPage === totalPages}
+                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded disabled:opacity-50"
+                  >
+                    Next
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
 
           {isCreateUserFormOpen && (
             <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-[9999]">
@@ -346,25 +621,57 @@ const AdminDashboard = ({ organizationSubdomain }) => {
             </div>
           )}
 
-          {showTeams && (
-            <div className="mt-6">
-              <h3 className="text-xl font-semibold text-gray-700 mb-2">
-                Teams
-              </h3>
-              <TeamList
-                organizationSubdomain={getEffectiveSubdomain()}
-                onEdit={handleOpenTeamForm}
-              />
+          {isTeamListOpen && (
+            <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-[9999]">
+              <div className="bg-white p-6 rounded-xl w-full max-w-2xl shadow-xl relative">
+                <button
+                  onClick={() => setIsTeamListOpen(false)}
+                  className="absolute top-3 right-3"
+                >
+                  <X className="w-5 h-5 text-gray-600" />
+                </button>
+                <h3 className="text-xl font-semibold mb-4">Teams</h3>
+                <TeamList
+                  organizationSubdomain={getEffectiveSubdomain()}
+                  onEdit={(team) => {
+                    setIsTeamListOpen(false);
+                    handleOpenTeamForm(team);
+                  }}
+                />
+              </div>
             </div>
           )}
 
-          {showUsers && (
-            <div className="mt-6">
-              <h3 className="text-xl font-semibold text-gray-700 mb-2">
-                Users
-              </h3>
-              <UserList users={users} />
+          {isUserListOpen && (
+            <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-[9999]">
+              <div className="bg-white p-6 rounded-xl w-full max-w-2xl shadow-xl relative">
+                <button
+                  onClick={() => setIsUserListOpen(false)}
+                  className="absolute top-3 right-3"
+                >
+                  <X className="w-5 h-5 text-gray-600" />
+                </button>
+                <h3 className="text-xl font-semibold mb-4">Users</h3>
+                <UserList users={users} />
+              </div>
             </div>
+          )}
+
+          {detailsTicket && (
+            <TicketDetailsPopup
+              selectedTicket={detailsTicket}
+              onClose={handleCloseDetails}
+              subdomain={getEffectiveSubdomain()}
+              authToken={token}
+              onUpdate={(updated) => {
+                setDashboardStats((prev) => ({
+                  ...prev,
+                  recent_tickets: prev.recent_tickets.map((t) =>
+                    t.id === updated.id ? { ...t, ...updated } : t
+                  ),
+                }));
+              }}
+            />
           )}
         </>
       ) : !error ? (
