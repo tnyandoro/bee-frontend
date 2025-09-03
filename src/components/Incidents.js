@@ -213,6 +213,7 @@ const Incident = () => {
     if (!updatedTicket) {
       console.error("handleResolveSuccess called without ticket data");
       fetchTickets();
+      setResolveTicket(null);
       return;
     }
 
@@ -490,8 +491,9 @@ const Incident = () => {
                       {getPriorityLabel(ticket.priority)}
                     </span>
                     <button
-                      onClick={() => handleResolve(ticket)}
+                      onClick={() => handleResolve(ticket) }
                       className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+                      hidden={ticket.status == "resolved"}
                     >
                       Resolve
                     </button>
