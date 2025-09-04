@@ -341,6 +341,12 @@ const Incident = () => {
     );
   };
 
+  // Helper function to determine if resolve button should be shown
+  const shouldShowResolveButton = (ticket) => {
+    const status = ticket?.status?.toLowerCase();
+    return status !== "resolved" && status !== "closed";
+  };
+
   // Moved useMemo outside of conditional rendering
   const filteredTickets = useMemo(() => {
     if (!Array.isArray(tickets)) {
@@ -527,12 +533,14 @@ const Incident = () => {
                           >
                             {getPriorityLabel(ticket.priority)}
                           </span>
-                          <button
-                            onClick={() => handleResolve(ticket)}
-                            className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
-                          >
-                            Resolve
-                          </button>
+                          {shouldShowResolveButton(ticket) && (
+                            <button
+                              onClick={() => handleResolve(ticket)}
+                              className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+                            >
+                              Resolve
+                            </button>
+                          )}
                           <button
                             onClick={() => handleDetails(ticket)}
                             className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600"
