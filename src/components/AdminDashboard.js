@@ -85,7 +85,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     return subdomain;
   }, [organizationSubdomain, authSubdomain]);
 
-  // Create API instance when dependencies change
   useEffect(() => {
     const activeSubdomain = getEffectiveSubdomain();
 
@@ -179,21 +178,45 @@ const AdminDashboard = ({ organizationSubdomain }) => {
         `/organizations/${activeSubdomain}/dashboard`
       );
       const statsData = response.data?.data;
+      console.log("API response:", JSON.stringify(statsData, null, 2)); // Debug logging
       if (!statsData?.stats) {
         setError("No stats data returned from the server.");
         setDashboardStats(null);
-      } else {
-        const statsEmpty = Object.values(statsData.stats).every(
-          (value) => value === 0
-        );
-        if (statsEmpty && statsData.recent_tickets?.length > 0) {
-          setError(
-            "Ticket statistics are empty. Possible data issue in the database."
-          );
-        }
-        setDashboardStats(statsData);
-        console.log("Dashboard stats loaded successfully");
+        return;
       }
+
+      const requiredStats = [
+        "total_tickets",
+        "open_tickets",
+        "assigned_tickets",
+        "escalated_tickets",
+        "resolved_tickets",
+        "closed_tickets",
+        "total_problems",
+        "p1_tickets", // Updated from high_priority_tickets
+        "unresolved_tickets",
+        "resolution_rate_percent",
+      ];
+      const missingStats = requiredStats.filter(
+        (key) =>
+          statsData.stats[key] === undefined || statsData.stats[key] === null
+      );
+      if (missingStats.length > 0) {
+        console.warn("Missing or null stats:", missingStats);
+        setError(`Incomplete stats data: missing ${missingStats.join(", ")}.`);
+        setDashboardStats(null);
+        return;
+      }
+      const statsEmpty = Object.values(statsData.stats).every(
+        (value) => value === 0
+      );
+      if (statsEmpty && statsData.recent_tickets?.length > 0) {
+        setError(
+          "Ticket statistics are empty despite recent tickets. Possible data issue."
+        );
+      }
+      setDashboardStats(statsData);
+      console.log("Dashboard stats loaded successfully:", statsData.stats);
     } catch (err) {
       console.error("Error fetching dashboard stats:", err);
       setError(handleApiError(err));
@@ -246,7 +269,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     }
   }, [token, getEffectiveSubdomain, handleApiError]);
 
-  // Fetch data when ready
   useEffect(() => {
     const activeSubdomain = getEffectiveSubdomain();
 
@@ -257,7 +279,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     });
 
     if (token && activeSubdomain) {
-      // Small delay to ensure API instance is ready
       const timer = setTimeout(() => {
         fetchDashboardStats();
         fetchUsers();
@@ -294,7 +315,7 @@ const AdminDashboard = ({ organizationSubdomain }) => {
     closed_tickets: 0,
     total_problems: 0,
     total_members: 0,
-    high_priority_tickets: 0,
+    p1_tickets: 0,
     unresolved_tickets: 0,
     resolution_rate_percent: 0,
   };
@@ -311,11 +332,10 @@ const AdminDashboard = ({ organizationSubdomain }) => {
       "Total",
       "Open",
       "Assigned",
-      "Escalated",
       "Resolved",
       "Closed",
+      "P1 Tickets",
       "Problems",
-      "Team Members",
     ],
     datasets: [
       {
@@ -324,13 +344,30 @@ const AdminDashboard = ({ organizationSubdomain }) => {
           stats.total_tickets,
           stats.open_tickets,
           stats.assigned_tickets,
-          stats.escalated_tickets,
           stats.resolved_tickets,
           stats.closed_tickets,
+          stats.p1_tickets,
           stats.total_problems,
-          stats.total_members,
         ],
-        backgroundColor: "rgba(75, 192, 192, 0.6)",
+        backgroundColor: [
+          "rgba(75, 192, 192, 0.6)", // Total
+          "rgba(255, 206, 86, 0.6)", // Open
+          "rgba(54, 162, 235, 0.6)", // Assigned
+          "rgba(75, 192, 75, 0.6)", // Resolved
+          "rgba(0, 128, 0, 0.6)", // Closed
+          "rgba(255, 99, 132, 0.6)", // P1
+          "rgba(153, 102, 255, 0.6)", // Problems
+        ],
+        borderColor: [
+          "rgba(75, 192, 192, 1)",
+          "rgba(255, 206, 86, 1)",
+          "rgba(54, 162, 235, 1)",
+          "rgba(75, 192, 75, 1)",
+          "rgba(0, 128, 0, 1)",
+          "rgba(255, 99, 132, 1)",
+          "rgba(153, 102, 255, 1)",
+        ],
+        borderWidth: 1,
       },
     ],
   };
@@ -346,6 +383,8 @@ const AdminDashboard = ({ organizationSubdomain }) => {
           slaData.breaching_soon,
         ],
         backgroundColor: ["#4caf50", "#f44336", "#ff9800"],
+        borderColor: ["#388e3c", "#d32f2f", "#f57c00"],
+        borderWidth: 1,
       },
     ],
   };
@@ -447,12 +486,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
               textColor="text-indigo-800"
             />
             <StatCard
-              title="Escalated Tickets"
-              value={stats.escalated_tickets}
-              color="bg-purple-100"
-              textColor="text-purple-800"
-            />
-            <StatCard
               title="Resolved Tickets"
               value={stats.resolved_tickets}
               color="bg-green-200"
@@ -465,6 +498,12 @@ const AdminDashboard = ({ organizationSubdomain }) => {
               textColor="text-green-800"
             />
             <StatCard
+              title="P1 Tickets"
+              value={stats.p1_tickets}
+              color="bg-red-200"
+              textColor="text-red-900"
+            />
+            <StatCard
               title="Problems"
               value={stats.total_problems}
               color="bg-red-100"
@@ -475,12 +514,6 @@ const AdminDashboard = ({ organizationSubdomain }) => {
               value={stats.total_members}
               color="bg-teal-100"
               textColor="text-teal-800"
-            />
-            <StatCard
-              title="High Priority Tickets"
-              value={stats.high_priority_tickets}
-              color="bg-red-200"
-              textColor="text-red-900"
             />
             <StatCard
               title="Unresolved Tickets"
