@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   CheckCircleIcon,
@@ -52,7 +58,6 @@ const Incident = () => {
       return;
     }
 
-    // Don't attempt to fetch if auth is still loading
     if (authLoading) {
       console.log("Incident: Auth still loading, skipping fetch");
       return;
@@ -84,20 +89,33 @@ const Incident = () => {
         response: response.data,
       });
 
-      const fetchedTickets = Array.isArray(response.data.tickets)
-        ? response.data.tickets.filter((ticket) => ticket && ticket.id)
-        : [];
-      setTickets(
-        fetchedTickets.sort(
-          (a, b) =>
-            new Date(b.reported_at || b.created_at) -
-            new Date(a.reported_at || a.created_at)
-        )
-      );
+      let fetchedTickets = [];
+      if (response.data && Array.isArray(response.data.tickets)) {
+        fetchedTickets = response.data.tickets.filter((ticket) => {
+          if (!ticket || typeof ticket !== "object" || !ticket.id) {
+            console.warn("Invalid ticket object received:", ticket);
+            return false;
+          }
+          return true;
+        });
+      } else {
+        console.warn(
+          "API response does not contain tickets array:",
+          response.data
+        );
+      }
+
+      const sortedTickets = fetchedTickets.sort((a, b) => {
+        const dateA = new Date(a.reported_at || a.created_at || 0);
+        const dateB = new Date(b.reported_at || b.created_at || 0);
+        return dateB - dateA;
+      });
+
+      setTickets(sortedTickets);
       setPagination(
         response.data.pagination || {
-          total_entries: fetchedTickets.length,
-          total_pages: Math.ceil(fetchedTickets.length / ticketsPerPage),
+          total_entries: sortedTickets.length,
+          total_pages: Math.ceil(sortedTickets.length / ticketsPerPage),
         }
       );
     } catch (err) {
@@ -117,6 +135,7 @@ const Incident = () => {
         setTickets([]);
       }
       setError(errorMsg);
+      setTickets([]);
     } finally {
       setLoading(false);
       isFetching.current = false;
@@ -141,11 +160,12 @@ const Incident = () => {
         ...location.state.newTicket,
         created_at: location.state.newTicket.reported_at || Date.now(),
       };
-      setTickets((prevTickets) =>
-        [
-          newTicket,
-          ...prevTickets.filter((t) => t && t.id !== newTicket.id),
-        ].sort(
+      if (!newTicket.id) {
+        console.warn("New ticket missing ID:", newTicket);
+        return;
+      }
+      setTickets((prev) =>
+        [newTicket, ...prev.filter((t) => t && t.id !== newTicket.id)].sort(
           (a, b) =>
             new Date(b.reported_at || b.created_at) -
             new Date(a.reported_at || a.created_at)
@@ -161,7 +181,6 @@ const Incident = () => {
   }, [location.state, fetchTickets]);
 
   useEffect(() => {
-    // Only attempt to fetch when auth is not loading
     if (
       !authLoading &&
       token &&
@@ -190,19 +209,20 @@ const Incident = () => {
     authLoading,
   ]);
 
-  // Show loading screen while authentication is loading
-  if (authLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-2"></div>
-          <p>Loading authentication...</p>
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    console.log("Tickets state debug:", {
+      ticketsType: typeof tickets,
+      ticketsIsArray: Array.isArray(tickets),
+      ticketsLength: tickets?.length,
+      firstTicket: tickets?.[0],
+    });
+  }, [tickets]);
 
   const handleResolve = (ticket) => {
+    if (!ticket?.id) {
+      console.error("Invalid ticket for resolve:", ticket);
+      return;
+    }
     console.log("Incident: Resolve ticket", { ticketId: ticket.id });
     setResolveTicket(ticket);
   };
@@ -210,8 +230,11 @@ const Incident = () => {
   const handleResolveSuccess = (updatedTicket) => {
     console.log("Incident: Resolve success", { updatedTicket });
 
-    if (!updatedTicket) {
-      console.error("handleResolveSuccess called without ticket data");
+    if (!updatedTicket?.id) {
+      console.error(
+        "Invalid updated ticket in handleResolveSuccess:",
+        updatedTicket
+      );
       fetchTickets();
       return;
     }
@@ -224,7 +247,6 @@ const Incident = () => {
             console.warn("Found invalid ticket in state:", t);
             return t;
           }
-
           return (t.ticket_number || `INC-${t.id}`) ===
             (updatedTicket.ticket_number || `INC-${updatedTicket.id}`)
             ? updatedTicket
@@ -239,38 +261,11 @@ const Incident = () => {
     setResolveTicket(null);
   };
 
-  const handleEdit = (ticket) => {
-    console.log("Incident: Edit ticket", { ticketId: ticket.id });
-    setSelectedTicket(ticket);
-  };
-
-  const handleCloseModal = () => {
-    console.log("Incident: Close edit modal");
-    setSelectedTicket(null);
-  };
-
-  const handleUpdateTicket = async (updatedTicket) => {
-    console.log("Incident: Updating ticket", { updatedTicket });
-    try {
-      const api = createApiInstance(token, subdomain);
-      const response = await api.put(
-        `/organizations/${subdomain}/tickets/${updatedTicket.id}`,
-        { ticket: updatedTicket }
-      );
-      console.log("Incident: Ticket updated", { response: response.data });
-      setTickets((prev) =>
-        prev.map((t) => (t && t.id === updatedTicket.id ? response.data : t))
-      );
-      setSelectedTicket(null);
-    } catch (err) {
-      console.error("Incident: Failed to update ticket", {
-        error: err.message,
-      });
-      setError("Failed to update ticket.");
-    }
-  };
-
   const handleDetails = (ticket) => {
+    if (!ticket?.id) {
+      console.error("Invalid ticket for details:", ticket);
+      return;
+    }
     console.log("Incident: Viewing ticket details", { ticketId: ticket.id });
     setDetailsTicket({
       ticketNumber: ticket.ticket_number || `INC-${ticket.id}`,
@@ -346,30 +341,50 @@ const Incident = () => {
     );
   };
 
-  const filteredTickets = tickets
-    .filter((t) => t && t.id && t.ticket_number)
-    .filter((t) => {
-      const term = searchTerm.toLowerCase();
-      return [
-        t.ticket_number,
-        `INC-${t.id}`,
-        t.status,
-        t.customer,
-        t.title,
-        t.priority?.toString(),
-        t.team?.name,
-        t.assignee?.name,
-        t.assignee,
-        t.urgency,
-        t.impact,
-        t.source,
-        t.category,
-        t.caller_name,
-        t.caller_surname,
-        t.caller_email,
-        t.caller_phone,
-      ].some((field) => field?.toLowerCase?.().includes(term));
-    });
+  // Moved useMemo outside of conditional rendering
+  const filteredTickets = useMemo(() => {
+    if (!Array.isArray(tickets)) {
+      console.warn("Tickets is not an array:", tickets);
+      return [];
+    }
+
+    return tickets
+      .filter((t) => {
+        if (!t || typeof t !== "object" || !t.id || !t.ticket_number) {
+          console.warn("Invalid ticket object:", t);
+          return false;
+        }
+        return true;
+      })
+      .filter((t) => {
+        if (!searchTerm || !searchTerm.trim()) return true;
+
+        const term = searchTerm.toLowerCase();
+        const searchableFields = [
+          t.ticket_number,
+          `INC-${t.id}`,
+          t.status,
+          t.customer,
+          t.title,
+          t.priority?.toString(),
+          t.team?.name || "",
+          t.assignee?.name || "",
+          typeof t.assignee === "string" ? t.assignee : "",
+          t.urgency,
+          t.impact,
+          t.source,
+          t.category,
+          t.caller_name,
+          t.caller_surname,
+          t.caller_email,
+          t.caller_phone,
+        ].filter(Boolean);
+
+        return searchableFields.some((field) =>
+          String(field).toLowerCase().includes(term)
+        );
+      });
+  }, [tickets, searchTerm]);
 
   const totalPages =
     pagination.total_pages ||
@@ -379,6 +394,17 @@ const Incident = () => {
     console.log("Incident: Page change", { page });
     setCurrentPage(page);
   };
+
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-2"></div>
+          <p>Loading authentication...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex flex-col w-full p-2 min-h-screen sm:px-6 lg:px-8">
@@ -452,66 +478,75 @@ const Incident = () => {
             </div>
           </div>
         )}
-        {filteredTickets.length === 0 && !loading && !error && (
-          <p className="text-center text-gray-500">
-            No incidents found for this organization.
-          </p>
-        )}
-        {filteredTickets.length > 0 && (
-          <ul className="w-full divide-y divide-gray-200">
-            {filteredTickets.map((ticket) => (
-              <li key={ticket.id} className="py-2 px-4">
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center">
-                  <div>
-                    <h3 className="text-lg font-semibold">
-                      {ticket.ticket_number || `INC-${ticket.id}`}
-                    </h3>
-                    <p className="text-sm">{ticket.title || "Untitled"}</p>
-                    <p className="text-xs text-gray-500">
-                      {ticket.created_at
-                        ? new Date(ticket.created_at).toLocaleString()
-                        : "N/A"}
-                    </p>
-                  </div>
-                  <div className="flex items-center space-x-2 mt-2 sm:mt-0">
-                    {getStatusIcon(ticket.status)}
-                    <span
-                      className={`px-2 py-1 text-xs font-medium rounded ${getStatusColor(
-                        ticket.status
-                      )}`}
+
+        {!loading && !error && (
+          <>
+            {filteredTickets.length === 0 ? (
+              <p className="text-center text-gray-500">
+                No incidents found for this organization.
+              </p>
+            ) : (
+              <ul className="w-full divide-y divide-gray-200">
+                {filteredTickets.map((ticket) => {
+                  if (!ticket?.id) {
+                    console.warn("Skipping invalid ticket in render:", ticket);
+                    return null;
+                  }
+                  return (
+                    <li
+                      key={`ticket-${ticket.id}-${ticket.ticket_number}`}
+                      className="py-2 px-4"
                     >
-                      {ticket.status || "Unknown"}
-                    </span>
-                    <span
-                      className={`px-2 py-1 text-xs font-medium rounded ${getPriorityColor(
-                        ticket.priority
-                      )}`}
-                    >
-                      {getPriorityLabel(ticket.priority)}
-                    </span>
-                    <button
-                      onClick={() => handleResolve(ticket)}
-                      className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
-                    >
-                      Resolve
-                    </button>
-                    {/* <button
-                      onClick={() => handleEdit(ticket)}
-                      className="bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600"
-                    >
-                      Edit
-                    </button> */}
-                    <button
-                      onClick={() => handleDetails(ticket)}
-                      className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600"
-                    >
-                      Details
-                    </button>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center">
+                        <div>
+                          <h3 className="text-lg font-semibold">
+                            {ticket.ticket_number || `INC-${ticket.id}`}
+                          </h3>
+                          <p className="text-sm">
+                            {ticket.title || "Untitled"}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {ticket.created_at
+                              ? new Date(ticket.created_at).toLocaleString()
+                              : "N/A"}
+                          </p>
+                        </div>
+                        <div className="flex items-center space-x-2 mt-2 sm:mt-0">
+                          {getStatusIcon(ticket.status)}
+                          <span
+                            className={`px-2 py-1 text-xs font-medium rounded ${getStatusColor(
+                              ticket.status
+                            )}`}
+                          >
+                            {ticket.status || "Unknown"}
+                          </span>
+                          <span
+                            className={`px-2 py-1 text-xs font-medium rounded ${getPriorityColor(
+                              ticket.priority
+                            )}`}
+                          >
+                            {getPriorityLabel(ticket.priority)}
+                          </span>
+                          <button
+                            onClick={() => handleResolve(ticket)}
+                            className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+                          >
+                            Resolve
+                          </button>
+                          <button
+                            onClick={() => handleDetails(ticket)}
+                            className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600"
+                          >
+                            Details
+                          </button>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </>
         )}
       </div>
       <div className="w-full flex justify-between items-center mt-6 px-4">
@@ -542,72 +577,23 @@ const Incident = () => {
           onCancel={handleResolveCancel}
         />
       )}
-      {selectedTicket && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">
-              Edit Ticket:{" "}
-              {selectedTicket.ticket_number || `INC-${selectedTicket.id}`}
-            </h2>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700">
-                Title
-              </label>
-              <input
-                type="text"
-                defaultValue={selectedTicket.title}
-                onChange={(e) =>
-                  setSelectedTicket({
-                    ...selectedTicket,
-                    title: e.target.value,
-                  })
-                }
-                className="w-full px-3 py-2 border rounded-lg"
-              />
-            </div>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700">
-                Description
-              </label>
-              <textarea
-                defaultValue={selectedTicket.description}
-                onChange={(e) =>
-                  setSelectedTicket({
-                    ...selectedTicket,
-                    description: e.target.value,
-                  })
-                }
-                className="w-full px-3 py-2 border rounded-lg"
-              />
-            </div>
-            <div className="flex justify-end space-x-2">
-              <button
-                onClick={handleCloseModal}
-                className="px-4 py-2 bg-gray-300 text-gray-700 rounded"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleUpdateTicket(selectedTicket)}
-                className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       {detailsTicket && (
         <TicketDetailsPopup
           selectedTicket={detailsTicket}
           onClose={handleCloseDetails}
           subdomain={subdomain}
           authToken={token}
-          onUpdate={(updated) =>
+          onUpdate={(updated) => {
+            if (!updated?.id) {
+              console.error("Invalid updated ticket:", updated);
+              return;
+            }
             setTickets((prev) =>
-              prev.map((t) => (t.id === updated.id ? updated : t))
-            )
-          }
+              prev
+                .filter((t) => t && t.id)
+                .map((t) => (t.id === updated.id ? updated : t))
+            );
+          }}
         />
       )}
     </div>

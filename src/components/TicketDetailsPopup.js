@@ -21,24 +21,23 @@ const TicketDetailsPopup = ({
   const [teamsLoading, setTeamsLoading] = useState(false);
   const [teamUsersLoading, setTeamUsersLoading] = useState(false);
 
-  // Initial data fetch when popup opens
   useEffect(() => {
-    if (!selectedTicket) return;
+    if (!selectedTicket?.id) {
+      console.error("Invalid selectedTicket:", selectedTicket);
+      return;
+    }
 
     console.log("Fetching initial data for ticket:", selectedTicket.id);
     fetchComments();
     fetchTeams();
   }, [selectedTicket?.id]);
 
-  // Initialize current team and assignee after teams are loaded
   useEffect(() => {
     if (teams.length > 0 && selectedTicket) {
-      // Set current team
       const currentTeamId =
         selectedTicket.team?.id || selectedTicket.team_id || "";
       setSelectedTeamId(String(currentTeamId));
 
-      // Set current assignee
       const currentAssigneeId =
         selectedTicket.assignee?.id || selectedTicket.assignee_id || "";
       setSelectedAssigneeId(String(currentAssigneeId));
@@ -52,7 +51,6 @@ const TicketDetailsPopup = ({
     }
   }, [teams, selectedTicket]);
 
-  // Fetch team users when team changes
   useEffect(() => {
     if (!selectedTeamId) {
       setTeamUsers([]);
@@ -63,7 +61,6 @@ const TicketDetailsPopup = ({
     fetchTeamUsers(selectedTeamId);
   }, [selectedTeamId]);
 
-  // fetchComments
   const fetchComments = async () => {
     try {
       const response = await axios.get(
@@ -108,8 +105,6 @@ const TicketDetailsPopup = ({
     setTeamUsersLoading(true);
     try {
       console.log("Fetching users for team:", teamId);
-
-      // Use the /api/v1/ pattern since that's working in your Rails logs
       const response = await axios.get(
         `${apiBaseUrl}/organizations/${subdomain}/teams/${teamId}/users`,
         {
@@ -119,13 +114,8 @@ const TicketDetailsPopup = ({
           },
         }
       );
-
       console.log("Team users response:", response.data);
-
-      // Your Rails controller returns the array directly: render json: @users.map { |user| user_attributes(user) }
-      // So response.data should be the array of users
       const users = response.data || [];
-      console.log("Setting team users:", users);
       setTeamUsers(users);
     } catch (err) {
       console.error(
@@ -152,10 +142,18 @@ const TicketDetailsPopup = ({
           },
         }
       );
-      onUpdate(response.data.ticket);
+
+      const updatedTicket = response.data.ticket || response.data;
+      if (!updatedTicket?.id) {
+        console.error("Invalid ticket response:", response.data);
+        throw new Error("Received invalid ticket data from server");
+      }
+
+      onUpdate(updatedTicket);
       onClose();
     } catch (err) {
       console.error("Close ticket error:", err.response?.data || err.message);
+      alert("Failed to close ticket. Please try again.");
     }
   };
 
@@ -165,7 +163,6 @@ const TicketDetailsPopup = ({
     });
   };
 
-  // handleAddComment
   const handleAddComment = async () => {
     if (!newComment.trim()) return;
 
@@ -200,14 +197,12 @@ const TicketDetailsPopup = ({
       const updateData = {
         ticket: {
           team_id: selectedTeamId,
-          // If no specific assignee is selected, clear the assignee_id to avoid validation issues
           assignee_id: selectedAssigneeId || null,
         },
       };
 
       console.log("Reassigning ticket with data:", updateData);
 
-      // Use the correct route format from your Rails routes
       const response = await axios.put(
         `${apiBaseUrl}/organizations/${subdomain}/tickets/${selectedTicket.id}`,
         updateData,
@@ -221,21 +216,21 @@ const TicketDetailsPopup = ({
       );
 
       console.log("Reassignment response:", response.data);
-      onUpdate(response.data.ticket || response.data);
+      const updatedTicket = response.data.ticket || response.data;
+      if (!updatedTicket?.id) {
+        console.error("Invalid reassignment response:", response.data);
+        throw new Error("Received invalid ticket data from server");
+      }
+      onUpdate(updatedTicket);
       alert("Ticket reassigned successfully!");
     } catch (err) {
       console.error("Reassignment error:", err.response?.data || err.message);
-      console.error("Full error object:", err);
-
       let errorMessage = "Failed to reassign ticket. Please try again.";
       if (err.response?.status === 404) {
         errorMessage =
           "Ticket update endpoint not found. Please check your API configuration.";
       } else if (err.response?.status === 422) {
-        // Handle validation errors from Rails
         const responseData = err.response.data;
-        console.log("422 Error details:", responseData);
-
         if (responseData?.errors && Array.isArray(responseData.errors)) {
           errorMessage = `Validation errors: ${responseData.errors.join(", ")}`;
         } else if (responseData?.error) {
@@ -247,7 +242,6 @@ const TicketDetailsPopup = ({
       } else if (err.response?.data?.error) {
         errorMessage = err.response.data.error;
       }
-
       alert(errorMessage);
     } finally {
       setIsLoading(false);
@@ -352,7 +346,10 @@ const TicketDetailsPopup = ({
     return new Date(dateString).toLocaleString();
   };
 
-  if (!selectedTicket) return null;
+  if (!selectedTicket?.id) {
+    console.error("No valid selectedTicket provided");
+    return null;
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -370,7 +367,6 @@ const TicketDetailsPopup = ({
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Column - Ticket Information */}
           <div className="space-y-4">
             <div>
               <label className="font-semibold block mb-1">
@@ -430,7 +426,6 @@ const TicketDetailsPopup = ({
             </div>
           </div>
 
-          {/* Right Column - Contact & Assignment */}
           <div className="space-y-4">
             <div>
               <label className="font-semibold block mb-1">Caller's Name</label>
@@ -464,7 +459,6 @@ const TicketDetailsPopup = ({
               />
             </div>
 
-            {/* Team Reassignment */}
             <div>
               <label className="font-semibold block mb-1">
                 Reassign to Team
@@ -497,7 +491,6 @@ const TicketDetailsPopup = ({
               )}
             </div>
 
-            {/* Assignee Selection */}
             {selectedTeamId && (
               <div>
                 <label className="font-semibold block mb-1">
@@ -534,7 +527,6 @@ const TicketDetailsPopup = ({
               </div>
             )}
 
-            {/* Reassign Button */}
             {selectedTeamId && (
               <button
                 onClick={handleReassignment}
@@ -545,7 +537,6 @@ const TicketDetailsPopup = ({
               </button>
             )}
 
-            {/* Debug Info (remove in production) */}
             <div className="text-xs text-gray-500 mt-2 p-2 bg-gray-100 rounded">
               <div>Teams loaded: {teams.length}</div>
               <div>Selected team: {selectedTeamId}</div>
@@ -555,7 +546,6 @@ const TicketDetailsPopup = ({
           </div>
         </div>
 
-        {/* Full Width Sections */}
         <div className="mt-6 space-y-4">
           <div>
             <label className="font-semibold block mb-1">Subject</label>
@@ -577,13 +567,11 @@ const TicketDetailsPopup = ({
             />
           </div>
 
-          {/* Attachments Section */}
           <div>
             <label className="font-semibold block mb-1">Attachments</label>
             {renderAttachments()}
           </div>
 
-          {/* Comments Section */}
           <div>
             <label className="font-semibold block mb-1">Comments</label>
             <div className="border rounded max-h-60 overflow-y-auto mb-2">
@@ -608,7 +596,6 @@ const TicketDetailsPopup = ({
               )}
             </div>
 
-            {/* Add Comment */}
             <div className="flex gap-2">
               <textarea
                 value={newComment}
@@ -628,7 +615,6 @@ const TicketDetailsPopup = ({
           </div>
         </div>
 
-        {/* Action Buttons */}
         <div className="flex justify-end space-x-2 mt-6 pt-4 border-t">
           <button
             onClick={onClose}
