@@ -20,40 +20,116 @@ const TicketDetailsPopup = ({
   const [isLoading, setIsLoading] = useState(false);
   const [teamsLoading, setTeamsLoading] = useState(false);
   const [teamUsersLoading, setTeamUsersLoading] = useState(false);
+  const [assignmentWarning, setAssignmentWarning] = useState("");
+  const [ticketLoading, setTicketLoading] = useState(true);
+  const [ticketError, setTicketError] = useState(null);
 
   useEffect(() => {
     if (!selectedTicket?.id) {
       console.error("Invalid selectedTicket:", selectedTicket);
+      setTicketLoading(false);
+      setTicketError("No valid ticket provided.");
       return;
     }
 
-    console.log("Fetching initial data for ticket:", selectedTicket.id);
+    console.log("Fetching initial data for ticket:", {
+      id: selectedTicket.id,
+      ticket_number: selectedTicket.ticket_number,
+      team: selectedTicket.team,
+      assignee: selectedTicket.assignee,
+      status: selectedTicket.status,
+    });
+    fetchTicketDetails();
     fetchComments();
     fetchTeams();
   }, [selectedTicket?.id]);
 
-  useEffect(() => {
-    if (teams.length > 0 && selectedTicket) {
-      const currentTeamId =
-        selectedTicket.team?.id || selectedTicket.team_id || "";
-      setSelectedTeamId(String(currentTeamId));
-
-      const currentAssigneeId =
-        selectedTicket.assignee?.id || selectedTicket.assignee_id || "";
-      setSelectedAssigneeId(String(currentAssigneeId));
-
-      console.log(
-        "Initialized current team:",
-        currentTeamId,
-        "assignee:",
-        currentAssigneeId
+  const fetchTicketDetails = async () => {
+    setTicketLoading(true);
+    setTicketError(null);
+    try {
+      console.log("Fetching ticket details for ID:", selectedTicket.id);
+      const response = await axios.get(
+        `${apiBaseUrl}/organizations/${subdomain}/tickets/${selectedTicket.id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+            Accept: "application/json",
+          },
+        }
       );
+      console.log("Ticket details response:", response.data);
+      const updatedTicket = response.data.ticket || response.data;
+      if (updatedTicket?.id) {
+        onUpdate(updatedTicket);
+      } else {
+        throw new Error("Invalid ticket data received");
+      }
+    } catch (err) {
+      console.error("Fetch ticket details error:", {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+      });
+      setTicketError(
+        err.response?.status === 500
+          ? "Server error: Unable to load ticket details. Please try again later."
+          : err.response?.data?.error || "Failed to load ticket details."
+      );
+    } finally {
+      setTicketLoading(false);
     }
-  }, [teams, selectedTicket]);
+  };
+
+  useEffect(() => {
+    if (!selectedTicket || teamsLoading || !teams.length || ticketLoading) {
+      console.log("Waiting for teams or ticket to load:", {
+        teamsLoading,
+        teamsCount: teams.length,
+        ticketLoading,
+        ticketId: selectedTicket?.id,
+      });
+      return;
+    }
+
+    const currentTeamId = String(selectedTicket.team?.id || "");
+    const currentAssigneeId = String(selectedTicket.assignee?.id || "");
+
+    console.log("Initializing ticket assignment:", {
+      ticketId: selectedTicket.id,
+      ticket_number: selectedTicket.ticket_number,
+      status: selectedTicket.status,
+      currentTeamId,
+      currentTeamName: selectedTicket.team?.name || "None",
+      currentAssigneeId,
+      currentAssigneeName: selectedTicket.assignee?.name || "None",
+      currentAssigneeEmail: selectedTicket.assignee?.email || "None",
+      teamsAvailable: teams.map((t) => ({ id: t.id, name: t.name })),
+    });
+
+    if (
+      selectedTicket.status === "assigned" &&
+      (!currentTeamId || !currentAssigneeId)
+    ) {
+      setAssignmentWarning(
+        "Warning: Ticket is marked as 'assigned' but lacks a team or assignee. Please reassign to continue."
+      );
+    } else {
+      setAssignmentWarning("");
+    }
+
+    setSelectedTeamId(currentTeamId);
+    setSelectedAssigneeId(currentAssigneeId);
+
+    if (currentTeamId) {
+      fetchTeamUsers(currentTeamId);
+    }
+  }, [teams, teamsLoading, ticketLoading, selectedTicket]);
 
   useEffect(() => {
     if (!selectedTeamId) {
       setTeamUsers([]);
+      setSelectedAssigneeId("");
       return;
     }
 
@@ -72,6 +148,7 @@ const TicketDetailsPopup = ({
           },
         }
       );
+      console.log("Comments response:", response.data);
       setComments(response.data.comments || []);
     } catch (err) {
       console.error("Fetch comments error:", err.response?.data || err.message);
@@ -92,7 +169,10 @@ const TicketDetailsPopup = ({
         }
       );
       console.log("Teams response:", response.data);
-      setTeams(response.data.teams || response.data || []);
+      const teamsData = Array.isArray(response.data)
+        ? response.data
+        : response.data.teams || [];
+      setTeams(teamsData);
     } catch (err) {
       console.error("Fetch teams error:", err.response?.data || err.message);
       alert("Failed to load teams. Please refresh and try again.");
@@ -115,7 +195,7 @@ const TicketDetailsPopup = ({
         }
       );
       console.log("Team users response:", response.data);
-      const users = response.data || [];
+      const users = Array.isArray(response.data) ? response.data : [];
       setTeamUsers(users);
     } catch (err) {
       console.error(
@@ -130,6 +210,15 @@ const TicketDetailsPopup = ({
   };
 
   const handleCloseTicket = async () => {
+    if (
+      selectedTicket.status === "assigned" &&
+      (!selectedTicket.team?.id || !selectedTicket.assignee?.id)
+    ) {
+      alert(
+        "Cannot close ticket without a team and assignee. Please reassign first."
+      );
+      return;
+    }
     try {
       const response = await axios.put(
         `${apiBaseUrl}/organizations/${subdomain}/tickets/${selectedTicket.id}`,
@@ -158,7 +247,23 @@ const TicketDetailsPopup = ({
   };
 
   const handleResolveNavigation = () => {
-    navigate(`/resolve/${selectedTicket.ticketNumber}`, {
+    if (
+      selectedTicket.status === "assigned" &&
+      (!selectedTicket.team?.id || !selectedTicket.assignee?.id)
+    ) {
+      alert(
+        "Cannot resolve ticket without a team and assignee. Please reassign first."
+      );
+      return;
+    }
+    console.log("Navigating to resolve ticket:", {
+      ticketId: selectedTicket.id,
+      ticket_number: selectedTicket.ticket_number,
+      subdomain,
+      teamId: selectedTicket.team?.id,
+      assigneeId: selectedTicket.assignee?.id,
+    });
+    navigate(`/resolve/${selectedTicket.ticket_number}`, {
       state: { ticket: selectedTicket, subdomain, authToken },
     });
   };
@@ -178,6 +283,7 @@ const TicketDetailsPopup = ({
           },
         }
       );
+      console.log("Comment added:", response.data);
       setComments([...comments, response.data.comment]);
       setNewComment("");
     } catch (err) {
@@ -198,6 +304,7 @@ const TicketDetailsPopup = ({
         ticket: {
           team_id: selectedTeamId,
           assignee_id: selectedAssigneeId || null,
+          status: selectedAssigneeId ? "assigned" : "open",
         },
       };
 
@@ -223,24 +330,29 @@ const TicketDetailsPopup = ({
       }
       onUpdate(updatedTicket);
       alert("Ticket reassigned successfully!");
+      setAssignmentWarning("");
+      fetchTicketDetails();
     } catch (err) {
-      console.error("Reassignment error:", err.response?.data || err.message);
+      console.error("Reassignment error:", {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+      });
       let errorMessage = "Failed to reassign ticket. Please try again.";
       if (err.response?.status === 404) {
-        errorMessage =
-          "Ticket update endpoint not found. Please check your API configuration.";
+        errorMessage = err.response.data.error || "Resource not found.";
       } else if (err.response?.status === 422) {
-        const responseData = err.response.data;
-        if (responseData?.errors && Array.isArray(responseData.errors)) {
-          errorMessage = `Validation errors: ${responseData.errors.join(", ")}`;
-        } else if (responseData?.error) {
-          errorMessage = `Validation error: ${responseData.error}`;
-        } else {
-          errorMessage =
-            "Ticket update failed due to validation errors. Check the console for details.";
-        }
-      } else if (err.response?.data?.error) {
-        errorMessage = err.response.data.error;
+        errorMessage =
+          err.response.data.errors?.join(", ") ||
+          err.response.data.error ||
+          "Validation error.";
+      } else if (err.response?.status === 403) {
+        errorMessage =
+          err.response.data.error ||
+          "You are not authorized to reassign this ticket.";
+      } else if (err.response?.status === 500) {
+        errorMessage =
+          "Server error: Unable to process reassignment. Please try again later.";
       }
       alert(errorMessage);
     } finally {
@@ -251,7 +363,7 @@ const TicketDetailsPopup = ({
   const handleDownloadAttachment = async (attachmentId, filename) => {
     try {
       const response = await axios.get(
-        `${apiBaseUrl}/organizations/${subdomain}/tickets/${selectedTicket.id}/attachments/${attachmentId}`,
+        `${apiBaseUrl}/organizations/${subdomain}/tickets/${selectedTicket.id}/download_attachment?attachment_id=${attachmentId}`,
         {
           headers: {
             Authorization: `Bearer ${authToken}`,
@@ -343,20 +455,51 @@ const TicketDetailsPopup = ({
 
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
-    return new Date(dateString).toLocaleString();
+    const date = new Date(dateString);
+    return date.toString() === "Invalid Date"
+      ? "N/A"
+      : date.toLocaleString("en-ZA", { timeZone: "Africa/Johannesburg" });
   };
 
-  if (!selectedTicket?.id) {
-    console.error("No valid selectedTicket provided");
-    return null;
+  if (!selectedTicket?.id || ticketError) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg shadow-lg p-6 w-11/12 md:w-4/5 lg:w-3/4 max-h-[90vh] overflow-y-auto">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-2xl font-bold">Ticket Details: Error</h3>
+            <button
+              onClick={onClose}
+              className="text-gray-500 hover:text-gray-700 text-2xl"
+            >
+              ×
+            </button>
+          </div>
+          <div className="p-3 bg-red-100 text-red-700 rounded-lg">
+            {ticketError || "No valid ticket provided."}
+          </div>
+          <div className="flex justify-end mt-6">
+            <button
+              onClick={onClose}
+              className="bg-gray-500 text-white py-2 px-4 rounded hover:bg-gray-600"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
+
+  const currentTeamName = selectedTicket.team?.name || "No Team Assigned";
+  const currentAssigneeName = selectedTicket.assignee?.name || "No Assignee";
+  const currentAssigneeEmail = selectedTicket.assignee?.email || "No Email";
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-lg p-6 w-11/12 md:w-4/5 lg:w-3/4 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-2xl font-bold">
-            Ticket Details: {selectedTicket.ticketNumber}
+            Ticket Details: {selectedTicket.ticket_number}
           </h3>
           <button
             onClick={onClose}
@@ -366,6 +509,18 @@ const TicketDetailsPopup = ({
           </button>
         </div>
 
+        {assignmentWarning && (
+          <div className="mb-4 p-3 bg-yellow-100 text-yellow-700 rounded-lg">
+            {assignmentWarning}
+          </div>
+        )}
+
+        {ticketLoading && (
+          <div className="mb-4 p-3 bg-blue-100 text-blue-700 rounded-lg">
+            Loading ticket details...
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="space-y-4">
             <div>
@@ -373,7 +528,7 @@ const TicketDetailsPopup = ({
                 Reported Date & Time
               </label>
               <div className="border p-2 bg-gray-50">
-                {formatDate(selectedTicket.reportedDate)}
+                {formatDate(selectedTicket.reported_at)}
               </div>
             </div>
 
@@ -382,46 +537,28 @@ const TicketDetailsPopup = ({
                 Expected Resolve Time
               </label>
               <div className="border p-2 bg-gray-50">
-                {selectedTicket.expectedResolveTime}
+                {formatDate(selectedTicket.resolution_due_at)}
               </div>
             </div>
 
             <div>
               <label className="font-semibold block mb-1">SLA Status</label>
               <div className="border p-2 bg-gray-50">
-                {selectedTicket.slaStatus}
-              </div>
-            </div>
-
-            <div>
-              <label className="font-semibold block mb-1">
-                % of SLA Time Consumed
-              </label>
-              <div className="border p-2 bg-gray-50">
-                {selectedTicket.slaConsumed}
-              </div>
-            </div>
-
-            <div>
-              <label className="font-semibold block mb-1">
-                Resolved Date & Time
-              </label>
-              <div className="border p-2 bg-gray-50">
-                {formatDate(selectedTicket.resolvedDate)}
+                {selectedTicket.sla_breached ? "Breached" : "Within SLA"}
               </div>
             </div>
 
             <div>
               <label className="font-semibold block mb-1">Ticket Status</label>
               <div className="border p-2 bg-gray-50">
-                {selectedTicket.status}
+                {selectedTicket.status || "N/A"}
               </div>
             </div>
 
             <div>
               <label className="font-semibold block mb-1">Priority</label>
               <div className="border p-2 bg-gray-50">
-                {selectedTicket.priority}
+                {selectedTicket.priority || "N/A"}
               </div>
             </div>
           </div>
@@ -432,7 +569,9 @@ const TicketDetailsPopup = ({
               <input
                 type="text"
                 className="border p-2 w-full bg-gray-50"
-                value={selectedTicket.callerName || ""}
+                value={`${selectedTicket.caller_name || "N/A"} ${
+                  selectedTicket.caller_surname || ""
+                }`.trim()}
                 readOnly
               />
             </div>
@@ -442,7 +581,17 @@ const TicketDetailsPopup = ({
               <input
                 type="text"
                 className="border p-2 w-full bg-gray-50"
-                value={selectedTicket.callerEmail || ""}
+                value={selectedTicket.caller_email || "N/A"}
+                readOnly
+              />
+            </div>
+
+            <div>
+              <label className="font-semibold block mb-1">Current Team</label>
+              <input
+                type="text"
+                className="border p-2 w-full bg-gray-50"
+                value={currentTeamName}
                 readOnly
               />
             </div>
@@ -454,7 +603,11 @@ const TicketDetailsPopup = ({
               <input
                 type="text"
                 className="border p-2 w-full bg-gray-50"
-                value={selectedTicket.assignee?.name || "Unassigned"}
+                value={
+                  currentAssigneeName === "No Assignee"
+                    ? "No Assignee"
+                    : `${currentAssigneeName} (${currentAssigneeEmail})`
+                }
                 readOnly
               />
             </div>
@@ -473,6 +626,7 @@ const TicketDetailsPopup = ({
                   onChange={(e) => {
                     console.log("Team selected:", e.target.value);
                     setSelectedTeamId(e.target.value);
+                    setSelectedAssigneeId("");
                   }}
                   className="border p-2 w-full"
                 >
@@ -486,7 +640,7 @@ const TicketDetailsPopup = ({
               )}
               {teams.length === 0 && !teamsLoading && (
                 <div className="text-red-500 text-sm mt-1">
-                  No teams available. Check your permissions.
+                  No teams available. Check your permissions or create a team.
                 </div>
               )}
             </div>
@@ -494,7 +648,7 @@ const TicketDetailsPopup = ({
             {selectedTeamId && (
               <div>
                 <label className="font-semibold block mb-1">
-                  Assign to User
+                  Assign to User (Optional)
                 </label>
                 {teamUsersLoading ? (
                   <div className="border p-2 w-full bg-gray-100 text-gray-500">
@@ -509,10 +663,10 @@ const TicketDetailsPopup = ({
                     }}
                     className="border p-2 w-full"
                   >
-                    <option value="">Select Assignee (Optional)</option>
+                    <option value="">No Assignee</option>
                     {teamUsers.map((user) => (
                       <option key={user.id} value={user.id}>
-                        {user.name} ({user.email})
+                        {user.name || "Unknown"} ({user.email || "No Email"})
                       </option>
                     ))}
                   </select>
@@ -521,7 +675,8 @@ const TicketDetailsPopup = ({
                   !teamUsersLoading &&
                   selectedTeamId && (
                     <div className="text-orange-500 text-sm mt-1">
-                      No users found in this team.
+                      No users found in this team. You can assign the ticket to
+                      the team without an assignee.
                     </div>
                   )}
               </div>
@@ -530,7 +685,9 @@ const TicketDetailsPopup = ({
             {selectedTeamId && (
               <button
                 onClick={handleReassignment}
-                disabled={isLoading}
+                disabled={
+                  isLoading || ticketLoading || teamsLoading || teamUsersLoading
+                }
                 className="bg-green-500 text-white py-2 px-4 rounded hover:bg-green-600 disabled:bg-gray-400 w-full"
               >
                 {isLoading ? "Reassigning..." : "Reassign Ticket"}
@@ -539,9 +696,21 @@ const TicketDetailsPopup = ({
 
             <div className="text-xs text-gray-500 mt-2 p-2 bg-gray-100 rounded">
               <div>Teams loaded: {teams.length}</div>
-              <div>Selected team: {selectedTeamId}</div>
+              <div>
+                Selected team:{" "}
+                {selectedTeamId
+                  ? teams.find((t) => t.id === selectedTeamId)?.name ||
+                    "Unknown"
+                  : "None"}
+              </div>
               <div>Team users: {teamUsers.length}</div>
-              <div>Selected assignee: {selectedAssigneeId}</div>
+              <div>
+                Selected assignee:{" "}
+                {selectedAssigneeId
+                  ? teamUsers.find((u) => u.id === selectedAssigneeId)?.name ||
+                    "Unknown"
+                  : "None"}
+              </div>
             </div>
           </div>
         </div>
@@ -552,7 +721,7 @@ const TicketDetailsPopup = ({
             <input
               type="text"
               className="border p-2 w-full bg-gray-50"
-              value={selectedTicket.subject || selectedTicket.title || ""}
+              value={selectedTicket.title || "N/A"}
               readOnly
             />
           </div>
@@ -562,7 +731,7 @@ const TicketDetailsPopup = ({
             <textarea
               className="border p-2 w-full bg-gray-50"
               rows="4"
-              value={selectedTicket.description || ""}
+              value={selectedTicket.description || "N/A"}
               readOnly
             />
           </div>
@@ -606,7 +775,7 @@ const TicketDetailsPopup = ({
               />
               <button
                 onClick={handleAddComment}
-                disabled={!newComment.trim()}
+                disabled={!newComment.trim() || ticketLoading}
                 className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-gray-400 self-start"
               >
                 Add
@@ -624,13 +793,15 @@ const TicketDetailsPopup = ({
           </button>
           <button
             onClick={handleCloseTicket}
-            className="bg-red-500 text-white py-2 px-4 rounded hover:bg-red-600"
+            disabled={ticketLoading}
+            className="bg-red-500 text-white py-2 px-4 rounded hover:bg-red-600 disabled:bg-gray-400"
           >
             Close Ticket
           </button>
           <button
             onClick={handleResolveNavigation}
-            className="bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600"
+            disabled={ticketLoading}
+            className="bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 disabled:bg-gray-400"
           >
             Resolve
           </button>

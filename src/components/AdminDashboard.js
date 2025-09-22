@@ -623,4 +623,4 @@ const AdminDashboard = ({ organizationSubdomain }) => {
   );
 };
 
-export default AdminDashboard;
+export default AdminDashboard; // fixed dahboard
