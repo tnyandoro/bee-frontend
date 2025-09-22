@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import apiBaseUrl from "../config";
@@ -21,6 +21,81 @@ const TicketDetailsPopup = ({
   const [teamsLoading, setTeamsLoading] = useState(false);
   const [teamUsersLoading, setTeamUsersLoading] = useState(false);
 
+  const fetchComments = useCallback(async () => {
+    if (!selectedTicket?.id) return;
+
+    try {
+      const response = await axios.get(
+        `${apiBaseUrl}/organizations/${subdomain}/tickets/${selectedTicket.id}/comments`,
+        {
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+            Accept: "application/json",
+          },
+        }
+      );
+      setComments(response.data.comments || []);
+    } catch (err) {
+      console.error("Fetch comments error:", err.response?.data || err.message);
+    }
+  }, [selectedTicket?.id, subdomain, authToken]);
+
+  const fetchTeams = useCallback(async () => {
+    setTeamsLoading(true);
+    try {
+      console.log("Fetching teams...");
+      const response = await axios.get(
+        `${apiBaseUrl}/organizations/${subdomain}/teams`,
+        {
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+            Accept: "application/json",
+          },
+        }
+      );
+      console.log("Teams response:", response.data);
+      setTeams(response.data.teams || response.data || []);
+    } catch (err) {
+      console.error("Fetch teams error:", err.response?.data || err.message);
+      alert("Failed to load teams. Please refresh and try again.");
+    } finally {
+      setTeamsLoading(false);
+    }
+  }, [subdomain, authToken]);
+
+  const fetchTeamUsers = useCallback(
+    async (teamId) => {
+      setTeamUsersLoading(true);
+      try {
+        console.log("Fetching users for team:", teamId);
+        const response = await axios.get(
+          `${apiBaseUrl}/organizations/${subdomain}/teams/${teamId}/users`,
+          {
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+              Accept: "application/json",
+            },
+          }
+        );
+        console.log("Team users response:", response.data);
+        const users = response.data || [];
+        setTeamUsers(users);
+      } catch (err) {
+        console.error(
+          "Fetch team users error:",
+          err.response?.data || err.message
+        );
+        setTeamUsers([]);
+        alert(
+          "Failed to load team users. Please try selecting the team again."
+        );
+      } finally {
+        setTeamUsersLoading(false);
+      }
+    },
+    [subdomain, authToken]
+  );
+
   useEffect(() => {
     if (!selectedTicket?.id) {
       console.error("Invalid selectedTicket:", selectedTicket);
@@ -30,7 +105,7 @@ const TicketDetailsPopup = ({
     console.log("Fetching initial data for ticket:", selectedTicket.id);
     fetchComments();
     fetchTeams();
-  }, [selectedTicket?.id]);
+  }, [selectedTicket?.id, fetchComments, fetchTeams]);
 
   useEffect(() => {
     if (teams.length > 0 && selectedTicket) {
@@ -59,75 +134,7 @@ const TicketDetailsPopup = ({
 
     console.log("Team changed, fetching users for team:", selectedTeamId);
     fetchTeamUsers(selectedTeamId);
-  }, [selectedTeamId]);
-
-  const fetchComments = async () => {
-    try {
-      const response = await axios.get(
-        `${apiBaseUrl}/organizations/${subdomain}/tickets/${selectedTicket.id}/comments`,
-        {
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-            Accept: "application/json",
-          },
-        }
-      );
-      setComments(response.data.comments || []);
-    } catch (err) {
-      console.error("Fetch comments error:", err.response?.data || err.message);
-    }
-  };
-
-  const fetchTeams = async () => {
-    setTeamsLoading(true);
-    try {
-      console.log("Fetching teams...");
-      const response = await axios.get(
-        `${apiBaseUrl}/organizations/${subdomain}/teams`,
-        {
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-            Accept: "application/json",
-          },
-        }
-      );
-      console.log("Teams response:", response.data);
-      setTeams(response.data.teams || response.data || []);
-    } catch (err) {
-      console.error("Fetch teams error:", err.response?.data || err.message);
-      alert("Failed to load teams. Please refresh and try again.");
-    } finally {
-      setTeamsLoading(false);
-    }
-  };
-
-  const fetchTeamUsers = async (teamId) => {
-    setTeamUsersLoading(true);
-    try {
-      console.log("Fetching users for team:", teamId);
-      const response = await axios.get(
-        `${apiBaseUrl}/organizations/${subdomain}/teams/${teamId}/users`,
-        {
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-            Accept: "application/json",
-          },
-        }
-      );
-      console.log("Team users response:", response.data);
-      const users = response.data || [];
-      setTeamUsers(users);
-    } catch (err) {
-      console.error(
-        "Fetch team users error:",
-        err.response?.data || err.message
-      );
-      setTeamUsers([]);
-      alert("Failed to load team users. Please try selecting the team again.");
-    } finally {
-      setTeamUsersLoading(false);
-    }
-  };
+  }, [selectedTeamId, fetchTeamUsers]);
 
   const handleCloseTicket = async () => {
     try {
