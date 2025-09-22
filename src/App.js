@@ -5,7 +5,7 @@ import {
   Routes,
   Navigate,
   useLocation,
-} from "react-router-dom";
+} from "react-router-dom"; //logo update
 
 import FullPageLoader from "./components/FullPageLoader";
 import { useAuth } from "./contexts/authContext";
