@@ -19,7 +19,7 @@
     "chart.js": "^4.4.4",
     "cloudinary-react": "^1.8.1",
     "formik": "^2.4.6",
-    "gss-itsm-front": "file:",
+    "bee-front": "file:",
     "js-cookie": "^3.0.5",
     "lodash.debounce": "^4.0.8",
     "lottie-react": "^2.4.1",

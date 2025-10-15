@@ -52,7 +52,7 @@ const UserLogin = (props) => {
     try {
       // Make API call to the correct endpoint
       const response = await axios.post(
-        "https://itsm-api-w8vr.onrender.com/api/v1/auth/login",
+        "https://connectfix.onrender.com/api/v1/auth/login",
         {
           email,
           password,
