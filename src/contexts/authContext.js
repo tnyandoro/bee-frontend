@@ -24,13 +24,14 @@ export const useAuth = () => {
   return { ...context, subdomain: fallbackSubdomain };
 };
 
+// FIXED: Removed the duplicate /api/v1 addition
 const getApiBaseUrl = () => {
-  let base =
+  const base =
     process.env.REACT_APP_API_BASE_URL ||
     (process.env.NODE_ENV === "development"
-      ? "http://lvh.me:3000/api/v1"
-      : "https://connectfix.onrender.com/api/v1");
-  if (!base.endsWith("/api/v1")) base = `${base}/api/v1`;
+      ? "http://localhost:3000"
+      : "https://connectfix.onrender.com");
+
   return base;
 };
 
@@ -65,7 +66,6 @@ export const AuthProvider = ({ children }) => {
     []
   );
 
-  // FIXED: Define logout outside of verifyAuth dependencies
   const logout = useCallback(() => {
     console.log("Logging out user");
     ["authToken", "subdomain", "email", "role", "userId"].forEach((name) =>
@@ -85,108 +85,104 @@ export const AuthProvider = ({ children }) => {
     });
   }, []);
 
-  const verifyAuth = useCallback(
-    async (token, subdomain) => {
-      const sanitizedSubdomain = sanitizeInput(subdomain);
-      if (!sanitizedSubdomain) {
-        setState((prev) => ({
-          ...prev,
-          error: "Organization subdomain is required",
-          loading: false,
-        }));
-        return false;
-      }
+  const verifyAuth = useCallback(async (token, subdomain) => {
+    const sanitizedSubdomain = sanitizeInput(subdomain);
+    if (!sanitizedSubdomain) {
+      setState((prev) => ({
+        ...prev,
+        error: "Organization subdomain is required",
+        loading: false,
+      }));
+      return false;
+    }
 
-      try {
-        setState((prev) => ({ ...prev, loading: true, error: null }));
-        const apiBase = getApiBaseUrl();
+    try {
+      setState((prev) => ({ ...prev, loading: true, error: null }));
+      const apiBase = getApiBaseUrl();
 
-        console.log(
-          `Verifying auth: ${apiBase}/organizations/${sanitizedSubdomain}/profile`
-        );
-        console.log(`Token present: ${!!token}`);
+      console.log(
+        `Verifying auth: ${apiBase}/api/v1/organizations/${sanitizedSubdomain}/profile`
+      );
+      console.log(`Token present: ${!!token}`);
 
-        const response = await axios.get(
-          `${apiBase}/organizations/${sanitizedSubdomain}/profile`,
-          {
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: token ? `Bearer ${token}` : undefined,
-            },
-            withCredentials: true,
+      const response = await axios.get(
+        `${apiBase}/api/v1/organizations/${sanitizedSubdomain}/profile`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: token ? `Bearer ${token}` : undefined,
+          },
+          withCredentials: true,
+        }
+      );
+
+      const user = response.data.current_user || null;
+      const organization = response.data.organization || null;
+
+      console.log("Auth verification successful:", {
+        user: !!user,
+        organization: !!organization,
+      });
+
+      const sanitizedUser = user
+        ? {
+            id: user.id,
+            email: user.email,
+            role: user.role,
+            name: user.name,
+            username: user.username,
+            team_id: user.team_id,
+            department_id: user.department_id,
+          }
+        : null;
+
+      if (sanitizedUser) {
+        ["authToken", "subdomain", "email", "role", "userId"].forEach(
+          (name) => {
+            const value = {
+              authToken: token,
+              subdomain: sanitizedSubdomain,
+              email: sanitizedUser.email,
+              role: sanitizedUser.role,
+              userId: sanitizedUser.id,
+            }[name];
+            Cookies.set(name, value, {
+              secure: true,
+              sameSite: "strict",
+              expires: 1,
+            });
           }
         );
-
-        const user = response.data.current_user || null;
-        const organization = response.data.organization || null;
-
-        console.log("Auth verification successful:", {
-          user: !!user,
-          organization: !!organization,
-        });
-
-        const sanitizedUser = user
-          ? {
-              id: user.id,
-              email: user.email,
-              role: user.role,
-              name: user.name,
-              username: user.username,
-              team_id: user.team_id,
-              department_id: user.department_id,
-            }
-          : null;
-
-        if (sanitizedUser) {
-          ["authToken", "subdomain", "email", "role", "userId"].forEach(
-            (name) => {
-              const value = {
-                authToken: token,
-                subdomain: sanitizedSubdomain,
-                email: sanitizedUser.email,
-                role: sanitizedUser.role,
-                userId: sanitizedUser.id,
-              }[name];
-              Cookies.set(name, value, {
-                secure: true,
-                sameSite: "strict",
-                expires: 1,
-              });
-            }
-          );
-        }
-
-        setState({
-          currentUser: sanitizedUser,
-          organization,
-          subdomain: sanitizedSubdomain,
-          token: token || null,
-          loading: false,
-          error: null,
-        });
-
-        return true;
-      } catch (error) {
-        console.error("Auth verification failed:", error);
-        const status = error.response?.status;
-        const message =
-          status === 401
-            ? "Session expired"
-            : status === 404
-            ? "Organization not found"
-            : "Authentication failed";
-
-        setState((prev) => ({ ...prev, error: message, loading: false }));
-
-        // FIXED: Don't call logout directly, dispatch event instead
-        if (status === 401) {
-          window.dispatchEvent(new CustomEvent("auth:unauthorized"));
-        }
-        return false;
       }
-    },
-    [] // FIXED: Removed logout from dependencies to prevent circular calls
-  );
+
+      setState({
+        currentUser: sanitizedUser,
+        organization,
+        subdomain: sanitizedSubdomain,
+        token: token || null,
+        loading: false,
+        error: null,
+      });
+
+      return true;
+    } catch (error) {
+      console.error("Auth verification failed:", error);
+      const status = error.response?.status;
+      const message =
+        status === 401
+          ? "Session expired"
+          : status === 404
+          ? "Organization not found"
+          : "Authentication failed";
+
+      setState((prev) => ({ ...prev, error: message, loading: false }));
+
+      if (status === 401) {
+        window.dispatchEvent(new CustomEvent("auth:unauthorized"));
+      }
+      return false;
+    }
+  }, []);
 
   const login = useCallback(
     async (email, password, domain) => {
@@ -202,11 +198,11 @@ export const AuthProvider = ({ children }) => {
       try {
         const apiBase = getApiBaseUrl();
         console.log(
-          `Login attempt: ${apiBase}/login for ${sanitizedEmail}@${sanitizedSubdomain}`
+          `Login attempt: ${apiBase}/api/v1/login for ${sanitizedEmail}@${sanitizedSubdomain}`
         );
 
         const response = await axios.post(
-          `${apiBase}/login`,
+          `${apiBase}/api/v1/login`,
           {
             email: sanitizedEmail,
             password,
@@ -231,7 +227,6 @@ export const AuthProvider = ({ children }) => {
     [verifyAuth]
   );
 
-  // FIXED: Only run auth check once on mount, with proper cleanup
   useEffect(() => {
     console.log("AuthProvider initializing...");
     const { token, subdomain } = getAuthTokens();
@@ -242,9 +237,8 @@ export const AuthProvider = ({ children }) => {
       console.log("No existing tokens found");
       setState((prev) => ({ ...prev, loading: false }));
     }
-  }, []); // Empty dependency array - only run once
+  }, []);
 
-  // Handle unauthorized events
   useEffect(() => {
     const handleUnauthorized = () => {
       console.log("Handling unauthorized event");

@@ -12,13 +12,14 @@ const createApiInstance = (token, subdomain) => {
 
   const isDev = process.env.NODE_ENV === "development";
 
-  // Base URL configuration
+  // FIXED: Base URL without /api/v1 duplication
   const baseURL = isDev
-    ? "http://localhost:3000/api/v1" // Dev: Rails backend
-    : process.env.REACT_APP_API_BASE_URL ||
-      "https://connectfix.onrender.com/api/v1";
+    ? "http://localhost:3000/api/v1"
+    : `${
+        process.env.REACT_APP_API_BASE_URL || "https://connectfix.onrender.com"
+      }/api/v1`;
 
-  console.log("Creating API instance:", { baseURL, subdomain }); // No token in logs
+  console.log("Creating API instance:", { baseURL, subdomain });
 
   const instance = axios.create({
     baseURL: baseURL.endsWith("/") ? baseURL.slice(0, -1) : baseURL,
@@ -28,10 +29,9 @@ const createApiInstance = (token, subdomain) => {
       "X-Organization-Subdomain": subdomain,
     },
     timeout: 60000,
-    withCredentials: true, // For CORS with credentials
+    withCredentials: true,
   });
 
-  // Response interceptor for unified error handling
   instance.interceptors.response.use(
     (response) => response,
     (error) => {

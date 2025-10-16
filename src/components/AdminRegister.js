@@ -1,14 +1,13 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/authContext"; // Import useAuth
+import { useAuth } from "../contexts/authContext";
 import axios from "axios";
 import { toast } from "react-toastify";
 import bg from "../assets/bg.png";
 import logor from "../assets/logor.png";
-import apiBaseUrl from "../config";
 
 function AdminRegister() {
-  const { login } = useAuth(); // Use login from AuthContext
+  const { login } = useAuth();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: "",
@@ -22,11 +21,21 @@ function AdminRegister() {
     department: "",
     position: "",
     username: "",
-    adminName: "",
+    adminFirstName: "",
+    adminLastName: "",
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  // Define API base URL directly in the component
+  const apiBaseUrl =
+    process.env.NODE_ENV === "development"
+      ? "http://localhost:3000/api/v1"
+      : `${
+          process.env.REACT_APP_API_BASE_URL ||
+          "https://connectfix.onrender.com"
+        }/api/v1`;
 
   useEffect(() => {
     if (formData.name) {
@@ -67,7 +76,10 @@ function AdminRegister() {
     if (!formData.phoneNumber)
       newErrors.phoneNumber = "Phone number is required";
     if (!formData.website) newErrors.website = "Website is required";
-    if (!formData.adminName) newErrors.adminName = "Admin name is required";
+    if (!formData.adminFirstName)
+      newErrors.adminFirstName = "First name is required";
+    if (!formData.adminLastName)
+      newErrors.adminLastName = "Last name is required";
     if (!formData.username) newErrors.username = "Username is required";
     else if (!/^[a-z0-9_]{3,}$/.test(formData.username))
       newErrors.username =
@@ -88,33 +100,34 @@ function AdminRegister() {
       if (isSubmitting || !validateForm()) return;
       setIsSubmitting(true);
 
+      const fullUrl = `${apiBaseUrl}/register`;
       console.log("apiBaseUrl:", apiBaseUrl);
-      console.log("Full URL:", `${apiBaseUrl}/register`);
+      console.log("Full URL:", fullUrl);
 
       try {
-        const response = await axios.post(
-          `http://lvh.me:3000/api/v1/register`,
-          {
-            organization: {
-              name: formData.name,
-              email: formData.email,
-              phone_number: formData.phoneNumber,
-              website: formData.website,
-              address: formData.address,
-              subdomain: formData.subdomain,
-            },
-            admin: {
-              name: formData.adminName,
-              email: formData.email,
-              phone_number: formData.phoneNumber,
-              password: formData.password,
-              password_confirmation: formData.passwordConfirmation,
-              department: formData.department,
-              position: formData.position,
-              username: formData.username,
-            },
-          }
-        );
+        const response = await axios.post(fullUrl, {
+          organization: {
+            name: formData.name,
+            email: formData.email,
+            phone_number: formData.phoneNumber,
+            website: formData.website,
+            address: formData.address,
+            subdomain: formData.subdomain,
+          },
+          admin: {
+            first_name: formData.adminFirstName,
+            last_name: formData.adminLastName,
+            email: formData.email,
+            phone_number: formData.phoneNumber,
+            password: formData.password,
+            password_confirmation: formData.passwordConfirmation,
+            department: formData.department,
+            position: formData.position,
+            username: formData.username,
+          },
+        });
+
+        console.log("Registration successful:", response.data);
 
         // Log in the admin user using useAuth
         await login(formData.email, formData.password, formData.subdomain);
@@ -131,17 +144,21 @@ function AdminRegister() {
 
         navigate("/admin/dashboard");
       } catch (err) {
+        console.error("Registration error:", err);
+        console.error("Error response:", err.response);
+
         const errorMessage =
-          err.response?.data?.errors?.join(", ") ||
           err.response?.data?.error ||
-          "Error during registration";
+          err.response?.data?.details?.subdomain?.[0] ||
+          err.response?.data?.errors?.join(", ") ||
+          "Error during registration. Please try again.";
+
         setErrors({ general: errorMessage });
-        console.error("Request Error:", err.response);
       } finally {
         setIsSubmitting(false);
       }
     },
-    [isSubmitting, formData, login, navigate]
+    [isSubmitting, formData, login, navigate, apiBaseUrl]
   );
 
   return (
@@ -157,7 +174,9 @@ function AdminRegister() {
           Welcome to the Admin Registration Page
         </h1>
         {errors.general && (
-          <p className="text-red-500 mb-4 text-center">{errors.general}</p>
+          <p className="text-red-500 mb-4 text-center bg-white p-3 rounded">
+            {errors.general}
+          </p>
         )}
         <hr className="w-full h-1 mx-auto my-4 bg-gray-100 border-0 rounded-sm md:my-10" />
         <form onSubmit={handleSubmit} className="flex flex-wrap gap-6">
@@ -180,13 +199,13 @@ function AdminRegister() {
                 placeholder="Enter organization name"
                 value={formData.name}
                 onChange={handleChange}
-                className={`border p-2 w-full ${
+                className={`border p-2 w-full rounded ${
                   errors.name ? "border-red-500" : ""
                 }`}
                 required
               />
               {errors.name && (
-                <p className="text-red-500 text-sm">{errors.name}</p>
+                <p className="text-red-500 text-sm mt-1">{errors.name}</p>
               )}
             </div>
             <div className="mb-4">
@@ -194,22 +213,22 @@ function AdminRegister() {
                 htmlFor="subdomain"
                 className="block text-sm font-medium text-gray-300 mb-1"
               >
-                Subdomain (Generated)
+                Subdomain (Auto-generated)
               </label>
               <input
                 id="subdomain"
                 name="subdomain"
                 type="text"
-                placeholder="Enter subdomain"
+                placeholder="your-subdomain"
                 value={formData.subdomain}
                 onChange={handleChange}
-                className={`border p-2 w-full ${
+                className={`border p-2 w-full rounded ${
                   errors.subdomain ? "border-red-500" : ""
                 }`}
                 required
               />
               {errors.subdomain && (
-                <p className="text-red-500 text-sm">{errors.subdomain}</p>
+                <p className="text-red-500 text-sm mt-1">{errors.subdomain}</p>
               )}
             </div>
             <div className="mb-4">
@@ -223,16 +242,16 @@ function AdminRegister() {
                 id="email"
                 name="email"
                 type="email"
-                placeholder="Enter organization email"
+                placeholder="org@example.com"
                 value={formData.email}
                 onChange={handleChange}
-                className={`border p-2 w-full ${
+                className={`border p-2 w-full rounded ${
                   errors.email ? "border-red-500" : ""
                 }`}
                 required
               />
               {errors.email && (
-                <p className="text-red-500 text-sm">{errors.email}</p>
+                <p className="text-red-500 text-sm mt-1">{errors.email}</p>
               )}
             </div>
             <div className="mb-4">
@@ -249,13 +268,15 @@ function AdminRegister() {
                 placeholder="Enter phone number"
                 value={formData.phoneNumber}
                 onChange={handleChange}
-                className={`border p-2 w-full ${
+                className={`border p-2 w-full rounded ${
                   errors.phoneNumber ? "border-red-500" : ""
                 }`}
                 required
               />
               {errors.phoneNumber && (
-                <p className="text-red-500 text-sm">{errors.phoneNumber}</p>
+                <p className="text-red-500 text-sm mt-1">
+                  {errors.phoneNumber}
+                </p>
               )}
             </div>
             <div className="mb-4">
@@ -263,22 +284,22 @@ function AdminRegister() {
                 htmlFor="website"
                 className="block text-sm font-medium text-gray-300 mb-1"
               >
-                Website (Required)
+                Website
               </label>
               <input
                 id="website"
                 name="website"
                 type="text"
-                placeholder="Enter website"
+                placeholder="www.example.com"
                 value={formData.website}
                 onChange={handleChange}
-                className={`border p-2 w-full ${
+                className={`border p-2 w-full rounded ${
                   errors.website ? "border-red-500" : ""
                 }`}
                 required
               />
               {errors.website && (
-                <p className="text-red-500 text-sm">{errors.website}</p>
+                <p className="text-red-500 text-sm mt-1">{errors.website}</p>
               )}
             </div>
             <div className="mb-4">
@@ -295,7 +316,7 @@ function AdminRegister() {
                 placeholder="Enter address"
                 value={formData.address}
                 onChange={handleChange}
-                className="border p-2 w-full"
+                className="border p-2 w-full rounded"
               />
             </div>
           </div>
@@ -307,25 +328,52 @@ function AdminRegister() {
             </h2>
             <div className="mb-4">
               <label
-                htmlFor="adminName"
+                htmlFor="adminFirstName"
                 className="block text-sm font-medium text-gray-300 mb-1"
               >
-                Admin Name
+                First Name
               </label>
               <input
-                id="adminName"
-                name="adminName"
+                id="adminFirstName"
+                name="adminFirstName"
                 type="text"
-                placeholder="Enter admin name"
-                value={formData.adminName}
+                placeholder="Enter first name"
+                value={formData.adminFirstName}
                 onChange={handleChange}
-                className={`border p-2 w-full ${
-                  errors.adminName ? "border-red-500" : ""
+                className={`border p-2 w-full rounded ${
+                  errors.adminFirstName ? "border-red-500" : ""
                 }`}
                 required
               />
-              {errors.adminName && (
-                <p className="text-red-500 text-sm">{errors.adminName}</p>
+              {errors.adminFirstName && (
+                <p className="text-red-500 text-sm mt-1">
+                  {errors.adminFirstName}
+                </p>
+              )}
+            </div>
+            <div className="mb-4">
+              <label
+                htmlFor="adminLastName"
+                className="block text-sm font-medium text-gray-300 mb-1"
+              >
+                Last Name
+              </label>
+              <input
+                id="adminLastName"
+                name="adminLastName"
+                type="text"
+                placeholder="Enter last name"
+                value={formData.adminLastName}
+                onChange={handleChange}
+                className={`border p-2 w-full rounded ${
+                  errors.adminLastName ? "border-red-500" : ""
+                }`}
+                required
+              />
+              {errors.adminLastName && (
+                <p className="text-red-500 text-sm mt-1">
+                  {errors.adminLastName}
+                </p>
               )}
             </div>
             <div className="mb-4">
@@ -342,7 +390,7 @@ function AdminRegister() {
                 placeholder="Enter username"
                 value={formData.username}
                 onChange={handleChange}
-                className={`border p-2 w-full ${
+                className={`border p-2 w-full rounded ${
                   errors.username ? "border-red-500" : ""
                 }`}
                 required
@@ -350,7 +398,7 @@ function AdminRegister() {
                 title="Only letters, numbers, and underscores allowed"
               />
               {errors.username && (
-                <p className="text-red-500 text-sm">{errors.username}</p>
+                <p className="text-red-500 text-sm mt-1">{errors.username}</p>
               )}
             </div>
             <div className="mb-4">
@@ -367,7 +415,7 @@ function AdminRegister() {
                 placeholder="Enter department"
                 value={formData.department}
                 onChange={handleChange}
-                className="border p-2 w-full"
+                className="border p-2 w-full rounded"
               />
             </div>
             <div className="mb-4">
@@ -384,7 +432,7 @@ function AdminRegister() {
                 placeholder="Enter position"
                 value={formData.position}
                 onChange={handleChange}
-                className="border p-2 w-full"
+                className="border p-2 w-full rounded"
               />
             </div>
             <div className="mb-4">
@@ -398,16 +446,16 @@ function AdminRegister() {
                 id="password"
                 name="password"
                 type={showPassword ? "text" : "password"}
-                placeholder="Enter password"
+                placeholder="Enter password (min 6 characters)"
                 value={formData.password}
                 onChange={handleChange}
-                className={`border p-2 w-full ${
+                className={`border p-2 w-full rounded ${
                   errors.password ? "border-red-500" : ""
                 }`}
                 required
               />
               {errors.password && (
-                <p className="text-red-500 text-sm">{errors.password}</p>
+                <p className="text-red-500 text-sm mt-1">{errors.password}</p>
               )}
             </div>
             <div className="mb-4">
@@ -424,13 +472,13 @@ function AdminRegister() {
                 placeholder="Confirm password"
                 value={formData.passwordConfirmation}
                 onChange={handleChange}
-                className={`border p-2 w-full ${
+                className={`border p-2 w-full rounded ${
                   errors.passwordConfirmation ? "border-red-500" : ""
                 }`}
                 required
               />
               {errors.passwordConfirmation && (
-                <p className="text-red-500 text-sm">
+                <p className="text-red-500 text-sm mt-1">
                   {errors.passwordConfirmation}
                 </p>
               )}
@@ -438,7 +486,7 @@ function AdminRegister() {
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="text-sm text-gray-200 underline"
+              className="text-sm text-gray-200 underline hover:text-white"
             >
               {showPassword ? "Hide Passwords" : "Show Passwords"}
             </button>
@@ -447,14 +495,14 @@ function AdminRegister() {
           <div className="w-full">
             <button
               type="submit"
-              className={`bg-white text-blue-500 rounded p-2 w-full ${
+              className={`bg-white text-blue-500 font-semibold rounded p-3 w-full ${
                 isSubmitting
                   ? "opacity-50 cursor-not-allowed"
-                  : "hover:bg-gray-300"
+                  : "hover:bg-gray-100"
               } transition-colors`}
               disabled={isSubmitting}
             >
-              {isSubmitting ? "Registering..." : "Register"}
+              {isSubmitting ? "Registering..." : "Register Organization"}
             </button>
           </div>
         </form>
