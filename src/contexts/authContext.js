@@ -1,271 +1,207 @@
 import React, {
   createContext,
-  useContext,
   useState,
+  useContext,
   useEffect,
   useCallback,
-  useMemo,
+  useRef,
 } from "react";
+import createApiInstance from "../utils/api";
 import axios from "axios";
-import Cookies from "js-cookie";
 
 const AuthContext = createContext();
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) throw new Error("useAuth must be used within an AuthProvider");
-
-  const fallbackSubdomain =
-    context.subdomain ||
-    context.organization?.subdomain ||
-    Cookies.get("subdomain") ||
-    (process.env.NODE_ENV === "development" ? "demo" : null);
-
-  return { ...context, subdomain: fallbackSubdomain };
-};
-
-// FIXED: Removed the duplicate /api/v1 addition
-const getApiBaseUrl = () => {
-  const base =
-    process.env.REACT_APP_API_BASE_URL ||
-    (process.env.NODE_ENV === "development"
-      ? "http://localhost:3000"
-      : "https://connectfix.onrender.com");
-
-  return base;
-};
-
-const sanitizeInput = (input, isEmail = false) => {
-  if (!input || typeof input !== "string") return "";
-  const value = input.toLowerCase().trim();
-  if (isEmail) {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(value) ? value : "";
-  }
-  return value.replace(/[^a-z0-9-_]/g, "");
+  return context;
 };
 
 export const AuthProvider = ({ children }) => {
-  const [state, setState] = useState({
-    currentUser: null,
-    organization: null,
-    subdomain: null,
-    token: null,
-    loading: true,
-    error: null,
-  });
+  const BASE_URL = process.env.REACT_APP_API_URL || "http://lvh.me:3000";
 
-  const getAuthTokens = useCallback(
-    () => ({
-      token: Cookies.get("authToken") || "",
-      subdomain: sanitizeInput(Cookies.get("subdomain") || ""),
-      email: Cookies.get("email") || "",
-      role: Cookies.get("role") || "",
-      userId: Cookies.get("userId") || "",
-    }),
-    []
+  const [currentUser, setCurrentUser] = useState(() =>
+    JSON.parse(localStorage.getItem("currentUser") || "null")
   );
+  const [token, setToken] = useState(() => localStorage.getItem("token"));
+  const [refreshToken, setRefreshToken] = useState(() =>
+    localStorage.getItem("refresh_token")
+  );
+  const [subdomain, setSubdomain] = useState(() =>
+    localStorage.getItem("subdomain")
+  );
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const intervalRef = useRef(null);
 
-  const logout = useCallback(() => {
-    console.log("Logging out user");
-    ["authToken", "subdomain", "email", "role", "userId"].forEach((name) =>
-      Cookies.remove(name, { path: "/", secure: true, sameSite: "strict" })
-    );
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("subdomain");
-    localStorage.removeItem("role");
-
-    setState({
-      currentUser: null,
-      organization: null,
-      subdomain: null,
-      token: null,
-      loading: false,
-      error: null,
-    });
-  }, []);
-
-  const verifyAuth = useCallback(async (token, subdomain) => {
-    const sanitizedSubdomain = sanitizeInput(subdomain);
-    if (!sanitizedSubdomain) {
-      setState((prev) => ({
-        ...prev,
-        error: "Organization subdomain is required",
-        loading: false,
-      }));
-      return false;
-    }
-
+  // 🔹 Decode and check token expiration
+  const decodeToken = (tokenToCheck) => {
+    if (!tokenToCheck) return null;
     try {
-      setState((prev) => ({ ...prev, loading: true, error: null }));
-      const apiBase = getApiBaseUrl();
+      return JSON.parse(atob(tokenToCheck.split(".")[1]));
+    } catch {
+      return null;
+    }
+  };
 
-      console.log(
-        `Verifying auth: ${apiBase}/api/v1/organizations/${sanitizedSubdomain}/profile`
-      );
-      console.log(`Token present: ${!!token}`);
+  const isTokenExpired = useCallback((tokenToCheck) => {
+    const payload = decodeToken(tokenToCheck);
+    if (!payload?.exp) return true;
+    return Date.now() >= payload.exp * 1000;
+  }, []);
 
-      const response = await axios.get(
-        `${apiBase}/api/v1/organizations/${sanitizedSubdomain}/profile`,
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: token ? `Bearer ${token}` : undefined,
-          },
-          withCredentials: true,
-        }
-      );
+  const getTimeUntilExpiry = useCallback((tokenToCheck) => {
+    const payload = decodeToken(tokenToCheck);
+    if (!payload?.exp) return 0;
+    return payload.exp * 1000 - Date.now();
+  }, []);
 
-      const user = response.data.current_user || null;
-      const organization = response.data.organization || null;
+  // 🔹 Refresh access token
+  const refreshAccessToken = useCallback(async () => {
+    if (isRefreshing) return false;
+    const storedRefreshToken = localStorage.getItem("refresh_token");
 
-      console.log("Auth verification successful:", {
-        user: !!user,
-        organization: !!organization,
-      });
-
-      const sanitizedUser = user
-        ? {
-            id: user.id,
-            email: user.email,
-            role: user.role,
-            name: user.name,
-            username: user.username,
-            team_id: user.team_id,
-            department_id: user.department_id,
-          }
-        : null;
-
-      if (sanitizedUser) {
-        ["authToken", "subdomain", "email", "role", "userId"].forEach(
-          (name) => {
-            const value = {
-              authToken: token,
-              subdomain: sanitizedSubdomain,
-              email: sanitizedUser.email,
-              role: sanitizedUser.role,
-              userId: sanitizedUser.id,
-            }[name];
-            Cookies.set(name, value, {
-              secure: true,
-              sameSite: "strict",
-              expires: 1,
-            });
-          }
-        );
-      }
-
-      setState({
-        currentUser: sanitizedUser,
-        organization,
-        subdomain: sanitizedSubdomain,
-        token: token || null,
-        loading: false,
-        error: null,
-      });
-
-      return true;
-    } catch (error) {
-      console.error("Auth verification failed:", error);
-      const status = error.response?.status;
-      const message =
-        status === 401
-          ? "Session expired"
-          : status === 404
-          ? "Organization not found"
-          : "Authentication failed";
-
-      setState((prev) => ({ ...prev, error: message, loading: false }));
-
-      if (status === 401) {
-        window.dispatchEvent(new CustomEvent("auth:unauthorized"));
-      }
+    if (!storedRefreshToken || isTokenExpired(storedRefreshToken)) {
+      console.warn("Refresh token missing or expired. Logging out...");
+      logout();
       return false;
     }
-  }, []);
 
-  const login = useCallback(
-    async (email, password, domain) => {
-      const sanitizedEmail = sanitizeInput(email, true);
-      const sanitizedSubdomain =
-        sanitizeInput(domain) ||
-        (process.env.NODE_ENV === "development" ? "demo" : "");
-      if (!sanitizedEmail) throw new Error("Valid email is required");
-      if (!sanitizedSubdomain) throw new Error("Subdomain is required");
+    setIsRefreshing(true);
+    try {
+      const response = await axios.post(`${BASE_URL}/api/v1/refresh`, {
+        refresh_token: storedRefreshToken,
+      });
 
-      setState((prev) => ({ ...prev, loading: true, error: null }));
-
-      try {
-        const apiBase = getApiBaseUrl();
-        console.log(
-          `Login attempt: ${apiBase}/api/v1/login for ${sanitizedEmail}@${sanitizedSubdomain}`
-        );
-
-        const response = await axios.post(
-          `${apiBase}/api/v1/login`,
-          {
-            email: sanitizedEmail,
-            password,
-            subdomain: sanitizedSubdomain,
-          },
-          { withCredentials: true }
-        );
-
-        const { auth_token } = response.data;
-        console.log("Login successful, token received");
-
-        await verifyAuth(auth_token, sanitizedSubdomain);
-
+      const newToken = response.data.auth_token;
+      if (newToken) {
+        localStorage.setItem("token", newToken);
+        setToken(newToken);
+        console.info("Access token refreshed successfully");
         return true;
-      } catch (error) {
-        console.error("Login failed:", error);
-        const message = error.response?.data?.message || "Login failed";
-        setState((prev) => ({ ...prev, error: message, loading: false }));
-        throw new Error(message);
       }
-    },
-    [verifyAuth]
-  );
 
-  useEffect(() => {
-    console.log("AuthProvider initializing...");
-    const { token, subdomain } = getAuthTokens();
-    if (token && subdomain) {
-      console.log("Found existing tokens, verifying auth...");
-      verifyAuth(token, subdomain);
-    } else {
-      console.log("No existing tokens found");
-      setState((prev) => ({ ...prev, loading: false }));
+      logout();
+      return false;
+    } catch (err) {
+      console.error("Token refresh failed:", err);
+      logout();
+      return false;
+    } finally {
+      setIsRefreshing(false);
     }
+  }, [BASE_URL, isRefreshing, isTokenExpired]);
+
+  // 🔹 Auto-refresh before expiry
+  useEffect(() => {
+    if (!token || !refreshToken) {
+      setLoading(false);
+      return;
+    }
+
+    const handleTokenCycle = async () => {
+      const timeUntilExpiry = getTimeUntilExpiry(token);
+
+      if (timeUntilExpiry <= 0) {
+        console.warn("Access token expired, logging out...");
+        logout();
+      } else if (timeUntilExpiry < 60 * 60 * 1000) {
+        console.log("Access token expires soon, refreshing...");
+        await refreshAccessToken();
+      }
+    };
+
+    handleTokenCycle(); // Run once immediately
+    intervalRef.current = setInterval(handleTokenCycle, 5 * 60 * 1000);
+
+    setLoading(false);
+    return () => clearInterval(intervalRef.current);
+  }, [token, refreshToken, getTimeUntilExpiry, refreshAccessToken]);
+
+  // 🔹 Login
+  const login = async (email, password, subdomainParam) => {
+    try {
+      const response = await axios.post(`${BASE_URL}/api/v1/login`, {
+        email: email.trim(),
+        password,
+        subdomain: subdomainParam.trim(),
+      });
+
+      const {
+        auth_token,
+        refresh_token: newRefreshToken,
+        user,
+        subdomain: returnedSubdomain,
+      } = response.data;
+
+      if (!auth_token || !user) throw new Error("Invalid server response");
+
+      localStorage.setItem("token", auth_token);
+      localStorage.setItem("refresh_token", newRefreshToken);
+      localStorage.setItem("currentUser", JSON.stringify(user));
+      localStorage.setItem("subdomain", returnedSubdomain || subdomainParam);
+
+      setToken(auth_token);
+      setRefreshToken(newRefreshToken);
+      setCurrentUser(user);
+      setSubdomain(returnedSubdomain || subdomainParam);
+
+      console.info("Login successful ✅");
+      return user;
+    } catch (err) {
+      console.error("Login failed:", err);
+      throw new Error(
+        err.response?.data?.error || "Login failed. Please check credentials."
+      );
+    }
+  };
+
+  // 🔹 Logout
+  const logout = useCallback(() => {
+    console.log("Logging out user...");
+    clearInterval(intervalRef.current);
+    ["token", "refresh_token", "currentUser", "subdomain"].forEach((key) =>
+      localStorage.removeItem(key)
+    );
+    setToken(null);
+    setRefreshToken(null);
+    setCurrentUser(null);
+    setSubdomain(null);
   }, []);
 
+  // 🔹 Multi-tab logout sync
   useEffect(() => {
-    const handleUnauthorized = () => {
-      console.log("Handling unauthorized event");
-      logout();
+    const handleStorage = (e) => {
+      if (e.key === "token" && !e.newValue) logout();
     };
-    window.addEventListener("auth:unauthorized", handleUnauthorized);
-    return () =>
-      window.removeEventListener("auth:unauthorized", handleUnauthorized);
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
   }, [logout]);
 
-  const contextValue = useMemo(
-    () => ({
-      ...state,
-      login,
-      logout,
-      isAdmin:
-        state.currentUser?.role === "system_admin" ||
-        state.currentUser?.role === "domain_admin",
-      isSuperUser:
-        state.currentUser?.role === "system_admin" ||
-        state.currentUser?.role === "domain_admin",
-      isAuthenticated: !!state.currentUser && !!state.token,
-    }),
-    [state, login, logout]
-  );
+  // 🔹 Expose authorized API client
+  const getAuthorizedApi = useCallback(() => {
+    if (!token) throw new Error("No active token found.");
+    return createApiInstance(token, subdomain);
+  }, [token, subdomain]);
+
+  const value = {
+    currentUser,
+    token,
+    refreshToken,
+    subdomain,
+    login,
+    logout,
+    refreshAccessToken,
+    getAuthorizedApi,
+    loading,
+    isAuthenticated: !!token && !!currentUser,
+  };
 
   return (
-    <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={value}>
+      {!loading && children}
+    </AuthContext.Provider>
   );
 };
+
+export default AuthContext;

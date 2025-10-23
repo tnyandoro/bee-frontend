@@ -1,9 +1,7 @@
-import apiBaseUrl from "../config";
+import createApiInstance from "../utils/api";
+import { useAuth } from "../contexts/authContext";
 
-const fetchData = async () => {
-  const response = await fetch(`${apiBaseUrl}/endpoint`);
-  const data = await response.json();
-  return data;
+export const useApiClient = () => {
+  const { token, subdomain } = useAuth();
+  return createApiInstance(token, subdomain);
 };
-
-export default fetchData;

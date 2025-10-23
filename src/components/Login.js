@@ -20,11 +20,13 @@ const Login = ({ loginType = "User" }) => {
 
   const navigate = useNavigate();
 
+  // Splash screen for 2 seconds
   useEffect(() => {
     const splashTimeout = setTimeout(() => setShowSplash(false), 2000);
     return () => clearTimeout(splashTimeout);
   }, []);
 
+  // Redirect if currentUser exists (for auto-login)
   useEffect(() => {
     if (currentUser) {
       redirectAfterLogin(currentUser.role);
@@ -77,12 +79,14 @@ const Login = ({ loginType = "User" }) => {
     setErrors({});
 
     try {
-      const success = await login(
+      // Make sure login returns the user object
+      const user = await login(
         formData.email,
         formData.password,
         formData.subdomain
       );
-      if (success) {
+
+      if (user && user.role) {
         toast.success("You have successfully logged in", {
           position: "top-right",
           autoClose: 6000,
@@ -92,7 +96,11 @@ const Login = ({ loginType = "User" }) => {
           draggable: true,
           theme: "light",
         });
-        // navigation happens automatically in useEffect when currentUser updates
+        redirectAfterLogin(user.role); // immediate navigation
+      } else {
+        setErrors({
+          general: "Login succeeded but user data is missing.",
+        });
       }
     } catch (error) {
       console.error("Login error:", error);
@@ -143,6 +151,7 @@ const Login = ({ loginType = "User" }) => {
           )}
 
           <form onSubmit={handleLogin} className="space-y-4">
+            {/* Subdomain */}
             <div>
               <label
                 htmlFor="subdomain"
@@ -171,6 +180,7 @@ const Login = ({ loginType = "User" }) => {
               )}
             </div>
 
+            {/* Email */}
             <div>
               <label
                 htmlFor="email"
@@ -199,10 +209,11 @@ const Login = ({ loginType = "User" }) => {
               )}
             </div>
 
+            {/* Password */}
             <div>
               <label
                 htmlFor="password"
-                className="foobar text-sm font-medium text-gray-700 mb-1"
+                className="text-sm font-medium text-gray-700 mb-1"
               >
                 Password
               </label>
@@ -274,6 +285,7 @@ const Login = ({ loginType = "User" }) => {
               </div>
             </div>
 
+            {/* Submit */}
             <div className="pt-2">
               <button
                 type="submit"

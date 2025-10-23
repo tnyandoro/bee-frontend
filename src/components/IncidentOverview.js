@@ -27,6 +27,7 @@ const IncidentOverview = () => {
   const [teamFilter, setTeamFilter] = useState("");
   const [assigneeFilter, setAssigneeFilter] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("");
+  const [ticketTypeFilter, setTicketTypeFilter] = useState("");
   const isFetching = useRef(false);
 
   // Memoize the API instance to prevent recreation on every render
@@ -50,7 +51,7 @@ const IncidentOverview = () => {
           subdomain,
           currentUser,
         });
-        setError("Please log in to view incidents.");
+        setError("Please log in to view tickets.");
         setLoading(false);
         logout();
         navigate("/login", { replace: true });
@@ -70,7 +71,8 @@ const IncidentOverview = () => {
           params: {
             page,
             per_page: 10,
-            ticket_type: "Incident",
+            // Remove ticket_type filter to show all tickets
+            ticket_type: ticketTypeFilter || undefined,
             status: statusFilter || undefined,
             team_id: teamFilter || undefined,
             assignee_id: assigneeFilter || undefined,
@@ -96,7 +98,7 @@ const IncidentOverview = () => {
           data: err.response?.data,
           headers: err.response?.headers,
         });
-        let errorMsg = err.response?.data?.error || "Failed to fetch incidents";
+        let errorMsg = err.response?.data?.error || "Failed to fetch tickets";
         if (err.response?.status === 401) {
           errorMsg = "Session expired. Please log in again.";
           logout();
@@ -115,6 +117,7 @@ const IncidentOverview = () => {
       teamFilter,
       assigneeFilter,
       priorityFilter,
+      ticketTypeFilter,
       token,
       currentUser,
       logout,
@@ -157,13 +160,22 @@ const IncidentOverview = () => {
     }
   };
 
+  const getTicketTypeBadgeClass = (type) => {
+    const classes = {
+      Incident: "bg-red-100 text-red-800 border-red-300",
+      Problem: "bg-yellow-100 text-yellow-800 border-yellow-300",
+      Request: "bg-blue-100 text-blue-800 border-blue-300",
+    };
+    return classes[type] || "bg-gray-100 text-gray-800 border-gray-300";
+  };
+
   const downloadExport = async (format = "csv") => {
     const filters = new URLSearchParams();
     if (statusFilter) filters.append("status", statusFilter);
     if (teamFilter) filters.append("team_id", teamFilter);
     if (assigneeFilter) filters.append("assignee_id", assigneeFilter);
     if (priorityFilter) filters.append("priority", priorityFilter);
-    filters.append("ticket_type", "Incident");
+    if (ticketTypeFilter) filters.append("ticket_type", ticketTypeFilter);
 
     const url = `/organizations/${subdomain}/tickets/export.${format}?${filters}`;
     try {
@@ -173,7 +185,7 @@ const IncidentOverview = () => {
         status: response.status,
       });
       const blob = response.data;
-      const filename = `incidents-${new Date().toISOString()}.${format}`;
+      const filename = `tickets-${new Date().toISOString()}.${format}`;
       const downloadUrl = URL.createObjectURL(blob);
 
       const a = document.createElement("a");
@@ -198,6 +210,7 @@ const IncidentOverview = () => {
     const filteredData = tickets.map((ticket) => ({
       "Ticket Number": ticket.ticket_number,
       Title: ticket.title,
+      Type: ticket.ticket_type,
       Status: ticket.status,
       Priority: ticket.priority,
       "Created At": ticket.created_at,
@@ -207,8 +220,8 @@ const IncidentOverview = () => {
 
     const worksheet = XLSX.utils.json_to_sheet(filteredData);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Incidents");
-    XLSX.writeFile(workbook, `incidents-${new Date().toISOString()}.xlsx`);
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Tickets");
+    XLSX.writeFile(workbook, `tickets-${new Date().toISOString()}.xlsx`);
   };
 
   if (loading) {
@@ -217,8 +230,7 @@ const IncidentOverview = () => {
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-2"></div>
           <p>
-            Loading incidents... First load may take up to 30s if server is
-            idle.
+            Loading tickets... First load may take up to 30s if server is idle.
           </p>
         </div>
       </div>
@@ -262,10 +274,30 @@ const IncidentOverview = () => {
   return (
     <div className="container mt-2 p-2 bg-gray-100 min-h-screen">
       <div className="p-2 mx-auto text-center align-middle rounded-b-lg bg-blue-700 shadow-2xl mb-6">
-        <h2 className="text-4xl text-white">Incident Overview</h2>
+        <h2 className="text-4xl text-white">Tickets Overview</h2>
+        <p className="text-blue-100 text-sm mt-1">
+          Monitor and manage all tickets (Incidents, Problems, and Requests)
+        </p>
       </div>
 
       <div className="flex flex-col md:flex-row flex-wrap gap-4 mb-6">
+        <select
+          value={ticketTypeFilter}
+          onChange={(e) => {
+            console.log(
+              `${new Date().toISOString()} Ticket type filter changed:`,
+              e.target.value
+            );
+            setTicketTypeFilter(e.target.value);
+          }}
+          className="w-full md:w-1/6 px-4 py-2 border rounded-md shadow-sm"
+        >
+          <option value="">All Types</option>
+          <option value="Incident">Incidents</option>
+          <option value="Problem">Problems</option>
+          <option value="Request">Requests</option>
+        </select>
+
         <select
           value={statusFilter}
           onChange={(e) => {
@@ -275,7 +307,7 @@ const IncidentOverview = () => {
             );
             setStatusFilter(e.target.value);
           }}
-          className="w-full md:w-1/5 px-4 py-2 border rounded-md shadow-sm"
+          className="w-full md:w-1/6 px-4 py-2 border rounded-md shadow-sm"
         >
           <option value="">All Statuses</option>
           <option value="open">Open</option>
@@ -295,7 +327,7 @@ const IncidentOverview = () => {
             setTeamFilter(e.target.value);
           }}
           placeholder="Filter by Team ID"
-          className="w-full md:w-1/5 px-4 py-2 border rounded-md shadow-sm"
+          className="w-full md:w-1/6 px-4 py-2 border rounded-md shadow-sm"
         />
 
         <input
@@ -309,7 +341,7 @@ const IncidentOverview = () => {
             setAssigneeFilter(e.target.value);
           }}
           placeholder="Filter by Assignee ID"
-          className="w-full md:w-1/5 px-4 py-2 border rounded-md shadow-sm"
+          className="w-full md:w-1/6 px-4 py-2 border rounded-md shadow-sm"
         />
 
         <select
@@ -321,7 +353,7 @@ const IncidentOverview = () => {
             );
             setPriorityFilter(e.target.value);
           }}
-          className="w-full md:w-1/5 px-4 py-2 border rounded-md shadow-sm"
+          className="w-full md:w-1/6 px-4 py-2 border rounded-md shadow-sm"
         >
           <option value="">All Priorities</option>
           <option value="0">Low</option>
@@ -350,6 +382,7 @@ const IncidentOverview = () => {
         <thead className="bg-gray-200 text-gray-700 uppercase">
           <tr>
             <th className="px-4 py-3">Ticket Number</th>
+            <th className="px-4 py-3">Type</th>
             <th className="px-4 py-3">Title</th>
             <th className="px-4 py-3">Status</th>
             <th className="px-4 py-3">Actions</th>
@@ -363,8 +396,17 @@ const IncidentOverview = () => {
                 <td className="border px-4 py-3 font-medium">
                   {ticket.ticket_number}
                 </td>
+                <td className="border px-4 py-3">
+                  <span
+                    className={`inline-block px-3 py-1 text-xs font-semibold rounded-full border ${getTicketTypeBadgeClass(
+                      ticket.ticket_type
+                    )}`}
+                  >
+                    {ticket.ticket_type}
+                  </span>
+                </td>
                 <td className="border px-4 py-3">{ticket.title}</td>
-                <td className="border px-4 py-3">{ticket.status}</td>
+                <td className="border px-4 py-3 capitalize">{ticket.status}</td>
                 <td className="border px-4 py-3">
                   {ticket.status !== "resolved" &&
                     ticket.status !== "closed" && (
@@ -380,6 +422,12 @@ const IncidentOverview = () => {
             ))}
         </tbody>
       </table>
+
+      {tickets.length === 0 && (
+        <div className="text-center py-8 text-gray-500">
+          No tickets found. Try adjusting your filters.
+        </div>
+      )}
 
       <div className="flex justify-center mt-4">
         <button

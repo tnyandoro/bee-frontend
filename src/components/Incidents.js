@@ -37,6 +37,7 @@ const Incident = () => {
   const [detailsTicket, setDetailsTicket] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [ticketsPerPage, setTicketsPerPage] = useState(100);
+  const [ticketTypeFilter, setTicketTypeFilter] = useState("all"); // NEW: Add ticket type filter state
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const location = useLocation();
@@ -49,6 +50,7 @@ const Incident = () => {
     token,
     authError,
     authLoading,
+    ticketTypeFilter, // Log the filter
     path: location.pathname,
   });
 
@@ -70,7 +72,7 @@ const Incident = () => {
         currentUser,
         authLoading,
       });
-      setError("Please log in to view incidents.");
+      setError("Please log in to view tickets.");
       logout();
       navigate("/login");
       return;
@@ -82,8 +84,14 @@ const Incident = () => {
 
     try {
       const api = createApiInstance(token, subdomain);
-      const url = `/organizations/${subdomain}/tickets?page=${currentPage}&per_page=${ticketsPerPage}`;
-      console.log("Incident: Fetching tickets", { url });
+
+      // UPDATED: Build URL with optional ticket_type filter
+      let url = `/organizations/${subdomain}/tickets?page=${currentPage}&per_page=${ticketsPerPage}`;
+      if (ticketTypeFilter !== "all") {
+        url += `&ticket_type=${ticketTypeFilter}`;
+      }
+
+      console.log("Incident: Fetching tickets", { url, ticketTypeFilter });
       const response = await api.get(url);
       console.log("Incident: Tickets API response", {
         response: response.data,
@@ -123,7 +131,7 @@ const Incident = () => {
         error: err.message,
         response: err.response?.data,
       });
-      let errorMsg = `Failed to fetch incidents: ${
+      let errorMsg = `Failed to fetch tickets: ${
         err.response?.data?.error || err.message
       }`;
       if (err.response?.status === 401) {
@@ -131,7 +139,9 @@ const Incident = () => {
         logout();
         navigate("/login");
       } else if (err.response?.status === 404) {
-        errorMsg = "No incidents found for this organization.";
+        errorMsg = `No ${
+          ticketTypeFilter === "all" ? "tickets" : ticketTypeFilter + " tickets"
+        } found for this organization.`;
         setTickets([]);
       }
       setError(errorMsg);
@@ -146,6 +156,7 @@ const Incident = () => {
     currentUser,
     currentPage,
     ticketsPerPage,
+    ticketTypeFilter, // UPDATED: Add to dependencies
     logout,
     navigate,
     authLoading,
@@ -197,13 +208,14 @@ const Incident = () => {
         currentUser: !!currentUser,
         authLoading,
       });
-      setError("Please log in to view incidents.");
+      setError("Please log in to view tickets.");
     }
   }, [
     token,
     subdomain,
     currentPage,
     ticketsPerPage,
+    ticketTypeFilter, // UPDATED: Add to dependencies
     fetchTickets,
     currentUser,
     authLoading,
@@ -419,7 +431,7 @@ const Incident = () => {
           <div className="text-center">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-2"></div>
             <p>
-              Loading incidents... First load may take up to 30s if server is
+              Loading tickets... First load may take up to 30s if server is
               idle.
             </p>
           </div>
@@ -427,9 +439,11 @@ const Incident = () => {
       )}
       <div className="container bg-gray-100">
         <div className="p-2 mb-6 text-center align-middle rounded-b-lg bg-blue-700 shadow-2xl">
-          <h2 className="text-4xl text-white">Incident List</h2>
+          <h2 className="text-4xl text-white">Ticket List</h2>
         </div>
       </div>
+
+      {/* UPDATED: Added ticket type filter dropdown */}
       <div className="w-full mb-6 flex flex-col sm:flex-row sm:space-x-4">
         <input
           type="text"
@@ -440,9 +454,29 @@ const Incident = () => {
             });
             setSearchTerm(e.target.value);
           }}
-          placeholder="Search incidents"
+          placeholder="Search tickets"
           className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-2 sm:mb-0"
         />
+
+        {/* NEW: Ticket Type Filter Dropdown */}
+        <select
+          value={ticketTypeFilter}
+          onChange={(e) => {
+            console.log("Incident: Ticket type filter changed", {
+              ticketTypeFilter: e.target.value,
+            });
+            setTicketTypeFilter(e.target.value);
+            setCurrentPage(1); // Reset to first page when filter changes
+          }}
+          className="w-full sm:w-40 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-2 sm:mb-0"
+        >
+          <option value="all">All Types</option>
+          <option value="Incident">Incident</option>
+          <option value="Request">Request</option>
+          <option value="Problem">Problem</option>
+          <option value="Change">Change</option>
+        </select>
+
         <select
           value={ticketsPerPage}
           onChange={(e) => {
@@ -458,6 +492,7 @@ const Incident = () => {
           <option value={100}>100 per page</option>
         </select>
       </div>
+
       <div className="w-full">
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 mb-4">
@@ -489,7 +524,11 @@ const Incident = () => {
           <>
             {filteredTickets.length === 0 ? (
               <p className="text-center text-gray-500">
-                No incidents found for this organization.
+                No{" "}
+                {ticketTypeFilter === "all"
+                  ? "tickets"
+                  : ticketTypeFilter + " tickets"}{" "}
+                found for this organization.
               </p>
             ) : (
               <ul className="w-full divide-y divide-gray-200">
